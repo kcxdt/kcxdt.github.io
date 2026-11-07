@@ -114,7 +114,7 @@ if __name__ == "__main__":
 
 
 def test_earnings_calendar_splits_upcoming_and_reported():
-    today = fetch.pd.Timestamp.now(tz="America/New_York").normalize()
+    today = fetch.pd.Timestamp(fetch.pd.Timestamp.now(tz="America/New_York").date())
     past = next(d for d in fetch.pd.date_range(end=today - fetch.pd.Timedelta(days=1), periods=7)[::-1] if d.weekday() < 5)
     nxt = next(d for d in fetch.pd.date_range(today, periods=7) if d.weekday() < 5)
     rows = {past.strftime("%Y-%m-%d"): [{"symbol": "RNG", "time": "time-after-hours", "eps": "$0.23"},
@@ -138,7 +138,7 @@ def test_earnings_calendar_splits_upcoming_and_reported():
 def test_earnings_calendar_cache_keeps_past_days(tmp_path=None):
     import tempfile
     cache = pathlib.Path(tempfile.mkdtemp()) / "done.json"
-    today = fetch.pd.Timestamp.now(tz="America/New_York").normalize()
+    today = fetch.pd.Timestamp(fetch.pd.Timestamp.now(tz="America/New_York").date())
     old = next(d for d in fetch.pd.date_range(end=today - fetch.pd.Timedelta(days=30), periods=7)[::-1] if d.weekday() < 5)
     cache.write_text(fetch.json.dumps({old.strftime("%Y-%m-%d"): ["A"], "2020-01-02": ["ZZZ"]}))
     asked = []
@@ -161,3 +161,18 @@ def test_earnings_calendar_cache_keeps_past_days(tmp_path=None):
     assert len(asked) < asked_first <= 60  # second run only asks the last few days and the weeks ahead
     saved = fetch.json.loads(cache.read_text())
     assert "2020-01-02" not in saved and saved[old.strftime("%Y-%m-%d")] == ["A"]
+
+
+def test_earnings_calendar_across_clock_change():
+    """The range spans 1 Nov 2026, when New York clocks go back; a tz-aware range crashed every run from 2 Nov."""
+    def fake_get(url, **kw):
+        return _Resp([])
+
+    real_get, real_sleep = fetch.requests.get, fetch.time.sleep
+    fetch.requests.get, fetch.time.sleep = fake_get, lambda s: None
+    try:
+        for today in ("2026-11-07", "2026-03-10"):  # autumn and spring changes
+            out, done = fetch.earnings_calendar(back=100, today=today)
+            assert out == {} and done == {}
+    finally:
+        fetch.requests.get, fetch.time.sleep = real_get, real_sleep
