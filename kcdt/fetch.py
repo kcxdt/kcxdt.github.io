@@ -398,14 +398,15 @@ def _earn_rows(day):
         time.sleep(0.5)
 
 
-def earnings_calendar(days=15, back=100, cache_file=None):
+def earnings_calendar(days=15, back=100, cache_file=None, today=None):
     """({ticker: [date, "bmo" | "amc" | None]} for the next `days` calendar days,
     {ticker: date} of reports in the last `back` days that came with an actual EPS, i.e. confirmed as published).
 
     Past days don't change once the numbers are in, so they are kept in `cache_file` ({date: [tickers]}) and only
     the last few days are asked for again; the first run fills a whole quarter."""
     out, done = {}, {}
-    start = pd.Timestamp.now(tz="America/New_York").normalize()
+    # Plain dates, no timezone: a tz-aware range breaks on the day the clocks change (AmbiguousTimeError on 1 Nov)
+    start = pd.Timestamp(today or pd.Timestamp.now(tz="America/New_York").date())
     path = pathlib.Path(cache_file) if cache_file else None
     seen = {}
     if path and path.exists():
