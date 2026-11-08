@@ -1,0 +1,23 @@
+name: probe
+on:
+  push:
+    branches: [claude/project-thread-bdvckn]
+    paths: [.github/workflows/probe.yml]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          python3 - <<'PY'
+          import json, urllib.request
+          d = json.load(urllib.request.urlopen("https://kcxdt.github.io/data.json"))
+          by = {s["s"]: s for s in d["stocks"]}
+          print("BUILT", d.get("built"), d.get("asof"))
+          for t in ["NVDA","WDAY","MRVL","ADSK","ZM","SNOW","DELL","MDT","BABA","ROST","PDD","HD","LOW","TJX","CRM","AVGO","ORCL","COST","CSCO","AMAT","WMT"]:
+              s = by.get(t) or {}
+              print("ROW", t, s.get("edate"), s.get("etime"), s.get("econf"), s.get("mcap") or s.get("ecap"))
+          ed = [s for s in d["stocks"] if s.get("edate")]
+          print("COUNT", len(ed), "conf", sum(1 for s in ed if s.get("econf")), "time", sum(1 for s in ed if s.get("etime")))
+          nd = [s for s in d["stocks"] if s.get("ndx")]
+          print("NDX unknown", [s["s"] for s in nd if not s.get("edate")])
+          PY
