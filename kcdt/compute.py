@@ -293,12 +293,22 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             row["edate"], row["etime"] = yd, yt
             if ysure:
                 row["econf"] = True  # Yahoo says the company set this date
-        if earn and t in earn:  # Nasdaq's calendar is more current than Yahoo and says before/after the market
+        if earn and t in earn:
             e = list(earn[t]) + [None] * 3
-            row["edate"], row["etime"] = e[0], e[1] or (yt if yd == e[0] else None)  # Nasdaq often omits the time
-            row["econf"] = True  # on Nasdaq's dated calendar; Yahoo-only dates are estimates
             if e[2] and row.get("mcap") is None:
                 row["ecap"] = e[2]  # market cap from the calendar, for sorting stocks without fundamentals
+            # Nasdaq's entries with a before/after-the-market time are the company's date. Without a time they can be
+            # a projection (BABA on 24 Nov while Alibaba had set 19 Nov), so a date Yahoo marks as set wins over them.
+            if e[1]:
+                row["edate"], row["etime"], row["econf"] = e[0], e[1], True
+            elif ysure and yd and yd != e[0] and yd >= asof:
+                pass  # keep Yahoo's set date
+            else:
+                row["edate"], row["etime"] = e[0], (yt if yd == e[0] else None)
+                if ysure and yd == e[0]:
+                    row["econf"] = True  # both agree
+                else:
+                    row.pop("econf", None)  # date only, nobody confirms it: shown as 預計
         if done and t in done and done[t] > (row.get("erep") or ""):  # on Nasdaq's calendar with an actual EPS
             row["erep"] = done[t]
         if row.get("edate") and row["edate"] < asof:

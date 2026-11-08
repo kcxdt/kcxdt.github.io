@@ -102,8 +102,8 @@ def main():
             for t, rec in fund.items()}
     prof = profiles(list(meta.index), ROOT / "cache" / "profiles.json", have={t for t, r in fund.items() if r.get("ind")})
     earn, done = earnings_calendar(cache_file=ROOT / "cache" / "earnings_done.json")
-    # Yahoo's next date for everything Nasdaq's calendar doesn't have yet (Nasdaq-100 first)
-    soon = set(earn) | {t for t, r in fund.items() if (r.get("edate") or 0) > time.time()}
+    # Yahoo's next date for everything without a set one yet (Nasdaq's dates without a time can be projections)
+    soon = {t for t, e in earn.items() if e[1]} | {t for t, r in fund.items() if (r.get("edate") or 0) > time.time()}
     order = sorted(meta.index, key=lambda t: (not meta.at[t, "ndx"], t not in fund, t))
     ydates = earnings_dates(order, ROOT / "cache" / "earnings_dates.json", known=soon)
     data = build(px, meta, fund, fear_greed(ROOT / "cache" / "fear_greed.json"), earn, done, prof, ydates)

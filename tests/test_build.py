@@ -97,7 +97,11 @@ def test_build():
     fund[want[3]].update(epsq=[1.5, 1.2, 1.0, 0.8], nrev=list(fund[want[3]]["revq"]), neps=[1.5, 1.2, 1.0, 0.8, 0.7])
     w4 = want[4]  # on Nasdaq's calendar without a time; Yahoo has the same day with a time
     fund[w4].update(edate=pd.Timestamp("2026-10-30 12:00", tz="UTC").timestamp(), eest=False)
+    w5, w6 = [t for t in want[5:] if t != "S0001"][:2]  # Nasdaq without a time: w5 Yahoo set another day (Yahoo wins), w6 nobody confirms
+    fund[w5].update(edate=pd.Timestamp("2026-11-03 21:00", tz="UTC").timestamp(), eest=False)
+    fund[w6].update(edate=pd.Timestamp("2026-11-03 21:00", tz="UTC").timestamp(), eest=True)
     d = build(px, meta, fund, fng, {"S0001": ["2026-10-29", "amc"], w4: ["2026-10-30", None, 12.5],
+                                    w5: ["2026-11-09", None, 9.0], w6: ["2026-11-09", None, 9.0],
                                     other: ["2026-10-30", "bmo", 321.0]}, {b: "2026-10-22"},
               {other: dict(ysec="Industrials", ind="Airlines")})
     assert d["asof"] == "2026-10-27"
@@ -115,6 +119,9 @@ def test_build():
     assert s1["edate"] == "2026-10-29" and s1["etime"] == "amc"
     s4 = next(s for s in d["stocks"] if s["s"] == w4)
     assert s4["edate"] == "2026-10-30" and s4["etime"] == "bmo" and s4["econf"] and "ecap" not in s4
+    s5, s6 = (next(s for s in d["stocks"] if s["s"] == t) for t in (w5, w6))
+    assert s5["edate"] == "2026-11-03" and s5["etime"] == "amc" and s5["econf"]
+    assert s6["edate"] == "2026-11-09" and s6["etime"] is None and "econf" not in s6
     assert len(d["tech"]["hist"]) == 60 and 0 <= d["tech"]["hist"][-1]["score"] <= 16
     assert set(d["panic"]) == {"on", "day"}
     assert set(d["rebound"]) == {"on", "day", "ma20", "close"}
