@@ -8,6 +8,7 @@ from kcdt import fetch
 class _Resp:
     def __init__(self, rows): self.rows = rows
     def json(self): return {"data": {"rows": self.rows}}
+    def raise_for_status(self): pass
 
 
 def test_economic_calendar_dates_rows_one_day_back():
@@ -202,3 +203,21 @@ def test_earnings_dates_only_asks_for_missing_next_dates():
         fetch.yf.Ticker, fetch.time.sleep = real_t, real_sleep
     assert asked == ["NEW", "OLDFUT", "PAST"]  # never checked first; Nasdaq's and fresh ones skipped
     assert got["NEW"]["est"] is True and got["PAST"]["ts"] > now
+
+
+def test_earn_rows_retries_a_failed_day():
+    calls = []
+
+    def flaky(url, **kw):
+        calls.append(url)
+        if len(calls) < 2:
+            raise fetch.requests.ConnectionError("reset")
+        return _Resp([{"symbol": "NVDA", "time": "time-after-hours"}])
+
+    real_get, real_sleep = fetch.requests.get, fetch.time.sleep
+    fetch.requests.get, fetch.time.sleep = flaky, lambda s: None
+    try:
+        rows = fetch._earn_rows("2026-11-17")
+    finally:
+        fetch.requests.get, fetch.time.sleep = real_get, real_sleep
+    assert len(calls) == 2 and rows[0]["symbol"] == "NVDA"

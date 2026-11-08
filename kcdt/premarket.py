@@ -67,12 +67,8 @@ def treasury(now):
 
 
 def _earn_day(day):
-    try:
-        r = requests.get(f"https://api.nasdaq.com/api/calendar/earnings?date={day}", headers=NASDAQ_UA, timeout=30)
-        return ((r.json().get("data") or {}).get("rows")) or []
-    except Exception as e:
-        print("earnings calendar failed:", day, e)
-        return []
+    from .fetch import _earn_rows  # same request, with retries
+    return _earn_rows(day)
 
 
 def _money(x):
@@ -104,17 +100,21 @@ def prev_bday(day):
     return d.strftime("%Y-%m-%d")
 
 
+def next_bday(day):
+    return (pd.Timestamp(day) + pd.offsets.BDay(1)).strftime("%Y-%m-%d")
+
+
 def earnings(today, stocks):
-    """Today's reporters in the universe, and last night's / this morning's that are already out with EPS."""
+    """Today's reporters in the universe, last night's / this morning's that are already out with EPS, and the
+    next trading day's (so the brief the day before already says who reports tomorrow)."""
     by = {s["s"]: s for s in stocks}
     big = lambda s: s.get("ndx") or (s.get("mcap") or 0) >= 10
     rows = lambda day: [(r["symbol"].strip().replace(".", "-"), EARN_TIME.get(r.get("time")), r) for r in _earn_day(day)
                         if (r.get("symbol") or "").strip().replace(".", "-") in by]
-    out_today = []
-    for t, tm, r in rows(today):
-        s = by[t]
-        out_today.append(dict(s=t, n=s.get("n"), tm=tm, est=_money(r.get("epsForecast")), ndx=bool(s.get("ndx")),
-                              mcap=s.get("mcap")))
+    def listed(day):
+        return [dict(s=t, n=by[t].get("n"), tm=tm, est=_money(r.get("epsForecast")), ndx=bool(by[t].get("ndx")),
+                     mcap=by[t].get("mcap")) for t, tm, r in rows(day)]
+    out_today, out_next = listed(today), listed(next_bday(today))
     y = prev_bday(today)
     done = []
     for day, tm_want in [(y, "amc"), (today, "bmo")]:
@@ -127,7 +127,7 @@ def earnings(today, stocks):
                 done.append(dict(s=t, n=s.get("n"), d=day, tm=tm, ndx=bool(s.get("ndx")), mcap=s.get("mcap"), **eps))
             time.sleep(0.3)
     key = lambda x: (not x["ndx"], -(x.get("mcap") or 0))
-    return sorted(out_today, key=key), sorted(done, key=key)
+    return sorted(out_today, key=key), sorted(done, key=key), sorted(out_next, key=key)
 
 
 def movers(bars, now):
@@ -212,17 +212,17 @@ def build_brief(data, now=None):
     econ = economic_calendar(labels_file=str(ROOT / "cache" / "econ_labels.json")) or data.get("econ") or []
     for e in econ:
         e["key"] = e.get("imp") == 3 or any(k.lower() in (e.get("e") or "").lower() for k in KEY)
-    earn_today, earn_done = earnings(today, stocks)
+    earn_today, earn_done, earn_next = earnings(today, stocks)
     want = {s["s"] for s in stocks if s.get("ndx") or pass_kc(s) or (s.get("mcap") or 0) >= 50}
     want |= {e["s"] for e in earn_today + earn_done} | {t for t, _n in ETF}
     mv = movers(_yf_bars(sorted(want), "5d", "5m", True), now)
     etf = [dict(k=t, n=n, link=QUOTE + t, **mv[t]) for t, n in ETF if t in mv]
     b = dict(d=today, t=now_utc(), asof=data.get("asof"), idx=idx, etf=etf, mkt=mkt, world=world, econ=_econ_today(econ, today),
-             earn_today=earn_today, earn_done=earn_done, movers=mv)
+             earn_today=earn_today, earn_done=earn_done, earn_next=earn_next, nd=next_bday(today), movers=mv)
     b["score"] = [round(h["score"] * 100 / 16) for h in (data.get("hist") or [])[-1:]] + \
         [round(h["score"] * 100 / 16) for h in ((data.get("tech") or {}).get("hist") or [])[-1:]]
     print(f"premarket {today}: {len(idx)} indices, {len(etf)} ETFs, {len(mkt)} market items, {len(world)} world, "
-          f"{len(b['econ'])} releases, {len(earn_today)} reporting today, {len(earn_done)} reported, {len(mv)} movers")
+          f"{len(b['econ'])} releases, {len(earn_today)} reporting today, {len(earn_next)} next day, {len(earn_done)} reported, {len(mv)} movers")
     return b, econ
 
 

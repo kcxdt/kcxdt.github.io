@@ -395,15 +395,23 @@ def _cap_bn(x):
         return None
 
 
-def _earn_rows(day):
-    try:
-        r = requests.get(f"https://api.nasdaq.com/api/calendar/earnings?date={day}", headers=NASDAQ_UA, timeout=30)
-        return ((r.json().get("data") or {}).get("rows")) or []
-    except Exception as e:
-        print("earnings calendar failed:", day, e)
-        return []
-    finally:
-        time.sleep(0.5)
+def _earn_rows(day, tries=3):
+    """One day of Nasdaq's earnings calendar. A failed request is tried again: a day lost here would drop every
+    company reporting that day from the calendar (and from 「明日出業績」)."""
+    for i in range(tries):
+        try:
+            r = requests.get(f"https://api.nasdaq.com/api/calendar/earnings?date={day}", headers=NASDAQ_UA, timeout=30)
+            r.raise_for_status()
+            data = r.json().get("data")
+            if data is None:
+                raise ValueError("no data")
+            return data.get("rows") or []
+        except Exception as e:
+            print(f"earnings calendar failed ({i + 1}/{tries}):", day, e)
+            time.sleep(3 * (i + 1))
+        finally:
+            time.sleep(0.5)
+    return []
 
 
 def earnings_calendar(days=63, back=100, cache_file=None, today=None):
