@@ -141,8 +141,10 @@ button.tog[aria-pressed="true"]{background:var(--sel);border-color:var(--selline
 button.tog:focus-visible,th button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 th button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 th button[data-active="true"]{color:var(--ink);font-weight:700}
-button.rssort:not([data-active="true"])::after{content:" ⇅";opacity:.55}
-button.rssort:hover{color:var(--ink)}
+button.csort{white-space:nowrap}
+button.csort::after{content:" ⇅";opacity:.4;font-size:.9em}
+button.csort[data-active="true"]::after{content:" " attr(data-arrow);opacity:1}
+button.csort:hover{color:var(--ink)}
 .note{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:12px}
 .cols2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
 @media (max-width:860px){.cols2{grid-template-columns:minmax(0,1fr)}}
@@ -547,8 +549,8 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <div class="panel wlsum" id="wl-sum" role="status"></div>
       <div class="wllists" id="wl-lists"></div>
       <div class="controls" id="wl-filter"></div>
-      <div class="panel tablewrap wl"><table class="cen">
-        <thead><tr><th class="frz">代號</th><th id="wl-lh">清單</th><th>狀態</th><th class="r">收市</th><th class="r">今日 %</th><th class="r"><button class="rssort" type="button" data-g="wl" title="撳一下由高排到低，再撳由低排到高，第三下回復原本排法">RS</button></th><th class="r">距 50 日線 %</th><th>趨勢</th><th>KC 條件</th><th>下次業績（美東）</th><th>今日變化</th><th>筆記</th><th>加入</th></tr></thead>
+      <div class="panel tablewrap wl"><table class="cen" data-sort="wl">
+        <thead><tr><th class="frz">代號</th><th id="wl-lh">清單</th><th>狀態</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">RS</th><th class="r">距 50 日線 %</th><th>趨勢</th><th>KC 條件</th><th>下次業績（美東）</th><th>今日變化</th><th>筆記</th><th>加入</th></tr></thead>
         <tbody id="wlbody"></tbody></table></div>
       <p class="note">喺選股器、機會頁或者個股頁撳 ☆ 就加入；有幾個清單嘅話會問你加入邊個（一隻股可以喺幾個清單）。撳「＋ 新增清單」開新清單，例如「長線」、「短炒」。筆記打完撳 Enter 或者撳出去就自動儲存。登入 Gmail 後會儲喺你個帳戶，換機都睇到；未登入就儲喺呢部機嘅瀏覽器。</p>
     </section>
@@ -849,24 +851,55 @@ document.querySelectorAll('.themesw button').forEach(b=>b.onclick=()=>{
   Store.set('theme',b.dataset.theme); drawTheme() });
 drawTheme();
 
-// RS column sort for the stock tables that aren't the screener (KC, round 14).
-// Click RS: high → low; again: low → high; third click: back to the table's own order. Tables sharing a group sort together.
-const RSS={};
-const rsHead = g => `<button class="rssort" type="button" data-g="${g}" title="撳一下由高排到低，再撳由低排到高，第三下回復原本排法">RS</button>`;
-function rsApply(g){
-  const dir=RSS[g]||0;
-  document.querySelectorAll(`button.rssort[data-g="${g}"]`).forEach(b=>{
-    b.dataset.active=String(!!dir); b.textContent='RS'+(dir<0?' ▾':dir>0?' ▴':'');
-    const th=b.closest('th'); th.setAttribute('aria-sort',dir<0?'descending':dir>0?'ascending':'none');
-    const tb=b.closest('table').tBodies[0]; if(!tb) return;
+// Column sort for the stock tables that aren't the screener (KC, round 14–15): every header is a button.
+// 1st click: numbers high → low, text A → Z; 2nd click: the other way; 3rd click: back to the table's own order.
+// Tables marked data-sort="g" share group g (e.g. every day of the earnings calendar) and sort together.
+// A cell's value: data-v if set, trend bars = number lit, a select's chosen text, an input's text, else its text (leading number if any).
+const SORT={};
+function cellVal(td){
+  if(!td) return null;
+  if(td.dataset.v!=null){ const n=parseFloat(td.dataset.v); return isNaN(n)?td.dataset.v:n }
+  const tt=td.querySelector('.tt'); if(tt) return tt.querySelectorAll('i.ok').length;
+  const sel=td.querySelector('select'); if(sel) return sel.selectedOptions[0]?sel.selectedOptions[0].textContent:null;
+  const inp=td.querySelector('input:not([type=checkbox])'); if(inp) return inp.value.trim()||null;
+  const t=td.textContent.replace(/[☆★]/g,'').replace(/\s+/g,' ').trim();
+  if(!t||/^[—–-]$/.test(t)) return null;
+  const m=t.replace(/,/g,'').replace(/^−/,'-').match(/^[+-]?\d[\d.]*(?![\d-])/);
+  return m?parseFloat(m[0]):t }
+function sortApply(g){
+  const st=SORT[g]||{c:-1,dir:0};
+  document.querySelectorAll(`table[data-sort="${g}"]`).forEach(tbl=>{
+    const ths=[...tbl.tHead.rows[0].cells];
+    ths.forEach((th,c)=>{
+      let b=th.querySelector('button.csort');
+      if(!b){ b=document.createElement('button'); b.type='button'; b.className='csort'; b.dataset.g=g; b.dataset.c=c;
+        b.title='撳一下排序（數字由高到低、文字由 A 到 Z），再撳反轉，第三下回復原本排法';
+        b.innerHTML=th.innerHTML; th.textContent=''; th.appendChild(b) }
+      const on=st.c===c&&st.dir!==0; b.dataset.active=String(on); b.dataset.arrow=on?(st.dir<0?'▾':'▴'):'';
+      th.setAttribute('aria-sort',on?(st.dir<0?'descending':'ascending'):'none') });
+    const tb=tbl.tBodies[0]; if(!tb) return;
     const rows=[...tb.rows]; rows.forEach((r,k)=>{ if(r.dataset.o==null) r.dataset.o=k });
-    const v=r=>{ const e=r.querySelector('.rs'), n=e?parseFloat(e.textContent):NaN; return isNaN(n)?null:n };
-    const o=(a,c)=>a.dataset.o-c.dataset.o;
-    rows.sort((a,c)=>{ if(!dir) return o(a,c); const A=v(a),B=v(c);
-      if(A==null||B==null) return A==null&&B==null?o(a,c):A==null?1:-1; return (A-B)*dir||o(a,c) });
+    const o=(a,b)=>a.dataset.o-b.dataset.o;
+    if(st.dir===0||st.c<0){ rows.sort(o); rows.forEach(r=>tb.appendChild(r)); return }
+    // hidden header cells (e.g. 清單 with one list) have no cell in the rows
+    const shown=ths.filter(th=>!th.hidden), ci=shown.indexOf(ths[st.c]);
+    const v=r=>r.cells.length===shown.length?cellVal(r.cells[ci]):undefined;  // undefined = a note row spanning the table
+    rows.sort((a,b)=>{ const A=v(a),B=v(b);
+      if(A===undefined||B===undefined) return A===undefined&&B===undefined?o(a,b):A===undefined?1:-1;
+      if(A==null||B==null) return A==null&&B==null?o(a,b):A==null?1:-1;   // blanks always last
+      const nA=typeof A==='number', nB=typeof B==='number';
+      if(nA!==nB) return nA?-1:1;                                          // numbers before text (e.g. 虧損收窄)
+      return (nA?A-B:String(A).localeCompare(String(B),'zh-HK'))*st.dir||o(a,b) });
     rows.forEach(r=>tb.appendChild(r)) }) }
-document.addEventListener('click',e=>{ const b=e.target.closest('button.rssort'); if(!b) return;
-  const g=b.dataset.g; RSS[g]=RSS[g]===-1?1:RSS[g]===1?0:-1; rsApply(g) });
+document.addEventListener('click',e=>{ const b=e.target.closest('button.csort'); if(!b) return;
+  const g=b.dataset.g, c=+b.dataset.c, st=SORT[g];
+  if(!st||st.c!==c||st.dir===0){
+    const tbl=b.closest('table'), th=b.closest('th'), shown=[...tbl.tHead.rows[0].cells].filter(x=>!x.hidden), ci=shown.indexOf(th);
+    const first=[...tbl.tBodies[0].rows].map(r=>r.cells.length===shown.length?cellVal(r.cells[ci]):null).find(x=>x!=null);
+    const d=th.dataset.first?+th.dataset.first:typeof first==='number'?-1:1;  // data-first="1": numbers that read best low → high
+    SORT[g]={c,dir:d,first:d} }
+  else SORT[g]={...st,dir:st.dir===st.first?-st.dir:0};
+  sortApply(g) });
 
 // ---------- update times, stale data warning ----------
 const nyNow = () => new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
@@ -1723,7 +1756,7 @@ function drawWatch(){
   $('wlbody').querySelectorAll('select[data-st]').forEach(sel=>sel.onchange=async()=>{const r=WL.get(sel.dataset.st); if(await wlPut({...r,st:sel.value})) {wlMsg('已更新狀態'); drawWatch()}});
   $('wlbody').querySelectorAll('input[data-note]').forEach(inp=>{ inp.onchange=async()=>{const r=WL.get(inp.dataset.note); if(await wlPut({...r,note:inp.value.trim()})) wlMsg('筆記已儲存')};
     inp.onkeydown=e=>{if(e.key==='Enter') inp.blur()} });
-  rsApply('wl');
+  sortApply('wl');
 }
 // Summary at the top: only the watched stocks whose state changed (weaker, stronger, earnings soon)
 function wlSummary(list){
@@ -1945,9 +1978,9 @@ function earnings(){
   const days={}; rows.forEach(s=>(days[s.edate]=days[s.edate]||[]).push(s));
   $('earnlist').innerHTML = Object.keys(days).sort().map(d=>{
     const dd=new Date(d+'T12:00:00'), list=days[d].sort((a,b)=>((ETORD[a.etime]??2)-(ETORD[b.etime]??2))||cap(b)-cap(a));
-    return `<div class="panel eday"><h3><span class="num">${d.slice(5)}</span><span class="muted small">星期${WD[dd.getDay()]} · ${list.length} 隻</span></h3><div class="tablewrap"><table class="cen"><thead><tr><th class="frz">代號</th><th>時間</th><th>公司</th><th class="r">收市</th><th class="r">${rsHead('earn')}</th><th>趨勢</th><th class="r">營收增長 %</th><th class="r" title="GAAP，最近一季對去年同季">EPS 增長 %</th><th class="r">市值 (億)</th></tr></thead><tbody>${list.map(s=>`<tr><td class="frz">${tk(s)}</td><td class="small" style="white-space:nowrap">${ETIME[s.etime]||'<span class="muted">未公佈</span>'}</td><td class="small cname" title="${esc(s.n||'')}">${esc(shortN(s.n))}</td><td class="r num">${f(s.c)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr}</span></td><td>${ttbar(s.tt)}</td>${pcell(s.sq)}${epsCell(s)}<td class="r num">${cap(s)?f(cap(s)*10,0):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
+    return `<div class="panel eday"><h3><span class="num">${d.slice(5)}</span><span class="muted small">星期${WD[dd.getDay()]} · ${list.length} 隻</span></h3><div class="tablewrap"><table class="cen" data-sort="earn"><thead><tr><th class="frz">代號</th><th data-first="1">時間</th><th>公司</th><th class="r">收市</th><th class="r">RS</th><th>趨勢</th><th class="r">營收增長 %</th><th class="r" title="GAAP，最近一季對去年同季">EPS 增長 %</th><th class="r">市值 (億)</th></tr></thead><tbody>${list.map(s=>`<tr><td class="frz">${tk(s)}</td><td class="small" style="white-space:nowrap" data-v="${ETORD[s.etime]??2}">${ETIME[s.etime]||'<span class="muted">未公佈</span>'}</td><td class="small cname" title="${esc(s.n||'')}">${esc(shortN(s.n))}</td><td class="r num">${f(s.c)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr}</span></td><td>${ttbar(s.tt)}</td>${pcell(s.sq)}${epsCell(s)}<td class="r num">${cap(s)?f(cap(s)*10,0):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
   }).join('') || '<div class="panel muted">未來兩星期冇呢組股票出業績。</div>';
-  rsApply('earn');
+  sortApply('earn');
 }
 DRAW.earnings = () => {
   [['e-ndx','ndx'],['e-scr','scr'],['e-all','all']].forEach(([id,k])=>$(id).onclick=()=>{setPressed(['e-ndx','e-scr','e-all'],id);earnSet=k;earnings()});
@@ -2200,12 +2233,12 @@ function drawPeers(s){ const box=$('s-peers');
   const L=PEER_ALL?P:P.slice(0,10); if(!PEER_ALL&&!L.includes(s)) L.push(s);
   box.innerHTML=`<div class="sechead"><h3 id="h-peers">同業 <span class="muted small">${esc(s.ind)} · ${P.length} 隻 · 按市值排</span></h3>
       <button class="tog" id="peer-scr" type="button">喺選股器篩選呢個行業</button></div>
-    <div class="tablewrap"><table class="cen"><thead><tr><th class="frz">代號</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">${rsHead('peer')}</th><th class="r">3 個月 %</th><th class="r" title="GAAP，最近一季按年">EPS 增長 %</th><th class="r">市值 (億)</th><th>趨勢</th></tr></thead>
+    <div class="tablewrap"><table class="cen" data-sort="peer"><thead><tr><th class="frz">代號</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">RS</th><th class="r">3 個月 %</th><th class="r" title="GAAP，最近一季按年">EPS 增長 %</th><th class="r">市值 (億)</th><th>趨勢</th></tr></thead>
     <tbody>${L.map(x=>`<tr${x===s?' class="me"':''}><td class="frz"><span style="white-space:nowrap">${star(x.s)}${tk(x)}</span><div class="muted small" title="${esc(x.n||'')}">${esc(shortN(x.n))}</div></td>
       <td class="r num">${f(x.c)}</td>${pcell(x.chg,2)}<td class="r"><span class="rs" style="color:${rsColor(x.rsr)}">${x.rsr}</span></td>${pcell(x.r63)}${epsCell(x)}<td class="r num">${x.mcap!=null?f(x.mcap*10,0):'—'}</td><td>${ttbar(x.tt)}</td></tr>`).join('')}</tbody></table></div>
     ${P.length>10?`<button class="tog" id="peer-more" type="button">${PEER_ALL?'只顯示頭 10 隻':`顯示全部 ${P.length} 隻`}</button>`:''}`;
   if($('peer-more')) $('peer-more').onclick=()=>{PEER_ALL=!PEER_ALL; drawPeers(s)};
-  rsApply('peer');
+  sortApply('peer');
   $('peer-scr').onclick=()=>{CFS.ind='='+s.ind; location.hash='#screener'; setTimeout(()=>{drawCF(); renderStocks(); wlMsg(`已加入條件：細分行業 ${s.ind}`)},0)};
   wlStars();
 }
