@@ -89,13 +89,16 @@ def test_build():
     fng = dict(score=42.0, rating="fear", prev=40.1, w1=35.0, m1=55.2, y1=60.0, ts="2026-10-27",
                hist=[["2026-%02d-%02d" % (1 + i // 28, 1 + i % 28), 30 + (i * 7) % 50] for i in range(250)], live=True)
     fund = fake_fund(want)
-    past = pd.Timestamp("2026-10-21").timestamp()
+    past = pd.Timestamp("2026-10-21 16:00", tz="UTC").timestamp()  # noon in New York
     a, b = want[1], want[2]  # both were expected on 10-21; only b shows up on Nasdaq's calendar with an actual EPS
     fund[a].update(edate=past, erep=past - 90 * 86400)
     fund[b].update(edate=past, erep=past - 90 * 86400)
     other = next(t for t in universe if t not in fund)  # no fundamentals lookup: sector/industry from profiles
     fund[want[3]].update(epsq=[1.5, 1.2, 1.0, 0.8], nrev=list(fund[want[3]]["revq"]), neps=[1.5, 1.2, 1.0, 0.8, 0.7])
-    d = build(px, meta, fund, fng, {"S0001": ["2026-10-29", "amc"]}, {b: "2026-10-22"},
+    w4 = want[4]  # on Nasdaq's calendar without a time; Yahoo has the same day with a time
+    fund[w4].update(edate=pd.Timestamp("2026-10-30 12:00", tz="UTC").timestamp(), eest=False)
+    d = build(px, meta, fund, fng, {"S0001": ["2026-10-29", "amc"], w4: ["2026-10-30", None, 12.5],
+                                    other: ["2026-10-30", "bmo", 321.0]}, {b: "2026-10-22"},
               {other: dict(ysec="Industrials", ind="Airlines")})
     assert d["asof"] == "2026-10-27"
     assert len(d["hist"]) == 60 and len(d["stocks"]) == 1105
@@ -110,6 +113,8 @@ def test_build():
     assert d["fng"]["score"] == 42.0
     s1 = next(s for s in d["stocks"] if s["s"] == "S0001")
     assert s1["edate"] == "2026-10-29" and s1["etime"] == "amc"
+    s4 = next(s for s in d["stocks"] if s["s"] == w4)
+    assert s4["edate"] == "2026-10-30" and s4["etime"] == "bmo" and s4["econf"] and "ecap" not in s4
     assert len(d["tech"]["hist"]) == 60 and 0 <= d["tech"]["hist"][-1]["score"] <= 16
     assert set(d["panic"]) == {"on", "day"}
     assert set(d["rebound"]) == {"on", "day", "ma20", "close"}
@@ -119,6 +124,7 @@ def test_build():
     assert f0["ew"] is None and f0["g3eb"] == "a" and f0["ni"] is not None and f0["ind"]
     so = next(s for s in d["stocks"] if s["s"] == other)
     assert so["sec"] == "Industrials" and so["ind"] == "Airlines" and "fts" not in so
+    assert so["edate"] == "2026-10-30" and so["ecap"] == 321.0  # market cap from the calendar for sorting
     f3 = next(s for s in d["stocks"] if s["s"] == want[3])  # GAAP EPS from Nasdaq, dated by Yahoo's revenue
     assert f3["eqv"] == [1.5, 0.7] and f3["eqd"] == ["2026-09", "2025-09"]
     sa, sb = (next(s for s in d["stocks"] if s["s"] == t) for t in (a, b))
@@ -205,3 +211,21 @@ if __name__ == "__main__":
     d["pm_t"] = brief["t"]
     (m.OUT / "index.html").write_text(m.render(d), encoding="utf-8")
     print("ok", d["asof"], d["hist"][-1]["score"], len(d["stocks"]), d["breadth"])
+
+
+def test_yahoo_report_time_in_new_york():
+    from kcdt.compute import ny_day, ny_session, yahoo_next
+    nov = pd.Timestamp("2026-11-17 21:00", tz="UTC").timestamp()     # 16:00 New York (winter, UTC-5)
+    jul = pd.Timestamp("2026-07-28 20:05", tz="UTC").timestamp()     # 16:05 New York (summer, UTC-4)
+    late = pd.Timestamp("2026-11-18 01:00", tz="UTC").timestamp()    # 20:00 New York on the 17th
+    pre = pd.Timestamp("2026-11-18 13:30", tz="UTC").timestamp()     # 08:30 New York
+    mid = pd.Timestamp("2026-11-19 05:00", tz="UTC").timestamp()     # midnight New York: date only
+    assert ny_session(nov) == "amc" and ny_session(jul) == "amc" and ny_session(pre) == "bmo"
+    assert ny_day(late) == "2026-11-17" and ny_session(late) == "amc"
+    assert ny_session(mid) is None and ny_day(mid) == "2026-11-19"
+    # a fundamentals copy from before the next date was out loses to a newer earnings-date check
+    f = {"edate": pd.Timestamp("2026-08-27 20:05", tz="UTC").timestamp(), "_ts": pre - 30 * 86400}
+    assert yahoo_next(f, {"ts": nov, "est": False, "_ts": pre - 86400}) == ("2026-11-17", "amc", True)
+    assert yahoo_next(f, {"ts": nov, "est": True, "_ts": pre - 86400}) == ("2026-11-17", None, False)  # a guess
+    assert yahoo_next({"edate": nov, "eest": False, "_ts": 1}, None) == ("2026-11-17", "amc", True)
+    assert yahoo_next({"edate": nov, "_ts": 1}, None) == ("2026-11-17", None, False)  # older copy: no flag

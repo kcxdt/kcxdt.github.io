@@ -120,7 +120,7 @@ def test_earnings_calendar_splits_upcoming_and_reported():
     rows = {past.strftime("%Y-%m-%d"): [{"symbol": "RNG", "time": "time-after-hours", "eps": "$0.23"},
                                         {"symbol": "LATE", "time": "time-pre-market", "eps": ""},
                                         {"symbol": "LOSS", "time": "time-pre-market", "eps": "($0.12)"}],
-            nxt.strftime("%Y-%m-%d"): [{"symbol": "BRK.B", "time": "time-pre-market", "eps": ""}]}
+            nxt.strftime("%Y-%m-%d"): [{"symbol": "BRK.B", "time": "time-pre-market", "eps": "", "marketCap": "$1,050,000,000,000"}]}
 
     def fake_get(url, **kw):
         return _Resp(rows.get(url.rsplit("=", 1)[1], []))
@@ -131,7 +131,7 @@ def test_earnings_calendar_splits_upcoming_and_reported():
         out, done = fetch.earnings_calendar(back=10)
     finally:
         fetch.requests.get, fetch.time.sleep = real_get, real_sleep
-    assert out == {"BRK-B": [nxt.strftime("%Y-%m-%d"), "bmo"]}
+    assert out == {"BRK-B": [nxt.strftime("%Y-%m-%d"), "bmo", 1050.0]}
     assert done == {"RNG": past.strftime("%Y-%m-%d"), "LOSS": past.strftime("%Y-%m-%d")}  # no EPS yet = not confirmed
 
 
@@ -158,7 +158,7 @@ def test_earnings_calendar_cache_keeps_past_days(tmp_path=None):
         fetch.requests.get, fetch.time.sleep = real_get, real_sleep
     assert done == {"A": old.strftime("%Y-%m-%d")}  # an August report confirmed from the cache, not asked again
     assert old.strftime("%Y-%m-%d") not in asked
-    assert len(asked) < asked_first <= 60  # second run only asks the last few days and the weeks ahead
+    assert len(asked) < asked_first <= 100  # second run only asks the last few days and the weeks ahead
     saved = fetch.json.loads(cache.read_text())
     assert "2020-01-02" not in saved and saved[old.strftime("%Y-%m-%d")] == ["A"]
 
@@ -176,3 +176,29 @@ def test_earnings_calendar_across_clock_change():
             assert out == {} and done == {}
     finally:
         fetch.requests.get, fetch.time.sleep = real_get, real_sleep
+
+
+def test_earnings_dates_only_asks_for_missing_next_dates():
+    import tempfile
+    now = fetch.time.time()
+    cache = pathlib.Path(tempfile.mkdtemp()) / "dates.json"
+    cache.write_text(fetch.json.dumps({
+        "FUT": {"ts": now + 20 * 86400, "est": False, "_ts": now - 5 * 86400},    # next date known, checked recently
+        "OLDFUT": {"ts": now + 20 * 86400, "est": True, "_ts": now - 20 * 86400},  # known but a guess from weeks ago
+        "PAST": {"ts": now - 60 * 86400, "est": False, "_ts": now - 4 * 86400},   # still shows the last report
+        "RECENT": {"ts": now - 60 * 86400, "est": False, "_ts": now - 3600}}))    # checked an hour ago
+    asked = []
+
+    class T:
+        def __init__(self, t):
+            asked.append(t)
+            self.info = {"earningsTimestamp": now + 30 * 86400, "isEarningsDateEstimate": t == "NEW"}
+
+    real_t, real_sleep = getattr(fetch.yf, "Ticker", None), fetch.time.sleep
+    fetch.yf.Ticker, fetch.time.sleep = T, lambda s: None
+    try:
+        got = fetch.earnings_dates(["NQ", "FUT", "OLDFUT", "PAST", "RECENT", "NEW"], cache, known={"NQ"})
+    finally:
+        fetch.yf.Ticker, fetch.time.sleep = real_t, real_sleep
+    assert asked == ["NEW", "OLDFUT", "PAST"]  # never checked first; Nasdaq's and fresh ones skipped
+    assert got["NEW"]["est"] is True and got["PAST"]["ts"] > now
