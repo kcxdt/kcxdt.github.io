@@ -104,8 +104,10 @@ def main():
     earn, done = earnings_calendar(cache_file=ROOT / "cache" / "earnings_done.json")
     # Yahoo's next date for everything without a set one yet (Nasdaq's dates without a time can be projections)
     soon = {t for t, e in earn.items() if e[1]} | {t for t, r in fund.items() if (r.get("edate") or 0) > time.time()}
-    order = sorted(meta.index, key=lambda t: (not meta.at[t, "ndx"], t not in fund, t))
-    ydates = earnings_dates(order, ROOT / "cache" / "earnings_dates.json", known=soon)
+    # Nasdaq-100 first, then Nasdaq dates without a time (they can be projections: BABA, DELL, ORCL), then by size
+    cap = lambda t: (fund.get(t, {}).get("mcap") or 0) / 1e9 or (earn.get(t) or [None] * 3)[2] or 0
+    order = sorted(meta.index, key=lambda t: (not meta.at[t, "ndx"], not (t in earn and not earn[t][1]), -cap(t), t))
+    ydates = earnings_dates(order, ROOT / "cache" / "earnings_dates.json", known=soon, max_calls=400)
     data = build(px, meta, fund, fear_greed(ROOT / "cache" / "fear_greed.json"), earn, done, prof, ydates)
     data["econ"], data["econ_t"] = economic_calendar(labels_file="cache/econ_labels.json"), now_utc()
     data["news"], data["news_t"] = headlines(), now_utc()
