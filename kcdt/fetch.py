@@ -186,7 +186,7 @@ INFO_KEYS = {
     "marketCap": "mcap", "beta": "beta", "heldPercentInstitutions": "inst",
     "revenueGrowth": "sq", "earningsQuarterlyGrowth": "eq", "trailingPE": "pe",
     "forwardPE": "fpe", "sector": "ysec", "industry": "ind",
-    "firstTradeDateMilliseconds": "ipo", "earningsTimestamp": "edate",
+    "firstTradeDateMilliseconds": "ipo", "earningsTimestamp": "edate", "isEarningsDateEstimate": "eest",
 }
 
 
@@ -387,19 +387,36 @@ def nasdaq_quarters(tickers, cache_file, max_age_days=7, max_calls=400, workers=
 EARN_TIME = {"time-pre-market": "bmo", "time-after-hours": "amc"}
 
 
-def _earn_rows(day):
+def _cap_bn(x):
+    """'$4,376,559,880,000' -> 4376.56 (US$ bn); blank -> None."""
     try:
-        r = requests.get(f"https://api.nasdaq.com/api/calendar/earnings?date={day}", headers=NASDAQ_UA, timeout=30)
-        return ((r.json().get("data") or {}).get("rows")) or []
-    except Exception as e:
-        print("earnings calendar failed:", day, e)
-        return []
-    finally:
-        time.sleep(0.5)
+        return round(float(str(x).replace("$", "").replace(",", "")) / 1e9, 2)
+    except ValueError:
+        return None
 
 
-def earnings_calendar(days=15, back=100, cache_file=None, today=None):
-    """({ticker: [date, "bmo" | "amc" | None]} for the next `days` calendar days,
+def _earn_rows(day, tries=3):
+    """One day of Nasdaq's earnings calendar. A failed request is tried again: a day lost here would drop every
+    company reporting that day from the calendar (and from 「明日出業績」)."""
+    for i in range(tries):
+        try:
+            r = requests.get(f"https://api.nasdaq.com/api/calendar/earnings?date={day}", headers=NASDAQ_UA, timeout=30)
+            r.raise_for_status()
+            data = r.json().get("data")
+            if data is None:
+                raise ValueError("no data")
+            return data.get("rows") or []
+        except Exception as e:
+            print(f"earnings calendar failed ({i + 1}/{tries}):", day, e)
+            time.sleep(3 * (i + 1))
+        finally:
+            time.sleep(0.5)
+    return []
+
+
+def earnings_calendar(days=63, back=100, cache_file=None, today=None):
+    """({ticker: [date, "bmo" | "amc" | None, market cap in US$ bn | None]} for the next `days` calendar days
+    (about a quarter ahead, so the next date of most companies is a scheduled one rather than Yahoo's guess),
     {ticker: date} of reports in the last `back` days that came with an actual EPS, i.e. confirmed as published).
 
     Past days don't change once the numbers are in, so they are kept in `cache_file` ({date: [tickers]}) and only
@@ -429,7 +446,7 @@ def earnings_calendar(days=15, back=100, cache_file=None, today=None):
             if not sym:
                 continue
             if d >= start and sym not in out:
-                out[sym] = [day, EARN_TIME.get(row.get("time"))]
+                out[sym] = [day, EARN_TIME.get(row.get("time")), _cap_bn(row.get("marketCap"))]
             elif d < start and re.search(r"\d", str(row.get("eps") or "")):  # "$1.23", "($0.12)"; blank until published
                 done[sym] = max(done.get(sym, day), day)
                 got.append(sym)
@@ -441,6 +458,47 @@ def earnings_calendar(days=15, back=100, cache_file=None, today=None):
         path.write_text(json.dumps({k: v for k, v in sorted(seen.items()) if k >= first}))
     print(f"earnings calendar: {len(out)} companies in the next {days} days, {len(done)} reported in the last {back}")
     return out, done
+
+
+def earnings_dates(tickers, cache_file, known=(), max_calls=300, recheck_days=3, pause=0.4):
+    """Yahoo's next report time for stocks with no upcoming date yet: {ticker: {"ts", "est", "_ts"}}.
+
+    Yahoo keeps the last report's time for a while after it, so a fundamentals copy fetched then never shows the
+    next date. `known`: tickers that already have an upcoming date (Nasdaq's calendar, or Yahoo in the future).
+    One cheap call each; Nasdaq-100 order first (as given), then whatever was checked longest ago."""
+    path = pathlib.Path(cache_file)
+    cache = json.loads(path.read_text()) if path.exists() else {}
+    now = time.time()
+    known = set(known)
+    # a future date counts as known for two weeks; after that it is checked again in case the company moved it
+    has_next = lambda t: (cache.get(t, {}).get("ts") or 0) > now and now - cache[t].get("_ts", 0) < 14 * 86400
+    todo = [t for t in tickers if t not in known and not has_next(t)
+            and now - cache.get(t, {}).get("_ts", 0) > recheck_days * 86400]
+    order = {t: i for i, t in enumerate(tickers)}
+    todo.sort(key=lambda t: (cache.get(t, {}).get("_ts", 0) > 0, order[t]))
+    done = fails = 0
+    for t in todo[:max_calls]:
+        try:
+            info = yf.Ticker(t).info or {}
+            cache[t] = {"ts": info.get("earningsTimestamp") or info.get("earningsTimestampStart"),
+                        "est": info.get("isEarningsDateEstimate"), "_ts": now}
+            done += 1
+        except Exception as e:
+            fails += 1
+            print("earnings date failed:", t, e)
+            if fails > 25:
+                print("too many failures, stopping the earnings date refresh for this run")
+                break
+            time.sleep(pause * 10)
+        time.sleep(pause)
+    # drop entries nobody asked about for a month (delisted, left the universe)
+    keep = set(tickers)
+    cache = {t: r for t, r in cache.items() if t in keep or now - r.get("_ts", 0) < 30 * 86400}
+    print(f"earnings dates: {done} checked, {max(0, len(todo) - done)} still to check, "
+          f"{sum(1 for r in cache.values() if (r.get('ts') or 0) > now)} with a next date")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(cache))
+    return cache
 
 
 # ---- US economic calendar and market headlines (Nasdaq) ----

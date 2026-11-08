@@ -172,7 +172,7 @@ def fundamentals_row(f):
     if f.get("ipo"):
         ipo_years = (pd.Timestamp.now().timestamp() - f["ipo"] / 1000) / (365.25 * 86400)
     day = lambda ts: pd.Timestamp(ts, unit="s").strftime("%Y-%m-%d") if ts else None
-    edate = day(f.get("edate"))
+    edate = ny_day(f.get("edate"))
     return dict(
         mcap=_f((f.get("mcap") or 0) / 1e9, 2) if f.get("mcap") else None,  # US$ billions
         beta=_f(f.get("beta")), inst=_f((f["inst"] * 100) if f.get("inst") is not None else None, 1),
@@ -185,11 +185,40 @@ def fundamentals_row(f):
         g3r=_f(g3r, 1), g3e=_f(g3e, 1), g3eb=g3eb,
         yr=rising(reva) and rising(f.get("epsa") or []) if f.get("epsa") else None,
         e0=_f(pct(efc[0]), 1), e1=_f(pct(efc[1]), 1), r0=_f(pct(rfc[0]), 1), r1=_f(pct(rfc[1]), 1),
-        ipo=_f(ipo_years, 1), edate=edate, ind=f.get("ind"), qend=f.get("qend"), erep=day(f.get("erep")),
+        ipo=_f(ipo_years, 1), edate=edate, ind=f.get("ind"), qend=f.get("qend"), erep=ny_day(f.get("erep")),
     )
 
 
-def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None):
+NY = "America/New_York"
+
+
+def ny_day(ts):
+    """Unix time -> New York calendar date (a report at 20:00 New York time is still that day, not the next UTC one)."""
+    return pd.Timestamp(ts, unit="s", tz="UTC").tz_convert(NY).strftime("%Y-%m-%d") if ts else None
+
+
+def ny_session(ts):
+    """Unix time of a report -> "bmo" (before 09:30 New York time) / "amc" (16:00 or later) / None (during the
+    session, or exactly midnight, which Yahoo uses when it has a date but no time)."""
+    if not ts:
+        return None
+    t = pd.Timestamp(ts, unit="s", tz="UTC").tz_convert(NY)
+    m = t.hour * 60 + t.minute
+    return None if m == 0 else "bmo" if m < 570 else "amc" if m >= 960 else None
+
+
+def yahoo_next(f, y):
+    """Yahoo's report time for one stock from whichever copy is newer: the fundamentals record `f` or the
+    earnings-date check `y`. Returns (date, "bmo"/"amc"/None, scheduled); the time only when Yahoo says the date
+    is the company's own (not a guess)."""
+    f, y = f or {}, y or {}
+    fresh = y.get("ts") and (not f.get("edate") or f["edate"] <= y.get("_ts", 0) or y.get("_ts", 0) >= f.get("_ts", 0))
+    src = y if fresh else {"ts": f.get("edate"), "est": f.get("eest")}
+    ts = src.get("ts")
+    return ny_day(ts), (ny_session(ts) if src.get("est") is False else None), src.get("est") is False
+
+
+def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates=None):
     """px: dict of OHLCV DataFrames. meta: DataFrame indexed by ticker with n, gics, ndx, sp500...
     fund: {ticker: cached Yahoo record}."""
     fund = fund or {}
@@ -259,9 +288,27 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None):
             row["ind"] = p["ind"]
         if fund.get(t, {}).get("_ts"):
             row["fts"] = pd.Timestamp(fund[t]["_ts"], unit="s").strftime("%Y-%m-%d")
-        if earn and t in earn:  # Nasdaq's calendar is more current than Yahoo and says before/after the market
-            row["edate"], row["etime"] = earn[t]
-            row["econf"] = True  # on Nasdaq's dated calendar; Yahoo-only dates are estimates
+        yd, yt, ysure = yahoo_next(fund.get(t), (ydates or {}).get(t))
+        if yd:
+            row["edate"], row["etime"] = yd, yt
+            if ysure:
+                row["econf"] = True  # Yahoo says the company set this date
+        if earn and t in earn:
+            e = list(earn[t]) + [None] * 3
+            if e[2] and row.get("mcap") is None:
+                row["ecap"] = e[2]  # market cap from the calendar, for sorting stocks without fundamentals
+            # Nasdaq's entries with a before/after-the-market time are the company's date. Without a time they can be
+            # a projection (BABA on 24 Nov while Alibaba had set 19 Nov), so a date Yahoo marks as set wins over them.
+            if e[1]:
+                row["edate"], row["etime"], row["econf"] = e[0], e[1], True
+            elif ysure and yd and yd != e[0] and yd >= asof:
+                pass  # keep Yahoo's set date
+            else:
+                row["edate"], row["etime"] = e[0], (yt if yd == e[0] else None)
+                if ysure and yd == e[0]:
+                    row["econf"] = True  # both agree
+                else:
+                    row.pop("econf", None)  # date only, nobody confirms it: shown as 預計
         if done and t in done and done[t] > (row.get("erep") or ""):  # on Nasdaq's calendar with an actual EPS
             row["erep"] = done[t]
         if row.get("edate") and row["edate"] < asof:

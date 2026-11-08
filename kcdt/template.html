@@ -605,7 +605,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <div class="sechead"><h2 id="h-earn">未來兩星期業績 <span class="muted small">美東日期＋盤前／盤後</span></h2>
         <div class="controls"><button class="tog" id="e-ndx" aria-pressed="true">Nasdaq-100</button><button class="tog" id="e-scr" aria-pressed="false">符合 KC 條件</button><button class="tog" id="e-all" aria-pressed="false">全部</button></div></div>
       <div id="earnlist" style="display:grid;gap:14px"></div>
-      <p class="note">日期係<b>美東日期</b>。盤前 = 美股開市前公佈（約香港時間當晚 9 點半前，冬令時間 10 點半前）；盤後 = 收市後公佈（約香港時間翌日凌晨 4 點後，冬令時間 5 點後）。已經公佈咗嘅唔會再列出。「已排期」嚟自 Nasdaq 業績日曆；「預計」係 Yahoo Finance 嘅估計日子，公司有時會改期，以公司公佈為準。</p>
+      <p class="note">日期係<b>美東日期</b>。盤前 = 美股開市前公佈（約香港時間當晚 9 點半前，冬令時間 10 點半前）；盤後 = 收市後公佈（約香港時間翌日凌晨 4 點後，冬令時間 5 點後）。已經公佈咗嘅唔會再列出。「已排期」係 Nasdaq 業績日曆或者 Yahoo Finance 標明公司已定嘅日子；Nasdaq 未寫盤前／盤後嘅，用 Yahoo Finance 公佈嘅時間補上。「預計」係 Yahoo Finance 嘅估計日子，公司有時會改期，以公司公佈為準。</p>
     </section>
   </main>
 
@@ -1077,16 +1077,22 @@ function brief(T){
   const now=Date.now(), nx=econRows().filter(e=>e.key&&e.t&&e.t>now).sort((a,b)=>a.t-b.t)[0];
   const ne=S.filter(s=>s.ndx&&eNext(s)).sort((a,b)=>a.edate.localeCompare(b.edate)||(b.mcap||0)-(a.mcap||0));
   L.push(`<b>下一件事</b>：${nx?`${econName(nx)}，香港時間 ${hkFmt(nx.u,true)}`:'未來兩星期未有重要經濟數據'}。<a href="#news">經濟日曆</a>`);
-  if(ne.length){const d0=ne[0].edate, same=ne.filter(s=>s.edate===d0);
-    M.push(`下一批 Nasdaq-100 業績：美東 ${d0.slice(5)}，${same.slice(0,5).map(s=>`${tk(s)}${ETIME[s.etime]?' '+ETIME[s.etime]:''}`).join('、')}${same.length>5?` 等 ${same.length} 隻`:''}。<a href="#earnings">業績日曆</a>`)}
+  // today's and the next trading day's batches (so the day before already names tomorrow's reporters), else the next one
+  const [t0,t1,k1]=nextTradingDay(), batch=(lbl,d)=>{const same=ne.filter(s=>s.edate===d);
+    return `${lbl} Nasdaq-100 業績（美東 ${d.slice(5)}）：${same.slice(0,5).map(s=>`${tk(s)}${ETIME[s.etime]?' '+ETIME[s.etime]:''}`).join('、')}${same.length>5?` 等 ${same.length} 隻`:''}。<a href="#earnings">業績日曆</a>`};
+  const soon=[[ '今日',t0],[k1===1?'明日':'下個交易日',t1]].filter(([,d])=>ne.some(s=>s.edate===d));
+  if(soon.length) soon.forEach(([l,d])=>L.push(`<b>業績</b>：${batch(l,d)}`));
+  else if(ne.length) M.push(batch('下一批',ne[0].edate));
   $('brief').innerHTML=L.map(x=>`<li>${x}</li>`).join('');
   $('brief-more').hidden=!M.length; $('brief-all').innerHTML=M.map(x=>`<li>${x}</li>`).join('');
   $('brief-d').textContent=`${D.asof} 收市 · 由下面數據自動整理，唔係建議`;
   briefWatch();
 }
 // 自選提示 at the top of 大市: watchlist stocks that crossed the 50/200-day line at the last close, or report today / next trading day
+// [today, next trading day (weekends skipped), days between them] in New York dates
+const nextTradingDay=()=>{ const t0=ymd(nyNow()); let k=1, t1=edDay(1); while([0,6].includes(new Date(t1+'T12:00:00Z').getUTCDay())) t1=edDay(++k); return [t0,t1,k] };
 function briefWatch(){ const e=$('wl-alert'); if(!e) return;
-  const t0=ymd(nyNow()); let k=1, t1=edDay(1); while([0,6].includes(new Date(t1+'T12:00:00Z').getUTCDay())) t1=edDay(++k);
+  const [t0,t1,k]=nextTradingDay();
   const items=[];
   [...WL.keys()].map(t=>BY[t]).filter(Boolean).forEach(s=>{
     stockChanges(s).filter(c=>c.g==='up'||c.g==='dn').forEach(c=>items.push({o:c.g==='dn'?0:1, h:`${tk(s)} <span class="${c.g==='dn'?'down':'up'}">${c.txt}</span>`}));
@@ -1698,6 +1704,9 @@ DRAW.watch = () => drawWatch();
 let PM=[];
 const hkHM = iso => new Date(iso).toLocaleTimeString('en-GB',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false});
 const pmKey = e => e.imp===3 || ECON_KEY.test(e.e||'');
+// the brief's next trading day: 明日 when it is the next calendar day, else 下個交易日 (Friday -> Monday)
+const pmNextLbl = b => { const a=new Date(b.d+'T12:00:00Z'), n=new Date(b.nd+'T12:00:00Z');
+  return (n-a)/864e5===1 ? `明日（美東 ${b.nd.slice(5)}）` : `下個交易日（美東 ${b.nd.slice(5)}）` };
 function pmLines(b){
   const L=[], done=e=>e.a!=null, I=Object.fromEntries((b.idx||[]).concat(b.etf||[]).map(x=>[x.k,x])), pc=x=>`<span class="${cls(x.pct)}">${sgn(x.pct,2)}%</span>`;
   if(I.NDX) L.push(`<b>指數</b>：Nasdaq-100 ${I.NDX.d.slice(5)} 收市 ${f(I.NDX.v)}（${pc(I.NDX)}）${I.SPX?`；標普 500 ${f(I.SPX.v)}（${pc(I.SPX)}）`:''}${I.QQQ?`。QQQ ${I.QQQ.when==='pre'?'盤前':'盤後'} ${pc(I.QQQ)}`:''}${I.SPY?`，SPY ${pc(I.SPY)}`:''}。`);
@@ -1708,7 +1717,10 @@ function pmLines(b){
   if((b.earn_done||[]).length) L.push(`<b>已出業績</b>：${b.earn_done.slice(0,3).map(e=>{const m=(b.movers||{})[e.s]; return `${e.s} EPS ${e.rep}（預期 ${e.est??'—'}）${m?`，${m.when==='pre'?'盤前':'盤後'} <span class="${cls(m.pct)}">${sgn(m.pct,1)}%</span>`:''}`}).join('；')}。`);
   const nd=(b.earn_today||[]).filter(e=>e.ndx);
   if(nd.length) L.push(`<b>今日 Nasdaq-100 出業績</b>：${nd.slice(0,6).map(e=>`${e.s}${ETIME[e.tm]?`（${ETIME[e.tm]}）`:''}`).join('、')}${nd.length>6?` 等 ${nd.length} 隻`:''}。`);
-  const w=[...WL.keys()], we=(b.earn_today||[]).filter(e=>WL.has(e.s)).map(e=>`${e.s} 今日${ETIME[e.tm]||''}出業績`),
+  const nn=(b.earn_next||[]).filter(e=>e.ndx);
+  if(b.nd) L.push(`<b>${pmNextLbl(b)} Nasdaq-100 出業績</b>：${nn.length?nn.slice(0,6).map(e=>`${e.s}${ETIME[e.tm]?`（${ETIME[e.tm]}）`:''}`).join('、')+(nn.length>6?` 等 ${nn.length} 隻`:''):'冇'}。`);
+  const w=[...WL.keys()], we=(b.earn_today||[]).filter(e=>WL.has(e.s)).map(e=>`${e.s} 今日${ETIME[e.tm]||''}出業績`)
+      .concat((b.earn_next||[]).filter(e=>WL.has(e.s)).map(e=>`${e.s} ${pmNextLbl(b)}${ETIME[e.tm]||''}出業績`)),
     wm=w.map(t=>[t,(b.movers||{})[t]]).filter(([t,m])=>m&&Math.abs(m.pct)>=3).map(([t,m])=>`${t} ${m.when==='pre'?'盤前':'盤後'} ${sgn(m.pct,1)}%`);
   if(we.length||wm.length) L.push(`<b>自選</b>：${we.concat(wm).slice(0,5).join('；')}。`);
   if(b.score&&b.score.length) L.push(`<b>風險分</b>（${b.asof} 收市）：大市 ${b.score[0]}${b.score[1]!=null?`、科技 ${b.score[1]}`:''}／100，規則分數，唔係跌市機率。`);
@@ -1721,12 +1733,13 @@ let pmScope='ndx';
 function pmEarn(b){
   const M=b.movers||{}, pick=e=>pmScope==='all'||(pmScope==='ndx'?e.ndx:WL.has(e.s));
   const mv=s=>{const m=M[s]; return m?`<span class="${cls(m.pct)}">${sgn(m.pct,1)}%</span> <span class="muted small">${m.when==='pre'?'盤前':'盤後'}</span>`:'<span class="muted">—</span>'};
-  const done=(b.earn_done||[]).filter(pick), today=(b.earn_today||[]).filter(pick);
+  const done=(b.earn_done||[]).filter(pick), today=(b.earn_today||[]).filter(pick), next=(b.earn_next||[]).filter(pick);
   const nm=s=>BY[s]?tk(BY[s]):`<span class="num">${s}</span>`;
   return `<div class="controls" id="pm-scope">${[['ndx','Nasdaq-100'],['wl','自選'],['all','全部（市值 100 億美元以上先有 EPS）']].map(([k,l])=>`<button class="tog" data-k="${k}" aria-pressed="${k===pmScope}">${l}</button>`).join('')}</div>
   <div class="cols2" style="align-items:start">
     <div class="panel tablewrap"><h3>已出業績 <span class="muted small">隔晚盤後同今早盤前</span></h3><table class="cen"><thead><tr><th>代號</th><th>時間</th><th class="r">EPS 實際</th><th class="r">預期</th><th class="r">差距</th><th class="r">延長時段</th></tr></thead><tbody>${done.map(e=>`<tr><td>${nm(e.s)}</td><td class="small">${e.d.slice(5)} ${ETIME[e.tm]||''}</td><td class="r num">${f(e.rep)}</td><td class="r num">${f(e.est)}</td><td class="r num ${cls(e.sur)}">${e.sur==null?'—':sgn(e.sur,1)+'%'}</td><td class="r num">${mv(e.s)}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">冇（或者數據源未更新）</td></tr>'}</tbody></table></div>
     <div class="panel tablewrap"><h3>今日出業績 <span class="muted small">${today.length} 隻</span></h3><table class="cen"><thead><tr><th>代號</th><th>時間</th><th>公司</th><th class="r">EPS 預期</th></tr></thead><tbody>${today.sort((a,b)=>((ETORD[a.tm]??2)-(ETORD[b.tm]??2))).map(e=>`<tr><td>${nm(e.s)}</td><td class="small">${ETIME[e.tm]||'未公佈'}</td><td class="small">${esc(e.n||'')}</td><td class="r num">${e.est==null?'—':f(e.est)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">冇</td></tr>'}</tbody></table></div>
+    ${b.earn_next?`<div class="panel tablewrap"><h3>${b.nd?pmNextLbl(b):'下個交易日'}出業績 <span class="muted small">${next.length} 隻</span></h3><table class="cen"><thead><tr><th>代號</th><th>時間</th><th>公司</th><th class="r">EPS 預期</th></tr></thead><tbody>${next.sort((a,b)=>((ETORD[a.tm]??2)-(ETORD[b.tm]??2))).map(e=>`<tr><td>${nm(e.s)}</td><td class="small">${ETIME[e.tm]||'未公佈'}</td><td class="small">${esc(e.n||'')}</td><td class="r num">${e.est==null?'—':f(e.est)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">冇</td></tr>'}</tbody></table></div>`:''}
   </div>`;
 }
 function pmMovers(b){
@@ -1830,7 +1843,7 @@ DRAW.about = () => {
   const rows=[
     ['價格、指數、市場寬度','Yahoo Finance',hkFmt(D.built),`${n.toLocaleString('en-US')} 隻股票，價格截至 ${D.asof} 收市`, stale?spill(2,'過期'):spill(0,'正常')],
     ['營收／EPS（基本面）','Nasdaq、Yahoo Finance',fNew?`最新 ${fNew}，最舊 ${FTS[0]}`:'—',`共 ${nfmt(n)} 隻：${fcovTxt}（市值、營收增長、機構持股、Beta）· 每隻約 7 日輪流更新，出咗業績嘅優先`, old?spill(1,`${old} 隻出咗業績未更新`):spill(0,'正常')],
-    ['業績日','Nasdaq 業績日曆（已排期）、Yahoo Finance（預計）',hkFmt(D.built),`美東日期＋盤前／盤後 · ${nfmt(ed.length)} 隻有下次日期，${nfmt(conf)} 隻已排期`, past?spill(1,`${past} 隻預計日已過，未確認公布`):spill(0,'正常')],
+    ['業績日','Nasdaq 業績日曆、Yahoo Finance（公司已定＝已排期，其餘＝預計）',hkFmt(D.built),`美東日期＋盤前／盤後 · ${nfmt(ed.length)} 隻有下次日期，${nfmt(conf)} 隻已排期`, past?spill(1,`${past} 隻預計日已過，未確認公布`):spill(0,'正常')],
     ['美國經濟數據','Nasdaq、ForexFactory（對照按月／按年）',hkFmt(D.econ_t||D.news_t),`今個星期同下個星期 ${E.length} 項`, late||unc?spill(1,[late&&`${late} 項等數據源更新`,unc&&`${unc} 項按月／按年未確認`].filter(Boolean).join('，')):spill(0,'正常')],
     ['市場新聞','Nasdaq',hkFmt(D.news_t),`${(D.news||[]).length} 條`, (D.news||[]).length?spill(0,'正常'):spill(2,'拎唔到')],
     ['盤前需知','Yahoo Finance（延遲報價）、US Treasury、Nasdaq',D.pm_t?hkFmt(D.pm_t):'—','美股交易日紐約時間約 05:50 整理一次', D.pm_t?spill(0,'正常'):spill(1,'未有')],
@@ -1875,6 +1888,8 @@ const edtxt = s => eNext(s) ? `${s.edate.slice(5)}${ETIME[s.etime]?' '+ETIME[s.e
 const edcsv = s => eNext(s) ? `${s.edate}${ETIME[s.etime]?' '+ETIME[s.etime]:''}${s.econf?'':'（預計）'}` : '未知';
 const eltxt = (s, full) => { const l=eLast(s), w=eWas(s), d=x=>full?x:x.slice(5);
   return [l?d(l):'', w?`<span title="原本預計呢日出業績，日子過咗但未確認已經公布">${d(w)} <span class="muted">預計日已過，未確認</span></span>`:''].filter(Boolean).join(' · ') || '<span class="muted">未知</span>' };
+// market cap: fundamentals, else the figure Nasdaq's earnings calendar gives (stocks without a fundamentals lookup)
+const cap = s => s.mcap ?? s.ecap ?? 0;
 let earnSet='ndx';
 function earnings(){
   const today=ymd(nyNow()), end=new Date(nyNow()); end.setDate(end.getDate()+14); const endS=ymd(end);
@@ -1882,8 +1897,8 @@ function earnings(){
   const rows=S.filter(s=>s.edate && s.edate>=today && s.edate<=endS && !eDone(s) && pick(s));
   const days={}; rows.forEach(s=>(days[s.edate]=days[s.edate]||[]).push(s));
   $('earnlist').innerHTML = Object.keys(days).sort().map(d=>{
-    const dd=new Date(d+'T12:00:00'), list=days[d].sort((a,b)=>((ETORD[a.etime]??2)-(ETORD[b.etime]??2))||(b.mcap||0)-(a.mcap||0));
-    return `<div class="panel eday"><h3><span class="num">${d.slice(5)}</span><span class="muted small">星期${WD[dd.getDay()]} · ${list.length} 隻</span></h3><div class="tablewrap"><table class="cen"><thead><tr><th class="frz">代號</th><th>時間</th><th>公司</th><th class="r">收市</th><th class="r">RS</th><th>趨勢</th><th class="r">營收增長 %</th><th class="r" title="GAAP，最近一季對去年同季">EPS 增長 %</th><th class="r">市值 (億)</th></tr></thead><tbody>${list.map(s=>`<tr><td class="frz">${tk(s)}</td><td class="small" style="white-space:nowrap">${ETIME[s.etime]||'<span class="muted">未公佈</span>'}</td><td class="small cname" title="${esc(s.n||'')}">${esc(shortN(s.n))}</td><td class="r num">${f(s.c)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr}</span></td><td>${ttbar(s.tt)}</td>${pcell(s.sq)}${epsCell(s)}<td class="r num">${s.mcap!=null?f(s.mcap*10,0):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
+    const dd=new Date(d+'T12:00:00'), list=days[d].sort((a,b)=>((ETORD[a.etime]??2)-(ETORD[b.etime]??2))||cap(b)-cap(a));
+    return `<div class="panel eday"><h3><span class="num">${d.slice(5)}</span><span class="muted small">星期${WD[dd.getDay()]} · ${list.length} 隻</span></h3><div class="tablewrap"><table class="cen"><thead><tr><th class="frz">代號</th><th>時間</th><th>公司</th><th class="r">收市</th><th class="r">RS</th><th>趨勢</th><th class="r">營收增長 %</th><th class="r" title="GAAP，最近一季對去年同季">EPS 增長 %</th><th class="r">市值 (億)</th></tr></thead><tbody>${list.map(s=>`<tr><td class="frz">${tk(s)}</td><td class="small" style="white-space:nowrap">${ETIME[s.etime]||'<span class="muted">未公佈</span>'}</td><td class="small cname" title="${esc(s.n||'')}">${esc(shortN(s.n))}</td><td class="r num">${f(s.c)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr}</span></td><td>${ttbar(s.tt)}</td>${pcell(s.sq)}${epsCell(s)}<td class="r num">${cap(s)?f(cap(s)*10,0):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
   }).join('') || '<div class="panel muted">未來兩星期冇呢組股票出業績。</div>';
 }
 DRAW.earnings = () => {

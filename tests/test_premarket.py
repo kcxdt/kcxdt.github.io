@@ -40,3 +40,18 @@ if __name__ == "__main__":
     test_movers()
     test_daily_last_and_prev_bday()
     print("ok")
+
+
+def test_earnings_lists_the_next_trading_day():
+    """On Monday 16 Nov the brief already names NVDA, which reports after Tuesday's close."""
+    days = {"2026-11-16": [{"symbol": "AAA", "time": "time-pre-market"}],
+            "2026-11-17": [{"symbol": "NVDA", "time": "time-after-hours", "epsForecast": "$1.50"}]}
+    real = pm._earn_day
+    pm._earn_day = lambda d: days.get(d, [])
+    try:
+        today, done, nxt = pm.earnings("2026-11-16", [{"s": "AAA", "ndx": False, "mcap": 5}, {"s": "NVDA", "ndx": True, "mcap": 4000}])
+    finally:
+        pm._earn_day = real
+    assert [e["s"] for e in today] == ["AAA"] and done == []
+    assert nxt == [dict(s="NVDA", n=None, tm="amc", est=1.5, ndx=True, mcap=4000)]
+    assert pm.next_bday("2026-11-13") == "2026-11-16"  # Friday -> Monday
