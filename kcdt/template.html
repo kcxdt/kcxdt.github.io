@@ -3,6 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+HK:wght@400;500;600;700&family=Noto+Serif+HK:wght@900&display=swap">
+<script>try{if(JSON.parse(localStorage.getItem('kcdt.theme'))==='light')document.documentElement.dataset.theme='light'}catch(e){}</script>
 <style>
 /* Layout: one page with tabs (大市 / 機會 / 選股器 / 業績) plus a stock page at #s/TICKER. */
 :root{
@@ -16,7 +17,22 @@
   --f-body:"Noto Sans HK","Noto Sans TC","PingFang HK","Microsoft JhengHei",system-ui,sans-serif;
   --f-data:var(--f-body);  /* one font for text and numbers; numbers use tabular figures */
   color-scheme:dark;
+  --hover:#4b5363; --shade:rgba(0,0,0,.45);
 }
+/* white background (KC, round 14): same roles, light values; picked with the 深色／白色 switch and remembered per browser */
+:root[data-theme="light"]{
+  --bg:#f5f6f8; --side:#eceef2; --panel:#ffffff; --raise:#f0f2f5; --ink:#1b1f26; --muted:#5a6372; --line:#d6dae1; --soft:#e9ecf0;
+  --accent:#1a66d9; --link:#1559c2; --sel:#e2ebfb; --selline:#94b3ea; --ctl:#ffffff; --ctlline:#c9ced7;
+  --cool:#1e8a54; --warm:#b7791f; --hot:#d2382d;
+  --up:#178a4c; --down:#d2382d; --flat:#9aa2ae; --tile-ink:#ffffff;
+  --hover:#8c95a3; --shade:rgba(20,30,50,.18);
+  color-scheme:light;
+}
+.themesw{display:inline-flex;border:1px solid var(--ctlline);border-radius:999px;background:var(--ctl);padding:2px;gap:2px}
+.themesw button{font:inherit;font-size:13px;padding:3px 10px;border:0;border-radius:999px;background:none;color:var(--muted);cursor:pointer}
+.themesw button[aria-pressed="true"]{background:var(--sel);color:var(--ink);font-weight:600}
+.themesw button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (max-width:640px){.top .brand{order:-2}.top .themesw{order:-1;margin-left:auto}}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;font-variant-numeric:tabular-nums}
 .wrap{max-width:1180px;margin:0 auto;padding-block:16px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px}
 h1,h2,h3{text-wrap:balance;margin:0}
@@ -120,11 +136,13 @@ a.tk:hover{color:var(--accent);text-decoration:underline}
 .legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
 .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 button.tog,label.tog{font:inherit;font-size:14px;padding:4px 12px;border-radius:8px;border:1px solid var(--ctlline);background:var(--ctl);color:var(--ink);cursor:pointer}
-button.tog:hover,label.tog:hover{border-color:#4b5363}
+button.tog:hover,label.tog:hover{border-color:var(--hover)}
 button.tog[aria-pressed="true"]{background:var(--sel);border-color:var(--selline);color:var(--ink)}
 button.tog:focus-visible,th button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 th button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
 th button[data-active="true"]{color:var(--ink);font-weight:700}
+button.rssort:not([data-active="true"])::after{content:" ⇅";opacity:.55}
+button.rssort:hover{color:var(--ink)}
 .note{font-size:13px;color:var(--muted);border-left:3px solid var(--line);padding-left:12px}
 .cols2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
 @media (max-width:860px){.cols2{grid-template-columns:minmax(0,1fr)}}
@@ -292,7 +310,7 @@ table.ind{max-width:880px}
 .heat .t2{fill:var(--tile-ink);opacity:.9}
 .heat .sl{fill:var(--muted);font-size:12px;font-family:var(--f-body)}
 .heat{position:relative}
-.heattip{position:absolute;z-index:5;pointer-events:none;background:var(--raise);border:1px solid var(--ctlline);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.5;box-shadow:0 6px 18px rgba(0,0,0,.45);max-width:240px}
+.heattip{position:absolute;z-index:5;pointer-events:none;background:var(--raise);border:1px solid var(--ctlline);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.5;box-shadow:0 6px 18px var(--shade);max-width:240px}
 .heattip b{font-size:14px}
 
 /* screener */
@@ -379,7 +397,7 @@ tr.nextev td{background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
 .wllists{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .wllists input{font:inherit;font-size:14px;padding:5px 8px;border-radius:6px;border:1px solid var(--ctlline);background:var(--ctl);color:var(--ink);width:10em}
 .wltag{display:inline-block;font-size:12px;padding:0 6px;margin:1px 3px 1px 0;border-radius:5px;background:var(--soft);color:var(--muted);white-space:nowrap}
-.wlpick{position:fixed;z-index:10;background:var(--raise);border:1px solid var(--ctlline);border-radius:10px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.5);display:grid;gap:8px;min-width:200px;max-width:min(300px,92vw)}
+.wlpick{position:fixed;z-index:10;background:var(--raise);border:1px solid var(--ctlline);border-radius:10px;padding:12px 14px;box-shadow:0 8px 24px var(--shade);display:grid;gap:8px;min-width:200px;max-width:min(300px,92vw)}
 .wlpick label{display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
 .wlpick .row{display:flex;gap:8px;justify-content:flex-end}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 16px;border-radius:999px;font-size:14px;z-index:9;max-width:90vw}
@@ -395,6 +413,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <datalist id="tickers"></datalist>
     </form>
     <span class="badge">價格截至 <b class="num" id="asof"></b> 美股收市</span>
+    <span class="themesw" role="group" aria-label="背景顏色"><button type="button" data-theme="dark">深色</button><button type="button" data-theme="light">白色</button></span>
     <button class="tog" id="login" hidden>用 Gmail 登入</button>
   </header>
   <div class="stamps" id="stamps"></div>
@@ -529,7 +548,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <div class="wllists" id="wl-lists"></div>
       <div class="controls" id="wl-filter"></div>
       <div class="panel tablewrap wl"><table class="cen">
-        <thead><tr><th class="frz">代號</th><th id="wl-lh">清單</th><th>狀態</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">RS</th><th class="r">距 50 日線 %</th><th>趨勢</th><th>KC 條件</th><th>下次業績（美東）</th><th>今日變化</th><th>筆記</th><th>加入</th></tr></thead>
+        <thead><tr><th class="frz">代號</th><th id="wl-lh">清單</th><th>狀態</th><th class="r">收市</th><th class="r">今日 %</th><th class="r"><button class="rssort" type="button" data-g="wl" title="撳一下由高排到低，再撳由低排到高，第三下回復原本排法">RS</button></th><th class="r">距 50 日線 %</th><th>趨勢</th><th>KC 條件</th><th>下次業績（美東）</th><th>今日變化</th><th>筆記</th><th>加入</th></tr></thead>
         <tbody id="wlbody"></tbody></table></div>
       <p class="note">喺選股器、機會頁或者個股頁撳 ☆ 就加入；有幾個清單嘅話會問你加入邊個（一隻股可以喺幾個清單）。撳「＋ 新增清單」開新清單，例如「長線」、「短炒」。筆記打完撳 Enter 或者撳出去就自動儲存。登入 Gmail 後會儲喺你個帳戶，換機都睇到；未登入就儲喺呢部機嘅瀏覽器。</p>
     </section>
@@ -821,6 +840,33 @@ const S = D.stocks, BY = Object.fromEntries(S.map(s=>[s.s,s]));
 const Store = { // per-browser settings
   get(k,d){try{const v=localStorage.getItem('kcdt.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
   set(k,v){try{localStorage.setItem('kcdt.'+k,JSON.stringify(v))}catch(e){}}};
+
+// 深色／白色 background switch (KC, round 14); the choice is applied before first paint by the script at the top
+function drawTheme(){ const t=document.documentElement.dataset.theme==='light'?'light':'dark';
+  document.querySelectorAll('.themesw button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.theme===t))) }
+document.querySelectorAll('.themesw button').forEach(b=>b.onclick=()=>{
+  if(b.dataset.theme==='light') document.documentElement.dataset.theme='light'; else delete document.documentElement.dataset.theme;
+  Store.set('theme',b.dataset.theme); drawTheme() });
+drawTheme();
+
+// RS column sort for the stock tables that aren't the screener (KC, round 14).
+// Click RS: high → low; again: low → high; third click: back to the table's own order. Tables sharing a group sort together.
+const RSS={};
+const rsHead = g => `<button class="rssort" type="button" data-g="${g}" title="撳一下由高排到低，再撳由低排到高，第三下回復原本排法">RS</button>`;
+function rsApply(g){
+  const dir=RSS[g]||0;
+  document.querySelectorAll(`button.rssort[data-g="${g}"]`).forEach(b=>{
+    b.dataset.active=String(!!dir); b.textContent='RS'+(dir<0?' ▾':dir>0?' ▴':'');
+    const th=b.closest('th'); th.setAttribute('aria-sort',dir<0?'descending':dir>0?'ascending':'none');
+    const tb=b.closest('table').tBodies[0]; if(!tb) return;
+    const rows=[...tb.rows]; rows.forEach((r,k)=>{ if(r.dataset.o==null) r.dataset.o=k });
+    const v=r=>{ const e=r.querySelector('.rs'), n=e?parseFloat(e.textContent):NaN; return isNaN(n)?null:n };
+    const o=(a,c)=>a.dataset.o-c.dataset.o;
+    rows.sort((a,c)=>{ if(!dir) return o(a,c); const A=v(a),B=v(c);
+      if(A==null||B==null) return A==null&&B==null?o(a,c):A==null?1:-1; return (A-B)*dir||o(a,c) });
+    rows.forEach(r=>tb.appendChild(r)) }) }
+document.addEventListener('click',e=>{ const b=e.target.closest('button.rssort'); if(!b) return;
+  const g=b.dataset.g; RSS[g]=RSS[g]===-1?1:RSS[g]===1?0:-1; rsApply(g) });
 
 // ---------- update times, stale data warning ----------
 const nyNow = () => new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
@@ -1677,6 +1723,7 @@ function drawWatch(){
   $('wlbody').querySelectorAll('select[data-st]').forEach(sel=>sel.onchange=async()=>{const r=WL.get(sel.dataset.st); if(await wlPut({...r,st:sel.value})) {wlMsg('已更新狀態'); drawWatch()}});
   $('wlbody').querySelectorAll('input[data-note]').forEach(inp=>{ inp.onchange=async()=>{const r=WL.get(inp.dataset.note); if(await wlPut({...r,note:inp.value.trim()})) wlMsg('筆記已儲存')};
     inp.onkeydown=e=>{if(e.key==='Enter') inp.blur()} });
+  rsApply('wl');
 }
 // Summary at the top: only the watched stocks whose state changed (weaker, stronger, earnings soon)
 function wlSummary(list){
@@ -1898,8 +1945,9 @@ function earnings(){
   const days={}; rows.forEach(s=>(days[s.edate]=days[s.edate]||[]).push(s));
   $('earnlist').innerHTML = Object.keys(days).sort().map(d=>{
     const dd=new Date(d+'T12:00:00'), list=days[d].sort((a,b)=>((ETORD[a.etime]??2)-(ETORD[b.etime]??2))||cap(b)-cap(a));
-    return `<div class="panel eday"><h3><span class="num">${d.slice(5)}</span><span class="muted small">星期${WD[dd.getDay()]} · ${list.length} 隻</span></h3><div class="tablewrap"><table class="cen"><thead><tr><th class="frz">代號</th><th>時間</th><th>公司</th><th class="r">收市</th><th class="r">RS</th><th>趨勢</th><th class="r">營收增長 %</th><th class="r" title="GAAP，最近一季對去年同季">EPS 增長 %</th><th class="r">市值 (億)</th></tr></thead><tbody>${list.map(s=>`<tr><td class="frz">${tk(s)}</td><td class="small" style="white-space:nowrap">${ETIME[s.etime]||'<span class="muted">未公佈</span>'}</td><td class="small cname" title="${esc(s.n||'')}">${esc(shortN(s.n))}</td><td class="r num">${f(s.c)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr}</span></td><td>${ttbar(s.tt)}</td>${pcell(s.sq)}${epsCell(s)}<td class="r num">${cap(s)?f(cap(s)*10,0):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
+    return `<div class="panel eday"><h3><span class="num">${d.slice(5)}</span><span class="muted small">星期${WD[dd.getDay()]} · ${list.length} 隻</span></h3><div class="tablewrap"><table class="cen"><thead><tr><th class="frz">代號</th><th>時間</th><th>公司</th><th class="r">收市</th><th class="r">${rsHead('earn')}</th><th>趨勢</th><th class="r">營收增長 %</th><th class="r" title="GAAP，最近一季對去年同季">EPS 增長 %</th><th class="r">市值 (億)</th></tr></thead><tbody>${list.map(s=>`<tr><td class="frz">${tk(s)}</td><td class="small" style="white-space:nowrap">${ETIME[s.etime]||'<span class="muted">未公佈</span>'}</td><td class="small cname" title="${esc(s.n||'')}">${esc(shortN(s.n))}</td><td class="r num">${f(s.c)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr}</span></td><td>${ttbar(s.tt)}</td>${pcell(s.sq)}${epsCell(s)}<td class="r num">${cap(s)?f(cap(s)*10,0):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
   }).join('') || '<div class="panel muted">未來兩星期冇呢組股票出業績。</div>';
+  rsApply('earn');
 }
 DRAW.earnings = () => {
   [['e-ndx','ndx'],['e-scr','scr'],['e-all','all']].forEach(([id,k])=>$(id).onclick=()=>{setPressed(['e-ndx','e-scr','e-all'],id);earnSet=k;earnings()});
@@ -2152,11 +2200,12 @@ function drawPeers(s){ const box=$('s-peers');
   const L=PEER_ALL?P:P.slice(0,10); if(!PEER_ALL&&!L.includes(s)) L.push(s);
   box.innerHTML=`<div class="sechead"><h3 id="h-peers">同業 <span class="muted small">${esc(s.ind)} · ${P.length} 隻 · 按市值排</span></h3>
       <button class="tog" id="peer-scr" type="button">喺選股器篩選呢個行業</button></div>
-    <div class="tablewrap"><table class="cen"><thead><tr><th class="frz">代號</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">RS</th><th class="r">3 個月 %</th><th class="r" title="GAAP，最近一季按年">EPS 增長 %</th><th class="r">市值 (億)</th><th>趨勢</th></tr></thead>
+    <div class="tablewrap"><table class="cen"><thead><tr><th class="frz">代號</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">${rsHead('peer')}</th><th class="r">3 個月 %</th><th class="r" title="GAAP，最近一季按年">EPS 增長 %</th><th class="r">市值 (億)</th><th>趨勢</th></tr></thead>
     <tbody>${L.map(x=>`<tr${x===s?' class="me"':''}><td class="frz"><span style="white-space:nowrap">${star(x.s)}${tk(x)}</span><div class="muted small" title="${esc(x.n||'')}">${esc(shortN(x.n))}</div></td>
       <td class="r num">${f(x.c)}</td>${pcell(x.chg,2)}<td class="r"><span class="rs" style="color:${rsColor(x.rsr)}">${x.rsr}</span></td>${pcell(x.r63)}${epsCell(x)}<td class="r num">${x.mcap!=null?f(x.mcap*10,0):'—'}</td><td>${ttbar(x.tt)}</td></tr>`).join('')}</tbody></table></div>
     ${P.length>10?`<button class="tog" id="peer-more" type="button">${PEER_ALL?'只顯示頭 10 隻':`顯示全部 ${P.length} 隻`}</button>`:''}`;
   if($('peer-more')) $('peer-more').onclick=()=>{PEER_ALL=!PEER_ALL; drawPeers(s)};
+  rsApply('peer');
   $('peer-scr').onclick=()=>{CFS.ind='='+s.ind; location.hash='#screener'; setTimeout(()=>{drawCF(); renderStocks(); wlMsg(`已加入條件：細分行業 ${s.ind}`)},0)};
   wlStars();
 }
