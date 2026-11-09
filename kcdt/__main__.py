@@ -60,7 +60,7 @@ def snapshot(data):
 
 def keep_history(data, folder):
     """Save today's snapshot into `folder` (a checkout of the history branch) and publish all of them under site/h/.
-    Returns when the latest 盤前需知 was made (None if there is none yet)."""
+    Returns (when the latest 盤前需知 was made, its New York date), or (None, None) if there is none yet."""
     folder = pathlib.Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     (folder / f"{data['asof']}.json").write_text(json.dumps(snapshot(data), ensure_ascii=False, separators=(",", ":")),
@@ -80,8 +80,8 @@ def keep_history(data, folder):
         days = sorted(f.stem for f in pm_out.glob("20*.json"))
         (pm_out / "index.json").write_text(json.dumps(days), encoding="utf-8")
         if days:
-            return json.loads((pm_out / f"{days[-1]}.json").read_text(encoding="utf-8")).get("t")
-    return None
+            return json.loads((pm_out / f"{days[-1]}.json").read_text(encoding="utf-8")).get("t"), days[-1]
+    return None, None
 
 
 def write_stock_pages(pages):
@@ -114,11 +114,11 @@ def main():
     if len(data["stocks"]) < 1000:
         sys.exit(f"only {len(data['stocks'])} stocks computed, refusing to publish")
     data["built"] = now_utc()
+    OUT.mkdir(exist_ok=True)
+    data["pm_t"], data["pm_d"] = keep_history(data, os.environ.get("KCDT_HISTORY", ROOT / "hist"))
     data["checks"] = run_checks(data)
     for c in data["checks"]:
         print("check:", "ok" if c["lv"] == 0 else "LOOK" if c["lv"] == 1 else "PROBLEM", c["t"])
-    OUT.mkdir(exist_ok=True)
-    data["pm_t"] = keep_history(data, os.environ.get("KCDT_HISTORY", ROOT / "hist"))
     (OUT / "data.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     (OUT / "index.html").write_text(render(data), encoding="utf-8")
     write_stock_pages(stock_pages(px, data["stocks"]))

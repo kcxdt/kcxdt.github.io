@@ -138,10 +138,17 @@ def test_build():
     assert sa["eold"] == "2026-10-21" and sa["edate"] is None  # passed, not confirmed: next date unknown
     assert "eold" not in sb and sb["erep"] == "2026-10-22" and sb["edate"] is None
     assert d["fcov"][0] >= d["fcov"][1] > 0
+    # the front-page summary, the 50-day chart and the 市場寬度 bars print one number
+    for key, hk in (("ndx", "n50"), ("usa", "b50")):
+        b = d["breadth"][key]
+        assert d["hist"][-1][hk] == round(b["a50"] / b["n"] * 100, 1), (key, d["hist"][-1][hk], b)
     from kcdt.checks import run
     checks = run(d, today="2026-10-28")
     assert checks and all(c["lv"] in (0, 1, 2) for c in checks)
     assert not [c for c in checks if c["lv"] == 2], checks
+    by = {c.get("k"): c for c in checks}
+    assert by["b50ndx"]["lv"] == 0 and by["late"]["n"] == sum(1 for s in d["stocks"] if s.get("erep") and s.get("fts") and s["erep"] >= s["fts"])
+    assert by["past"]["n"] >= 1 and by["pm"]["lv"] == 1  # no 盤前需知 in this build
     assert len(d["leaders"]) == 30 and set(d["leaders"]) <= set(DOW30)
     pages = stock_pages(px, d["stocks"])
     nv = pages[d["stocks"][0]["s"]]
@@ -214,10 +221,42 @@ if __name__ == "__main__":
                  score=[38, 50])
     pm.publish(brief, hist)
     assert json.loads((m.OUT / "pm" / "index.json").read_text()) == [brief["d"]]
-    assert m.keep_history(d, hist) == brief["t"]  # the next daily build carries the briefs over
-    d["pm_t"] = brief["t"]
+    assert m.keep_history(d, hist) == (brief["t"], brief["d"])  # the next daily build carries the briefs over
+    d["pm_t"], d["pm_d"] = brief["t"], brief["d"]
     (m.OUT / "index.html").write_text(m.render(d), encoding="utf-8")
     print("ok", d["asof"], d["hist"][-1]["score"], len(d["stocks"]), d["breadth"])
+
+
+def test_breadth_ignores_missing_closes():
+    """A stock with no close on the last day is left out of the % series, as it is out of the counts."""
+    universe = [f"S{i:04d}" for i in range(300)]
+    tickers = sorted(set(universe + DOW30 + [t for t, _ in INDICES] + [t for t, _ in SECTORS] + ["^NDX", "^VXN", "QQQ"]))
+    px = fake_prices(tickers, seed=3)
+    for k in px:
+        px[k].iloc[-1, px[k].columns.get_loc("S0005")] = np.nan  # a Nasdaq-100 member without today's bar
+    d = build(px, fake_meta(universe), {}, None, {}, {}, {}, {})
+    b = d["breadth"]["ndx"]
+    assert d["hist"][-1]["n50"] == round(b["a50"] / b["n"] * 100, 1)
+
+
+def test_checks_helpers():
+    from kcdt.checks import past_due, pm_expected
+    ny = "America/New_York"
+    assert pm_expected(pd.Timestamp("2026-11-09 08:00", tz=ny)) == "2026-11-06"  # Monday before 09:30 -> Friday's
+    assert pm_expected(pd.Timestamp("2026-11-09 10:00", tz=ny)) == "2026-11-09"
+    assert pm_expected(pd.Timestamp("2026-11-08 20:00", tz=ny)) == "2026-11-06"  # Sunday
+    st = [dict(s="A", eold="2026-11-03"), dict(s="B", eold="2026-11-03", erep="2026-11-04"),
+          dict(s="C", edate="2026-11-06"), dict(s="D", edate="2026-11-06", econf=True), dict(s="E", edate="2026-11-09")]
+    assert past_due(st, "2026-11-06") == ["A", "C"]
+
+
+def test_premarket_marks_bars_still_trading():
+    from kcdt.premarket import still_open
+    now = pd.Timestamp("2026-11-05 05:47", tz="America/New_York")  # 18:47 Hong Kong
+    assert still_open("CL=F", "2026-11-05", now) and still_open("^VIX", "2026-11-05", now)
+    assert still_open("^GDAXI", "2026-11-05", now)  # Frankfurt closes 17:30
+    assert not still_open("^HSI", "2026-11-05", now) and not still_open("^N225", "2026-11-05", now)
+    assert not still_open("^NDX", "2026-11-04", now)
 
 
 def test_yahoo_report_time_in_new_york():
