@@ -55,3 +55,20 @@ def test_earnings_lists_the_next_trading_day():
     assert [e["s"] for e in today] == ["AAA"] and done == []
     assert nxt == [dict(s="NVDA", n=None, tm="amc", est=1.5, ndx=True, mcap=4000)]
     assert pm.next_bday("2026-11-13") == "2026-11-16"  # Friday -> Monday
+
+
+def test_due_skips_a_brief_already_on_the_history_branch(tmp_path=None):
+    import tempfile, pathlib
+    from kcdt import premarket as pm
+    hist = pathlib.Path(tmp_path or tempfile.mkdtemp())
+    now = pd.Timestamp("2026-11-09 12:40", tz="America/New_York")  # a late backup slot, still before 16:00
+    old = pm.OUT
+    pm.OUT = hist / "site"  # an older site copy without today's brief
+    try:
+        assert pm.due(now, hist)
+        (hist / "pm").mkdir()
+        (hist / "pm" / "2026-11-09.json").write_text("{}")
+        assert not pm.due(now, hist)  # the earlier run already made it: no second brief
+        assert not pm.due(pd.Timestamp("2026-11-09 16:05", tz="America/New_York"))  # after the close
+    finally:
+        pm.OUT = old

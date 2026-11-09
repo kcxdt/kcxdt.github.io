@@ -5,12 +5,14 @@ name: Pre-market brief
 # 05:30–16:00 in New York and today's brief doesn't exist yet, so the first run in that window does the work.
 # GitHub starts scheduled runs late or skips them when busy (the first 09:50 run began at 10:28; on 06 Nov every
 # run started after 16:50 UTC, past the old 09:30 cut-off, so there was no brief), so the :20 slots and the
-# later ones are backups; a brief made after the open is marked late. A run that finds today's brief stops.
+# later ones are backups; a brief made after the open is marked late. A run that finds today's brief (in the
+# saved site or on the history branch) stops, so the backups never make a second one. A run that fails tries
+# once more after 3 minutes, and the next slot tries again if that fails too.
 on:
   schedule:
     - cron: "50 9,10 * * 1-5"
     - cron: "20 10,11 * * 1-5"
-    - cron: "40 12,14 * * 1-5"
+    - cron: "40 12,14,16,18 * * 1-5"
   workflow_dispatch:
 
 permissions:
@@ -61,7 +63,9 @@ jobs:
           KCDT_HISTORY: hist
         run: |
           if [ ! -f site/data.json ]; then echo "no saved build yet; the next daily build will create one"; exit 1; fi
-          python -m kcdt.premarket ${{ github.event_name == 'schedule' && '--if-due' || '' }}
+          flag="${{ github.event_name == 'schedule' && '--if-due' || '' }}"
+          # one retry for a passing hiccup (Yahoo / Nasdaq timeouts); the brief is only written when it succeeds
+          python -m kcdt.premarket $flag || { echo "failed, trying again in 3 minutes"; sleep 180; python -m kcdt.premarket $flag; }
       - name: Save the brief
         if: steps.pm.outputs.run == 'true'
         run: |
