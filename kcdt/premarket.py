@@ -2,8 +2,10 @@
 
 Runs on top of the last full build (site/data.json) and writes site/pm/DATE.json plus site/pm/index.json; with
 KCDT_HISTORY set, the day's brief is also kept in that folder (the history branch) under pm/.
---if-due: only run on a US weekday between 05:30 and 09:30 New York time when today's brief doesn't exist yet,
-so two cron times (one per side of daylight saving) give one brief a day."""
+--if-due: only run on a US weekday between 05:30 and 16:00 New York time when today's brief doesn't exist yet,
+so two cron times (one per side of daylight saving) give one brief a day. GitHub has started the scheduled runs
+up to 7 hours late (06 Nov 2026: 11:56 New York), so a brief made after the 09:30 open is still published, marked
+late=True so the page says it came out after the open."""
 import io
 import json
 import os
@@ -33,6 +35,20 @@ def _r(x, d=2):
 
 def _iso(ts):
     return pd.Timestamp(ts).tz_convert("UTC").strftime("%Y-%m-%dT%H:%MZ")
+
+
+# When each daily bar is final: (time zone, minutes after midnight). A bar dated today before then is still trading,
+# so the page calls it 最新（日內）, not 收市 (futures, VIX and the dollar index trade before the New York open).
+CLOSE = {"^NDX": (NY, 960), "^GSPC": (NY, 960), "^VIX": (NY, 975), "DX-Y.NYB": (NY, 1020), "CL=F": (NY, 1020),
+         "GC=F": (NY, 1020), "^N225": ("Asia/Tokyo", 930), "^HSI": ("Asia/Hong_Kong", 970),
+         "^GDAXI": ("Europe/Berlin", 1050)}
+
+
+def still_open(sym, day, now):
+    """True when the bar dated `day` (YYYY-MM-DD) has not closed yet at `now`."""
+    tz, m = CLOSE.get(sym, (NY, 960))
+    t = pd.Timestamp(now).tz_convert(tz)
+    return day > t.strftime("%Y-%m-%d") or (day == t.strftime("%Y-%m-%d") and t.hour * 60 + t.minute < m)
 
 
 def daily_last(close):
@@ -203,7 +219,8 @@ def build_brief(data, now=None):
             c = c[y] if isinstance(c, pd.DataFrame) else c
             x = daily_last(c)
             if x:
-                dl[k] = dict(k=k, n=n, sym=y, link=QUOTE + y, eod=True, **x)
+                live = still_open(y, x["d"], now)
+                dl[k] = dict(k=k, n=n, sym=y, link=QUOTE + y, eod=not live, live=live, **x)
         except Exception as e:
             print("daily failed:", y, e)
     mkt = [dl[k] for k, _y, _n in MKT if k in dl] + treasury(now)
@@ -219,6 +236,8 @@ def build_brief(data, now=None):
     etf = [dict(k=t, n=n, link=QUOTE + t, **mv[t]) for t, n in ETF if t in mv]
     b = dict(d=today, t=now_utc(), asof=data.get("asof"), idx=idx, etf=etf, mkt=mkt, world=world, econ=_econ_today(econ, today),
              earn_today=earn_today, earn_done=earn_done, earn_next=earn_next, nd=next_bday(today), movers=mv)
+    if now.hour * 60 + now.minute >= 570:
+        b["late"] = True  # made after the 09:30 open: the "pre-market" prices include regular-session trading
     b["score"] = [round(h["score"] * 100 / 16) for h in (data.get("hist") or [])[-1:]] + \
         [round(h["score"] * 100 / 16) for h in ((data.get("tech") or {}).get("hist") or [])[-1:]]
     print(f"premarket {today}: {len(idx)} indices, {len(etf)} ETFs, {len(mkt)} market items, {len(world)} world, "
@@ -245,7 +264,7 @@ def publish(brief, folder=None):
 
 def due(now):
     m = now.hour * 60 + now.minute
-    return now.weekday() < 5 and 330 <= m < 570 and not (OUT / "pm" / f"{now.strftime('%Y-%m-%d')}.json").exists()
+    return now.weekday() < 5 and 330 <= m < 960 and not (OUT / "pm" / f"{now.strftime('%Y-%m-%d')}.json").exists()
 
 
 def main():
@@ -262,7 +281,7 @@ def main():
     publish(brief, os.environ.get("KCDT_HISTORY"))
     if econ:  # the brief fetched a fresh calendar: the 經濟 page gets it too
         data["econ"], data["econ_t"] = econ, now_utc()
-    data["pm_t"] = brief["t"]
+    data["pm_t"], data["pm_d"] = brief["t"], brief["d"]
     path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     (OUT / "index.html").write_text(render(data), encoding="utf-8")
     if flag:

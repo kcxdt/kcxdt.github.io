@@ -257,6 +257,7 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
     mvp = mvp_m.astype(int) + mvp_v.astype(int) + mvp_p.astype(int)
 
     stocks = []
+    up50, up200 = {}, {}  # above the line before rounding: d50 = 0.0 can still be above, and the % series counts it
     for t in tick:
         lc, m50, m200 = last[t], ma50[t].iloc[-1], ma200[t].iloc[-1]
         if pd.isna(lc) or pd.isna(m200):
@@ -319,6 +320,7 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             row.pop("econf", None)
             if not row.get("erep") or row["erep"] < (pd.Timestamp(was) - pd.Timedelta(days=3)).strftime("%Y-%m-%d"):
                 row["eold"] = was
+        up50[t], up200[t] = bool(lc > m50), bool(lc > m200)
         stocks.append(row)
 
     # ---- breadth: all stocks and Nasdaq-100 only ----
@@ -328,14 +330,19 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
         return dict(
             n=len(rows), adv=cnt(lambda r: (r["chg"] or 0) > 0), dec=cnt(lambda r: (r["chg"] or 0) < 0),
             nh=cnt(lambda r: r["nh"]), nl=cnt(lambda r: r["nl"]),
-            a50=cnt(lambda r: r["d50"] is not None and r["d50"] > 0),
-            a200=cnt(lambda r: r["d200"] is not None and r["d200"] > 0))
+            a50=cnt(lambda r: up50[r["s"]]), a200=cnt(lambda r: up200[r["s"]]))
 
-    above50 = (c > ma50).where(ma50.notna()).mean(axis=1) * 100
-    above200 = (c > ma200).where(ma200.notna()).mean(axis=1) * 100
-    nd = [t for t in tick if meta.at[t, "ndx"]]
-    nd50 = (c[nd] > ma50[nd]).where(ma50[nd].notna()).mean(axis=1) * 100
-    nd200 = (c[nd] > ma200[nd]).where(ma200[nd].notna()).mean(axis=1) * 100
+    # The daily % series use the same stocks as the breadth counts above (today's pool), so the last point equals
+    # a50 / n: a missing close or average is left out, never counted as "below".
+    pool = [r["s"] for r in stocks]
+
+    def share(cols, ma):
+        ok = c[cols].notna() & ma[cols].notna()
+        return (c[cols] > ma[cols]).where(ok).mean(axis=1) * 100
+
+    nd = [r["s"] for r in stocks if r["ndx"]]
+    above50, above200 = share(pool, ma50), share(pool, ma200)
+    nd50, nd200 = share(nd, ma50), share(nd, ma200)
 
     hist = []
     for d, row in ind.iterrows():
