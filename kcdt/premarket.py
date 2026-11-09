@@ -262,15 +262,19 @@ def publish(brief, folder=None):
     (out / "index.json").write_text(json.dumps(days), encoding="utf-8")
 
 
-def due(now):
+def due(now, history=None):
+    """A weekday between 05:30 and 16:00 New York with no brief for today yet, in the saved site or the history
+    branch (the backup runs restore an older site copy when the cache is behind)."""
     m = now.hour * 60 + now.minute
-    return now.weekday() < 5 and 330 <= m < 960 and not (OUT / "pm" / f"{now.strftime('%Y-%m-%d')}.json").exists()
+    name = f"{now.strftime('%Y-%m-%d')}.json"
+    have = (OUT / "pm" / name).exists() or bool(history and (pathlib.Path(history) / "pm" / name).exists())
+    return now.weekday() < 5 and 330 <= m < 960 and not have
 
 
 def main():
     now = pd.Timestamp.now(tz=NY)
     flag = os.environ.get("GITHUB_OUTPUT")
-    if "--if-due" in sys.argv and not due(now):
+    if "--if-due" in sys.argv and not due(now, os.environ.get("KCDT_HISTORY")):
         print(f"not due ({now:%Y-%m-%d %H:%M} New York)")
         if flag:
             open(flag, "a").write("run=false\n")
