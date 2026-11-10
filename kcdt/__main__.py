@@ -174,6 +174,19 @@ def drop_open_session(px, now=None):
     return px
 
 
+def last_day_coverage(px):
+    """(share of stocks with a close on the last S&P session, among those that had one the session before, date).
+
+    Yahoo sometimes returns the newest daily bar for the index but not for most stocks (10 Nov 2026 01:10 UTC:
+    80 of 2,711 had Monday's bar). build() fills gaps from the day before, so publishing then would label
+    Friday's prices as Monday's close, every change 0%."""
+    c = px["Close"]
+    days = c["^GSPC"].dropna().index
+    c = c.sort_index().loc[days[-2:], [t for t in c.columns if not t.startswith("^")]]
+    had = c.iloc[0].notna()
+    return float(c.iloc[1][had].notna().mean()) if had.any() else 0.0, days[-1].strftime("%Y-%m-%d")
+
+
 def say(msg, t0=time.time()):
     print(f"[{(time.time() - t0) / 60:4.1f} min] {msg}", flush=True)
 
@@ -195,7 +208,12 @@ def main():
             return
     meta = universe()
     px = drop_open_session(fetch_prices(meta))
-    say(f"prices to {px['Close'].index[-1]:%Y-%m-%d}")
+    cover, last = last_day_coverage(px)
+    say(f"prices to {last}: {cover:.1%} of stocks have that day's close")
+    if cover < 0.9:
+        # exit code 1: the report job opens an issue, and the next backup slot (or the Claude check) tries again
+        sys.exit(f"only {cover:.1%} of stocks have a close for {last}: Yahoo hasn't posted the day yet. "
+                 "Not publishing, so the site keeps the previous close instead of showing old prices as new.")
     want = wants_fundamentals(px, meta)
     fund = fundamentals(want, ROOT / "cache" / "fundamentals.json", max_calls=budget["fund"])
     say("fundamentals")
