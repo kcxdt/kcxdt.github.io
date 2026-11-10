@@ -364,7 +364,8 @@ table.ind{max-width:880px}
 /* journal */
 .jform form{display:grid;gap:12px}
 .jgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px 14px}
-.jgrid.wide{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.jgrid.wide{grid-template-columns:repeat(3,minmax(0,1fr))}  /* 買入理由／賣出理由／復盤筆記: three equal boxes across the row */
+@media (max-width:700px){.jgrid.wide{grid-template-columns:1fr}}
 .jgrid label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
 .jgrid input,.jgrid textarea{font:inherit;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);min-width:0}
 .jshots{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -2316,9 +2317,7 @@ const JX_F=[  // [field, label, required, synonyms (lower case, no spaces)]
   ['mood','交易情緒',0,['交易情緒','情緒','心態','emotion','mood']],
   ['why_in','買入理由',0,['買入理由','入場理由','開倉理由','entryreason','reasonin','whyin']],
   ['why_out','賣出理由',0,['賣出理由','出場理由','平倉理由','exitreason','reasonout','whyout']],
-  ['review','復盤筆記',0,['復盤筆記','復盤','筆記','備註','備忘','notes','note','review','remarks','comment','comments']],
-  ['cm','合約月份',0,['合約月份','contractmonth','expiry']],
-  ['mult','合約乘數',0,['合約乘數','乘數','multiplier','pointvalue']]];
+  ['review','復盤筆記',0,['復盤筆記','復盤','筆記','備註','備忘','notes','note','review','remarks','comment','comments']]];
 const jxNorm = h => String(h??'').toLowerCase().replace(/[（(][^）)]*[）)]/g,'').replace(/[\s_:：*#]/g,'');
 let JX = null;  // {wb, buf, rows, r0, hrow, map:{field: colIndex}, sheet, img}
 function jxLib(){ return window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok,bad)=>{ const sc=document.createElement('script');
@@ -2373,7 +2372,7 @@ function jxRow(r, M, dmy, tz){ const g=k=>M[k]==null?'':r[M[k]];
   if(!o) return {bad:`開倉日期讀唔到（${esc(g('open')||'空白')}）`};
   if(qty==null||!qty) return {bad:'冇數量'}; if(buy==null) return {bad:'冇入場價'};
   const mkt=jxMkt(g('mkt'),sym), side=jxSide(g('side'))||(qty<0?'S':'L');
-  const t={ sym, mkt, side, cm:mkt==='fut'?String(g('cm')).trim():'', mult:mkt==='fut'?(jxNum(g('mult'))||JX_MULT[sym.replace(/[FGHJKMNQUVXZ]\d{1,2}$/,'')]||20):null,
+  const t={ sym, mkt, side, cm:'', mult:mkt==='fut'?(JX_MULT[sym.replace(/[FGHJKMNQUVXZ]\d{1,2}$/,'')]||20):null,  // futures multiplier from the code (NQ 20, MNQ 2…)
     open:o.d, otime:jxTime(g('otime'))||o.t, close:c?c.d:null, ctime:c?(jxTime(g('ctime'))||c.t):'', tz,
     buy:Math.abs(buy), sell:sell==null?null:Math.abs(sell), qty:Math.abs(qty), fee:Math.abs(jxNum(g('fee'))||0),
     tp:jxNum(g('tp')), sl:jxNum(g('sl')), risk:jxNum(g('risk')),
