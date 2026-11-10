@@ -387,7 +387,7 @@ table.ind{max-width:880px}
 #j-xl::backdrop{background:rgb(0 0 0 / .6)}
 .jxl{display:grid;gap:10px}
 .jxl h3{margin:6px 0 0}
-#jx-map select{width:100%}
+#jx-map select,#jx-map2 select{width:100%}
 #jx-map label.miss{color:var(--hot)}
 #jx-prev td{white-space:nowrap}
 #jx-bad li{color:var(--hot)}
@@ -739,8 +739,10 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <div class="cfbar"><label id="jx-sheetw">工作表 <select id="jx-sheet"></select></label><label>欄名喺第 <input type="number" id="jx-hrow" min="1" style="width:4.5em"> 行</label>
         <label>時間係 <select id="jx-tz"><option value="HK">香港時間</option><option value="NY">美東時間</option></select></label></div>
       <h3>欄位對應 <span class="muted small" id="jx-mapn"></span></h3>
-      <p class="muted small">自動按欄名對好咗；唔啱可以改。最少要有代號、開倉日期、數量同入場價。</p>
+      <p class="muted small">自動按欄名對好咗；唔啱可以改。最少要有股票代號、開倉日期、股數同入場價。</p>
       <div class="jgrid" id="jx-map"></div>
+      <div class="jgrid wide" id="jx-map2"></div>
+      <p class="muted small" id="jx-shots"></p>
       <h3>預覽 <span class="muted small" id="jx-sum"></span></h3>
       <div class="tablewrap"><table><thead><tr><th>行</th><th>代號</th><th>市場</th><th>方向</th><th>開倉</th><th>平倉</th><th class="r">入場價</th><th class="r">出場價</th><th class="r">數量</th><th class="r">手續費</th><th>策略</th><th>截圖</th></tr></thead><tbody id="jx-prev"></tbody></table></div>
       <ul class="small" id="jx-bad"></ul>
@@ -2298,26 +2300,26 @@ async function jReload(){ TR = await DB.all('trades'); $('j-where').textContent 
 // Reads the first sheet's header row, matches column names to journal fields (Chinese or English, incl. our own CSV export),
 // lets the person fix the mapping, previews, then saves. The trade id comes from the trade's contents, so importing the same file twice overwrites.
 const XLSX_JS='xlsx.full.min.js';  // SheetJS, served with the site (kcdt/static), fetched only when someone imports
-const JX_F=[  // [field, label, required, synonyms (lower case, no spaces)]
-  ['sym','代號',1,['代號','股票代號','代碼','股票代碼','證券代碼','代號／合約','symbol','ticker','code','stock','instrument','合約','產品','證券']],
+const JX_F=[  // in the 新增交易 form's order and labels; the last three are the wide note boxes
   ['mkt','市場',0,['市場','market','類別','類型','assettype','assetclass']],
   ['side','方向',0,['方向','side','direction','longshort','long/short','買賣','買/賣','買賣方向','交易方向','action','buy/sell']],
+  ['sym','股票代號',1,['代號','股票代號','代碼','股票代碼','證券代碼','代號／合約','symbol','ticker','code','stock','instrument','合約','產品','證券']],
   ['open','開倉日期',1,['開倉日期','開倉','入場日期','買入日期','開倉日','opendate','entrydate','buydate','opened','date','日期','交易日期','成交日期']],
   ['otime','開倉時間',0,['開倉時間','入場時間','買入時間','opentime','entrytime','buytime','time','時間','成交時間']],
   ['close','平倉日期',0,['平倉日期','平倉','出場日期','賣出日期','平倉日','closedate','exitdate','selldate','closed']],
   ['ctime','平倉時間',0,['平倉時間','出場時間','賣出時間','closetime','exittime','selltime']],
-  ['qty','數量',1,['數量','股數','合約數','手數','成交數量','持倉數量','qty','quantity','shares','size','contracts','position']],
+  ['qty','股數',1,['數量','股數','合約數','手數','成交數量','持倉數量','qty','quantity','shares','size','contracts','position']],
   ['buy','入場價',1,['入場價','買入價','開倉價','入場價格','買入價格','開倉價格','成本價','entryprice','buyprice','openprice','entry','avgentry','avgprice','price','成交價','價格']],
   ['sell','出場價',0,['出場價','賣出價','平倉價','出場價格','賣出價格','平倉價格','exitprice','sellprice','closeprice','exit','avgexit']],
-  ['fee','手續費',0,['手續費','佣金','費用','交易費用','fee','fees','commission','commissions','comm']],
+  ['fee','手續費（USD）',0,['手續費','佣金','費用','交易費用','fee','fees','commission','commissions','comm']],
   ['strat','策略類型',0,['策略類型','策略','setup','strategy','playbook']],
   ['tp','預計止盈',0,['預計止盈','預計盈利','止盈','止賺','止盈價','目標價','takeprofit','target','tp']],
   ['sl','預計止損',0,['預計止損','預計虧損','止損','止蝕','止損價','stoploss','stop','sl']],
-  ['risk','計劃風險',0,['計劃風險','風險','風險金額','risk','plannedrisk','riskamount']],
+  ['risk','計劃風險（USD）',0,['計劃風險','風險','風險金額','risk','plannedrisk','riskamount']],
   ['mood','交易情緒',0,['交易情緒','情緒','心態','emotion','mood']],
   ['why_in','買入理由',0,['買入理由','入場理由','開倉理由','entryreason','reasonin','whyin']],
   ['why_out','賣出理由',0,['賣出理由','出場理由','平倉理由','exitreason','reasonout','whyout']],
-  ['review','復盤筆記',0,['復盤筆記','復盤','筆記','備註','備忘','notes','note','review','remarks','comment','comments']]];
+  ['review','復盤筆記（做對／做錯）',0,['復盤筆記','復盤','筆記','備註','備忘','notes','note','review','remarks','comment','comments']]];
 const jxNorm = h => String(h??'').toLowerCase().replace(/[（(][^）)]*[）)]/g,'').replace(/[\s_:：*#]/g,'');
 let JX = null;  // {wb, buf, rows, r0, hrow, map:{field: colIndex}, sheet, img}
 function jxLib(){ return window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok,bad)=>{ const sc=document.createElement('script');
@@ -2426,8 +2428,11 @@ function jxParse(){ const {rows,hrow,map,r0}=JX, body=rows.slice(hrow+1), tz=$('
   return {ok,bad} }
 function jxDraw(){ const head=(JX.rows[JX.hrow]||[]).map(String), cols=Math.max(head.length,...JX.rows.slice(JX.hrow,JX.hrow+50).map(r=>r.length));
   const letter=i=>XLSX.utils.encode_col(i), opts=Array.from({length:cols},(_,i)=>`<option value="${i}">${letter(i)}：${esc(head[i]||'（冇欄名）')}</option>`).join('');
-  $('jx-map').innerHTML=JX_F.map(([k,l,req])=>`<label class="${req&&JX.map[k]==null?'miss':''}">${l}${req?' *':''}<select data-k="${k}"><option value="">— 冇 —</option>${opts}</select></label>`).join('');
-  $('jx-map').querySelectorAll('select').forEach(sel=>{ sel.value=JX.map[sel.dataset.k]??''; sel.onchange=()=>{ const k=sel.dataset.k;
+  const sel=([k,l,req])=>`<label class="${req&&JX.map[k]==null?'miss':''}">${l}${req?' *':''}<select data-k="${k}"><option value="">— 冇 —</option>${opts}</select></label>`, WIDE=['why_in','why_out','review'];
+  $('jx-map').innerHTML=JX_F.filter(x=>!WIDE.includes(x[0])).map(sel).join(''); $('jx-map2').innerHTML=JX_F.filter(x=>WIDE.includes(x[0])).map(sel).join('');
+  const nImg=Object.values(JX.img||{}).reduce((a,x)=>a+x.length,0);
+  $('jx-shots').textContent=`交易截圖：${!JX.buf?'CSV 冇圖':nImg?`會自動讀入每行入面嘅圖（呢張表有 ${nImg} 張，每單最多 2 張）`:'呢張表入面冇圖'}；匯入之後都可以喺表格撳「加截圖」再加。`;
+  document.querySelectorAll('#jx-map select,#jx-map2 select').forEach(sel=>{ sel.value=JX.map[sel.dataset.k]??''; sel.onchange=()=>{ const k=sel.dataset.k;
     if(sel.value==='') delete JX.map[k]; else { for(const f in JX.map) if(JX.map[f]===+sel.value) delete JX.map[f]; JX.map[k]=+sel.value } jxDraw() } });
   $('jx-mapn').textContent=`對到 ${Object.keys(JX.map).length} 個欄位`;
   const miss=JX_F.filter(f=>f[2]&&JX.map[f[0]]==null).map(f=>f[1]);
