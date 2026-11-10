@@ -364,8 +364,7 @@ table.ind{max-width:880px}
 /* journal */
 .jform form{display:grid;gap:12px}
 .jgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px 14px}
-.jgrid.wide{grid-template-columns:repeat(3,minmax(0,1fr))}  /* 買入理由／賣出理由／復盤筆記: three equal boxes across the row */
-@media (max-width:700px){.jgrid.wide{grid-template-columns:1fr}}
+.jgrid.wide{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
 .jgrid label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
 .jgrid input,.jgrid textarea{font:inherit;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);min-width:0}
 .jshots{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -383,7 +382,7 @@ table.ind{max-width:880px}
 #j-img{border:0;border-radius:10px;padding:10px;background:var(--panel);max-width:96vw}
 #j-img img{max-width:92vw;max-height:80vh;display:block;margin-bottom:8px}
 #j-img::backdrop{background:rgb(0 0 0 / .6)}
-#j-xl{border:0;border-radius:10px;padding:16px;background:var(--bg);color:var(--ink);width:min(1100px,96vw);max-height:92vh}
+#j-xl{border:0;border-radius:10px;padding:16px;background:var(--bg);color:var(--ink);width:min(1720px,96vw);max-height:92vh}  /* as wide as the 新增交易 form, so the grid matches it */
 #j-xl::backdrop{background:rgb(0 0 0 / .6)}
 .jxl{display:grid;gap:10px}
 .jxl h3{margin:6px 0 0}
@@ -736,13 +735,13 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
     <dialog id="j-xl" aria-labelledby="h-jxl"><form method="dialog" class="jxl">
       <div class="sechead"><h2 id="h-jxl">匯入 Excel／CSV</h2><button class="tog" value="no" aria-label="關閉">×</button></div>
       <p class="muted small" id="jx-file"></p>
-      <div class="cfbar"><label id="jx-sheetw">工作表 <select id="jx-sheet"></select></label><label>欄名喺第 <input type="number" id="jx-hrow" min="1" style="width:4.5em"> 行</label>
-        <label>時間係 <select id="jx-tz"><option value="HK">香港時間</option><option value="NY">美東時間</option></select></label></div>
+      <div class="cfbar"><label id="jx-sheetw">工作表 <select id="jx-sheet"></select></label><label>欄名喺第 <input type="number" id="jx-hrow" min="1" style="width:4.5em"> 行</label></div>
       <h3>欄位對應 <span class="muted small" id="jx-mapn"></span></h3>
-      <p class="muted small">自動按欄名對好咗；唔啱可以改。最少要有股票代號、開倉日期、股數同入場價。</p>
+      <p class="muted small">排位同「新增交易」一樣：每格揀 Excel 邊一欄填入去，已經按欄名自動對好咗，唔啱可以改。最少要有股票代號、開倉日期、股數同入場價。</p>
       <div class="jgrid" id="jx-map"></div>
+      <p class="muted small">時間用 <select id="jx-tz" aria-label="時間時區"><option value="HK">香港時間</option><option value="NY">美東時間</option></select> 填（只影響「按時段」統計）。</p>
       <div class="jgrid wide" id="jx-map2"></div>
-      <p class="muted small" id="jx-shots"></p>
+      <div class="jshots"><span class="muted small" id="jx-shots"></span></div>
       <h3>預覽 <span class="muted small" id="jx-sum"></span></h3>
       <div class="tablewrap"><table><thead><tr><th>行</th><th>代號</th><th>市場</th><th>方向</th><th>開倉</th><th>平倉</th><th class="r">入場價</th><th class="r">出場價</th><th class="r">數量</th><th class="r">手續費</th><th>策略</th><th>截圖</th></tr></thead><tbody id="jx-prev"></tbody></table></div>
       <ul class="small" id="jx-bad"></ul>
@@ -2431,7 +2430,7 @@ function jxDraw(){ const head=(JX.rows[JX.hrow]||[]).map(String), cols=Math.max(
   const sel=([k,l,req])=>`<label class="${req&&JX.map[k]==null?'miss':''}">${l}${req?' *':''}<select data-k="${k}"><option value="">— 冇 —</option>${opts}</select></label>`, WIDE=['why_in','why_out','review'];
   $('jx-map').innerHTML=JX_F.filter(x=>!WIDE.includes(x[0])).map(sel).join(''); $('jx-map2').innerHTML=JX_F.filter(x=>WIDE.includes(x[0])).map(sel).join('');
   const nImg=Object.values(JX.img||{}).reduce((a,x)=>a+x.length,0);
-  $('jx-shots').textContent=`交易截圖：${!JX.buf?'CSV 冇圖':nImg?`會自動讀入每行入面嘅圖（呢張表有 ${nImg} 張，每單最多 2 張）`:'呢張表入面冇圖'}；匯入之後都可以喺表格撳「加截圖」再加。`;
+  $('jx-shots').textContent=`交易截圖（最多 2 張，會自動壓細）：${!JX.buf?'CSV 冇圖':nImg?`會自動讀入每行入面嘅圖（呢張表有 ${nImg} 張）`:'呢張表入面冇圖'}；匯入之後都可以喺表格撳「加截圖」再加。`;
   document.querySelectorAll('#jx-map select,#jx-map2 select').forEach(sel=>{ sel.value=JX.map[sel.dataset.k]??''; sel.onchange=()=>{ const k=sel.dataset.k;
     if(sel.value==='') delete JX.map[k]; else { for(const f in JX.map) if(JX.map[f]===+sel.value) delete JX.map[f]; JX.map[k]=+sel.value } jxDraw() } });
   $('jx-mapn').textContent=`對到 ${Object.keys(JX.map).length} 個欄位`;
