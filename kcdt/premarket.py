@@ -16,7 +16,7 @@ import time
 import pandas as pd
 import requests
 
-from .__main__ import OUT, ROOT, now_utc, pass_kc, render
+from .__main__ import OUT, ROOT, now_utc, pass_kc, write_page
 from .fetch import NASDAQ_UA, EARN_TIME, economic_calendar
 
 NY = "America/New_York"
@@ -287,7 +287,7 @@ def main():
         data["econ"], data["econ_t"] = econ, now_utc()
     data["pm_t"], data["pm_d"] = brief["t"], brief["d"]
     path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    (OUT / "index.html").write_text(render(data), encoding="utf-8")
+    write_page(data)
     if flag:
         open(flag, "a").write("run=true\n")
 

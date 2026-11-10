@@ -1,9 +1,15 @@
 name: Daily update
 
+# The close update. 21:50 UTC = 16:50 New York in winter, 17:50 in summer. GitHub often starts scheduled runs
+# late or drops them (09 Nov 2026: the 22:30 run never started), so later slots are backups: with --if-due a run
+# stops in seconds when the day's close is already on the history branch, or New York's day isn't a trading day.
+# A Claude scheduled task also checks at 17:47 New York and dispatches this workflow when the close is missing.
+# The slow fundamentals refresh runs at midday in refresh.yml, so this build takes ~10 minutes, not ~26.
 on:
   schedule:
-    # 22:30 UTC Mon–Fri = after the US close in both summer and winter time
-    - cron: "30 22 * * 1-5"
+    - cron: "50 21 * * 1-5"
+    - cron: "50 22,23 * * 1-5"
+    - cron: "50 1,3 * * 2-6"
   workflow_dispatch:
 
 permissions:
@@ -19,6 +25,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.build.outputs.run }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,11 +51,14 @@ jobs:
           else
             git init --quiet -b history hist && git -C hist remote add origin "$url"
           fi
-      - run: python -m kcdt
+      - id: build
+        name: Build the site
         env:
           KCDT_HISTORY: hist
+          KCDT_MODE: close
+        run: python -m kcdt ${{ github.event_name == 'schedule' && '--if-due' || '' }}
       - name: Save today's snapshot
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && steps.build.outputs.run == 'true'
         run: |
           cd hist
           git add -A
@@ -56,15 +67,17 @@ jobs:
           git push --quiet origin history
       # The intraday econ refresh (econ.yml) starts from this build
       - uses: actions/cache/save@v4
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && steps.build.outputs.run == 'true'
         with:
           path: site
           key: site-${{ github.run_id }}
       - uses: actions/upload-pages-artifact@v3
+        if: steps.build.outputs.run == 'true'
         with:
           path: site
   deploy:
     needs: build
+    if: needs.build.outputs.run == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -84,7 +97,7 @@ jobs:
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       NOTIFY: chovy723-bot  # KC's GitHub account: assigned + mentioned, so GitHub emails KC
     steps:
-      - if: needs.build.result != 'success' || needs.deploy.result != 'success'
+      - if: needs.build.result == 'failure' || needs.deploy.result == 'failure'
         run: |
           open=$(gh issue list --label update-failed --state open --json number -q '.[0].number')
           if [ -n "$open" ]; then

@@ -1,0 +1,58 @@
+name: Midday fundamentals refresh
+
+# Works through the slow one-by-one Yahoo / Nasdaq calls (revenue, EPS, sector, next report dates) during the US
+# day, so the close update (daily.yml) only fetches prices and finishes in ~10 minutes. Publishes nothing: it only
+# saves the refreshed cache, which the next close update starts from.
+# 17:40 UTC = 12:40 New York in winter, 13:40 in summer: by then Yahoo has the numbers of companies that reported
+# the evening before. 19:40 is a backup in case GitHub drops the first run; it stops when today's run already worked.
+on:
+  schedule:
+    - cron: "40 17,19 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fundamentals
+  cancel-in-progress: false
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
+        id: restore
+        with:
+          path: cache
+          key: fundamentals-latest
+          restore-keys: fundamentals-
+      - id: due
+        name: Already done today?
+        run: |
+          today=$(TZ=America/New_York date +%F)
+          if [ "${{ github.event_name }}" = schedule ] && [ "$(cat cache/warm.txt 2>/dev/null)" = "$today" ]; then
+            echo "already refreshed today ($today)"; echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-python@v5
+        if: steps.due.outputs.run == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+      - if: steps.due.outputs.run == 'true'
+        run: pip install -r requirements.txt
+      - if: steps.due.outputs.run == 'true'
+        env:
+          KCDT_MODE: warm
+        run: |
+          python -m kcdt
+          TZ=America/New_York date +%F > cache/warm.txt
+      - uses: actions/cache/save@v4
+        if: steps.due.outputs.run == 'true'
+        with:
+          path: cache
+          key: fundamentals-${{ github.run_id }}
