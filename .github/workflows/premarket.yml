@@ -14,6 +14,11 @@ on:
     - cron: "20 10,11 * * 1-5"
     - cron: "40 12,14,16,18 * * 1-5"
   workflow_dispatch:
+    inputs:
+      if_due:
+        description: "Only run when today's update is due and not done yet (used by the outside timer in timer/)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write  # keep the brief on the history branch
@@ -63,7 +68,7 @@ jobs:
           KCDT_HISTORY: hist
         run: |
           if [ ! -f site/data.json ]; then echo "no saved build yet; the next daily build will create one"; exit 1; fi
-          flag="${{ github.event_name == 'schedule' && '--if-due' || '' }}"
+          flag="${{ (github.event_name == 'schedule' || inputs.if_due) && '--if-due' || '' }}"
           # one retry for a passing hiccup (Yahoo / Nasdaq timeouts); the brief is only written when it succeeds
           python -m kcdt.premarket $flag || { echo "failed, trying again in 3 minutes"; sleep 180; python -m kcdt.premarket $flag; }
       - name: Save the brief
