@@ -8,10 +8,10 @@
 /* Layout: one page with tabs (大市 / 機會 / 選股器 / 業績) plus a stock page at #s/TICKER. */
 :root{
   /* neutral charcoal (KC, round 9): blue = selected / primary; green, red, yellow only for status */
-  --bg:#111318; --side:#15181e; --panel:#1a1e26; --raise:#20252f; --ink:#e8ecf2; --muted:#a6afbd; --line:#2d333e; --soft:#232833;
-  --accent:#8ab4f8; --link:#8ab4f8; --sel:#1e2a40; --selline:#36507c; --ctl:#20252e; --ctlline:#363d4a;
-  --cool:#3fb67a; --warm:#e3b341; --hot:#ef6b61;
-  --up:#4cc985; --down:#ef6b61; --flat:#4a5160; --tile-ink:#ffffff;
+  --bg:#0f1217; --side:#141820; --panel:#1a1f27; --raise:#202630; --ink:#e4e8f0; --muted:#9aa6ba; --line:#29303b; --soft:#232a35;
+  --accent:#a5b4f4; --link:#a5b4f4; --sel:#252f49; --selline:#45547a; --ctl:#171c25; --ctlline:#303947;
+  --cool:#68b49f; --warm:#dfb46c; --hot:#e0858f;
+  --up:#6fbfa6; --down:#e0858f; --flat:#4a5160; --tile-ink:#ffffff;
   --f-logo:"Noto Serif HK","Songti TC",serif;  /* the KCDT logo only */
   --f-display:var(--f-body);
   --f-body:"Noto Sans HK","Noto Sans TC","PingFang HK","Microsoft JhengHei",system-ui,sans-serif;
@@ -75,7 +75,7 @@ nav.tabs a{flex:none;text-decoration:none;color:var(--muted);padding:8px 14px;bo
 nav.tabs a:hover{color:var(--ink)}
 nav.tabs a[aria-current="page"]{color:var(--accent);border-bottom-color:var(--accent)}
 nav.tabs>div{display:contents}
-nav.tabs .side-brand,nav.tabs .side-foot,nav.tabs .navgrp,nav.tabs .navmore,.navsheet{display:none}
+nav.tabs .side-brand,nav.tabs .side-foot,nav.tabs .navmore,.navsheet{display:none}
 @media (min-width:1100px){
   .wrap{max-width:none;margin:0;grid-template-columns:220px minmax(0,1fr);column-gap:32px;padding-left:0;padding-right:32px}
   .wrap>*{grid-column:2}
@@ -87,13 +87,6 @@ nav.tabs .side-brand,nav.tabs .side-foot,nav.tabs .navgrp,nav.tabs .navmore,.nav
   nav.tabs a[aria-current="page"]{background:var(--sel);color:var(--ink);box-shadow:inset 3px 0 0 var(--accent)}
   nav.tabs .side-brand{display:block;padding:4px 6px 18px;text-decoration:none}
   nav.tabs .side-brand .h1{color:var(--ink);font-size:30px}
-  nav.tabs .navgrp{display:flex;align-items:center;justify-content:space-between;width:calc(100% - 12px);margin:10px 6px 2px;padding:12px 8px 4px;border:0;border-top:1px solid var(--line);background:none;font:inherit;font-size:13px;color:var(--muted);font-weight:500;cursor:pointer;text-align:left}
-  nav.tabs .navgrp:hover{color:var(--ink)}
-  nav.tabs .navgrp i{font-style:normal;font-size:12px;width:12px;text-align:center}
-  nav.tabs .navgrp i::before{content:"▾"}
-  nav.tabs .navgrp[aria-expanded="false"] i::before{content:"▸"}
-  nav.tabs a.gx{display:none}
-  nav.tabs .side-brand+.navgrp{margin-top:0;border-top:0;padding-top:0}
   nav.tabs .navabout{margin-top:14px;border-top:1px solid var(--line)!important;border-radius:0 0 9px 9px}
   nav.tabs .side-foot{display:block;margin-top:18px;padding:12px 6px 0;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
   .top .brand{display:none}
@@ -422,11 +415,93 @@ tr.nextev td{background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
 .wlpick .row{display:flex;gap:8px;justify-content:flex-end}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 16px;border-radius:999px;font-size:14px;z-index:9;max-width:90vw}
 footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px;display:grid;gap:6px}
+
+/* ===== sidebar v2 and 今日總覽 (KC, 2026-11-10: layout from KC's preview) ===== */
+nav.tabs a svg,nav.tabs .navlab,nav.tabs .wcount,nav.tabs .side-bottom{display:none}
+nav.tabs a em{font-style:normal}
+@media (max-width:1099px){nav.tabs a em{display:none}}
+@media (min-width:1100px){
+  .wrap{grid-template-columns:210px minmax(0,1fr);column-gap:0;padding-right:0}
+  .wrap>:not(nav){width:calc(100% - 64px);max-width:1600px;justify-self:center;box-sizing:border-box}
+  nav.tabs{position:fixed;inset:0 auto 0 0;width:210px;box-sizing:border-box;margin:0;padding:22px 12px 16px;overflow-y:auto;scrollbar-width:thin;gap:0;z-index:20}
+  nav.tabs>div{position:static;display:flex;flex-direction:column;gap:3px;flex:1 0 auto;min-height:100%}
+  nav.tabs .side-brand{display:flex;align-items:center;gap:10px;padding:0 6px 14px;border-radius:0}
+  nav.tabs .kmark{font:italic 600 27px system-ui,sans-serif;letter-spacing:-3px;color:var(--accent);padding-right:4px}
+  nav.tabs .kmark i{color:var(--ink)}
+  nav.tabs .kword{font-family:var(--f-body);font-weight:800;font-size:24px;letter-spacing:1.6px;color:var(--ink);line-height:1.15}
+  nav.tabs .kword small{display:block;font-size:12px;font-weight:500;letter-spacing:0;color:var(--muted)}
+  nav.tabs .navlab{display:block;font-size:12px;font-weight:500;color:var(--muted);opacity:.75;padding:14px 12px 3px}
+  nav.tabs a[data-v]{display:flex;align-items:center;gap:11px;padding:8px 12px;border-radius:7px;font-size:14px;min-height:38px;box-sizing:border-box;color:var(--muted)}
+  nav.tabs a[data-v]:hover{background:var(--raise);color:var(--ink)}
+  nav.tabs a[data-v][aria-current="page"]{background:var(--sel);color:var(--accent);box-shadow:none}
+  nav.tabs a svg{display:block;width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  nav.tabs .wcount{display:inline-block;margin-left:auto;background:var(--raise);border-radius:4px;padding:0 6px;font-size:12px;line-height:1.6;color:var(--muted)}
+  nav.tabs .navabout{margin-top:0;border-top:0!important;border-radius:7px}
+  nav.tabs .side-bottom{display:block;margin-top:auto;padding-top:18px}
+  nav.tabs a.side-status{display:flex;align-items:center;gap:8px;padding:10px 8px;font-size:13px;font-weight:400;color:var(--muted);border-radius:7px}
+  nav.tabs a.side-status:hover{color:var(--ink)}
+  .side-status i{width:7px;height:7px;border-radius:50%;background:var(--cool);flex:none}
+  .side-status i.w{background:var(--warm)} .side-status i.b{background:var(--hot)}
+  nav.tabs a.side-status svg{margin-left:auto;width:14px;height:14px}
+  .side-user{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding:14px 6px 0;font-size:13px;min-width:0}
+  .side-user>div{min-width:0;line-height:1.4}
+  .side-user b,.side-user small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .side-user b{font-weight:500} .side-user small{color:var(--muted);font-size:12px}
+  .side-av{flex:none;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--raise);display:grid;place-items:center;color:var(--accent);font-size:12px;font-weight:600}
+  #side-theme{margin-left:auto;flex:none;background:none;border:0;border-radius:6px;color:var(--muted);cursor:pointer;padding:5px;line-height:0}
+  #side-theme:hover{color:var(--ink)} #side-theme:focus-visible{outline:2px solid var(--accent)}
+  #side-theme svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round}
+  nav.tabs .side-foot{margin-top:14px;padding:12px 6px 0;font-size:12px}
+  .top .themesw{display:none}
+}
+.ov-head{display:flex;justify-content:space-between;align-items:center;gap:12px 24px;flex-wrap:wrap}
+.ov-head h2{font-size:clamp(22px,2.4vw,28px);font-weight:700;line-height:1.4}
+.ov-head h2 span{color:var(--muted)}
+.ov-go{background:var(--accent);color:#141d39;padding:10px 18px;border-radius:7px;text-decoration:none;font-size:14px;font-weight:600;white-space:nowrap}
+:root[data-theme="light"] .ov-go{color:#fff}
+.ov-links{display:flex;gap:8px;flex-wrap:wrap}
+.ov-links a{border:1px solid var(--line);border-radius:6px;padding:6px 11px;color:var(--muted);font-size:13px;text-decoration:none}
+.ov-links a:hover{color:var(--accent);border-color:var(--accent)}
+.ov-date{border-bottom:1px solid var(--line);padding-bottom:14px;font-size:13px;color:var(--muted)}
+.ov-date b{color:var(--accent);font-weight:500}
+.ov-3{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:16px}
+.ov-2{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(300px,1fr);gap:16px}
+.ov-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;min-width:0;display:flex;flex-direction:column}
+.ov-lab{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 12px;font-size:15px;font-weight:600;margin-bottom:14px}
+.ov-lab>span:first-child{white-space:nowrap}
+.ov-lab small,.ov-lab a{font-size:13px;font-weight:400;color:var(--muted);text-decoration:none}
+.ov-lab a{color:var(--link)}
+.ov-card h3{font-size:17px}
+.ov-card p{font-size:13px;color:var(--muted)}
+.ov-risk{display:grid;grid-template-columns:52px 86px 1fr auto;gap:10px;align-items:center;margin-top:14px;font-size:13px;color:var(--muted)}
+.ov-risk strong{font-size:25px;font-weight:500;color:var(--ink)}
+.ov-risk strong small{font-size:12px;color:var(--muted);font-weight:400}
+.ov-track{height:6px;background:var(--line);border-radius:3px;overflow:hidden;display:block}
+.ov-track b{display:block;height:100%;border-radius:3px;background:var(--accent)}
+.ov-num{font-size:38px;font-weight:500;line-height:1.2;margin:4px 0 6px}
+.ov-num small{font-size:18px;color:var(--muted)}
+.ov-num.ev{font-size:25px;margin:8px 0 4px}
+.ov-card .ov-track.big{margin:16px 0 10px}
+.ov-foot{margin-top:auto;padding-top:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.ov-foot a{text-decoration:none}
+.ov-price{font-size:27px;font-weight:500}
+.ov-price small{font-size:14px;margin-left:8px}
+.ov-chart svg{display:block;width:100%;height:auto;margin-top:8px}
+.ov-chart text{fill:var(--muted);font-size:12px}
+.ov-sec{margin-top:6px}
+.ov-sec>div{display:grid;grid-template-columns:104px 1fr 56px;gap:10px;align-items:center;min-height:42px;font-size:14px}
+.ov-sec small{font-size:12px;color:var(--muted)}
+.ov-sec strong{text-align:right;font-weight:500}
+.ov-sec .ov-track{height:7px}
+.ov-empty{padding:28px 10px;color:var(--muted);font-size:14px;line-height:2;text-align:center}
+.ov-co{display:block;color:var(--muted);font-size:12px}
+@media (max-width:1000px){.ov-3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.ov-3>:first-child{grid-column:1/-1}.ov-2{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.ov-3{grid-template-columns:minmax(0,1fr)}.ov-card{padding:16px}.ov-num{font-size:32px}.ov-risk{grid-template-columns:48px 78px 1fr auto}.ov-go{padding:8px 12px}}
 </style>
 
 <div class="wrap">
   <header class="top">
-    <a class="brand" href="#market"><h1>KCDT</h1><span class="eyebrow">美股趨勢溫度計</span></a>
+    <a class="brand" href="#overview"><h1>KCDT</h1><span class="eyebrow">美股趨勢溫度計</span></a>
     <form class="search" id="searchform" role="search" autocomplete="off">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input id="q" list="tickers" placeholder="搵股票：代號或公司名，例如 NVDA" aria-label="搵股票">
@@ -440,28 +515,38 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   <div class="stale" id="stale" role="alert" hidden></div>
 
   <nav class="tabs" aria-label="頁面"><div>
-    <a class="side-brand" href="#market"><div class="h1">KCDT</div><span class="eyebrow">美股趨勢溫度計</span></a>
-    <button type="button" class="navgrp" data-g="look" aria-expanded="true"><span>睇市</span><i aria-hidden="true"></i></button>
-    <a href="#market" data-v="market" data-g="look">大市</a>
-    <a href="#pm" data-v="pm" data-g="look">盤前需知</a>
-    <a href="#news" data-v="news" data-g="look" class="mx">經濟及新聞</a>
-    <a href="#earnings" data-v="earnings" data-g="look" class="mx">業績日曆</a>
-    <button type="button" class="navgrp" data-g="pick" aria-expanded="true"><span>選股</span><i aria-hidden="true"></i></button>
-    <a href="#ideas" data-v="ideas" data-g="pick" class="mx">機會</a>
-    <a href="#screener" data-v="screener" data-g="pick">選股器</a>
-    <a href="#watch" data-v="watch" data-g="pick">自選</a>
-    <button type="button" class="navgrp" data-g="review" aria-expanded="true"><span>復盤</span><i aria-hidden="true"></i></button>
-    <a href="#journal" data-v="journal" data-g="review" class="mx">交易日誌</a>
-    <a href="#history" data-v="history" data-g="review" class="mx">歷史</a>
-    <a href="#about" data-v="about" class="navabout mx">說明及數據狀態</a>
+    <a class="side-brand" href="#overview"><span class="kmark" aria-hidden="true">k<i>c</i></span><span class="kword">KCDT<small>美股趨勢溫度計</small></span></a>
+    <span class="navlab">睇市</span>
+    <a href="#overview" data-v="overview" data-g="look"><span><em>今日</em>總覽</span></a>
+    <a href="#market" data-v="market" data-g="look"><span>大市<em>及指標</em></span></a>
+    <a href="#pm" data-v="pm" data-g="look"><span>盤前需知</span></a>
+    <a href="#news" data-v="news" data-g="look" class="mx"><span>經濟及新聞</span></a>
+    <a href="#earnings" data-v="earnings" data-g="look" class="mx"><span>業績日曆</span></a>
+    <span class="navlab">揀股</span>
+    <a href="#ideas" data-v="ideas" data-g="pick" class="mx"><span>機會<em>及訊號</em></span></a>
+    <a href="#screener" data-v="screener" data-g="pick"><span>選股器</span></a>
+    <a href="#watch" data-v="watch" data-g="pick"><span>自選<em>清單</em></span><span class="wcount num" id="side-wl">0</span></a>
+    <span class="navlab">覆盤</span>
+    <a href="#journal" data-v="journal" data-g="review" class="mx"><span>交易日誌</span></a>
+    <a href="#history" data-v="history" data-g="review" class="mx"><span>歷史<em>日期</em></span></a>
+    <span class="navlab">資料</span>
+    <a href="#about" data-v="about" class="navabout mx"><span>說明及數據狀態</span></a>
     <a href="#" data-v="stock" class="stk" id="stocktab" hidden></a>
     <button type="button" class="navmore" id="navmore" aria-expanded="false" aria-controls="navsheet">更多 <i aria-hidden="true">▾</i></button>
-    <p class="side-foot">只供數據參考及教育用途，唔係投資建議。</p>
+    <div class="side-bottom">
+      <a class="side-status" href="#about"><i id="side-dot"></i><span id="side-st">數據狀態</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></a>
+      <div class="side-user"><span class="side-av" id="side-av" aria-hidden="true">KC</span><div><b id="side-name">未登入</b><small id="side-sub">紀錄存喺呢部機</small></div>
+        <button type="button" id="side-theme" aria-label="切換深色／白色背景" title="切換深色／白色背景"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.4 1.4m11.2 11.2L19 19M5 19l1.4-1.4M17.6 6.4 19 5"/></svg></button></div>
+      <p class="side-foot">只供數據參考及教育用途，唔係投資建議。</p>
+    </div>
   </div></nav>
   <div class="panel navsheet" id="navsheet" hidden></div>
 
+  <!-- ===== 今日總覽 (the landing page; drawn from the same snapshot as 大市) ===== -->
+  <main class="view" id="v-overview" hidden></main>
+
   <!-- ===== 大市 ===== -->
-  <main class="view" id="v-market">
+  <main class="view" id="v-market" hidden>
     <section class="ovhead" aria-labelledby="h-ov">
       <h2 id="h-ov">大市概覽</h2>
       <p class="muted small" id="ov-t"></p>
@@ -871,7 +956,7 @@ const warnMark = s => (s.ew||[]).some(k=>k!=='turn'&&k!=='loss')?' <span class="
 const epsCell = s => { const t=epsTxt(s); return t==null?'<td class="r num"><span class="muted">—</span></td>'
   : `<td class="r num nowrap ${epsSign(s)?(epsSign(s)==='轉盈'||epsSign(s)==='虧損收窄'?'up':'down'):cls(s.eq)}"${s.ew?` title="${ewTitle(s)}"`:''}>${t}${warnMark(s)}</td>` };
 // Short company name for tight tables (full name stays on the stock page)
-const shortN = n => String(n||'').replace(/\s*-\s*Class [A-Z].*$/i,'').replace(/\s+(Common Stock|Ordinary Shares|Class [A-Z]( Common Stock| Ordinary Shares)?|American Depositary Shares.*|Depositary Shares.*)$/i,'')
+const shortN = n => String(n||'').replace(/\s*\([A-Z]{2}\)$/,'').replace(/\s*-\s*Class [A-Z].*$/i,'').replace(/\s+(Common Stock|Ordinary Shares|Class [A-Z]( Common Stock| Ordinary Shares)?|American Depositary Shares.*|Depositary Shares.*)$/i,'')
   .replace(/,?\s+(Inc\.?|Incorporated|Corp\.?|Corporation|Co\.?|Company|Ltd\.?|Limited|plc|PLC|N\.V\.|S\.A\.|AG|SE|Holdings?|Group|L\.P\.)$/i,'').replace(/,?\s+(Inc\.?|Corp\.?|Holdings?|Group)$/i,'').trim();
 // Sector (板塊) and industry (細分行業) from one source (Yahoo; index lists fill in sectors); missing = 未知
 const secZh = s => s.sec?(ZH[s.sec]||s.sec):'未知';
@@ -984,6 +1069,10 @@ drawStamps();
     box.hidden=false; box.classList.add('soft');
     box.innerHTML=`<b>今日收市數據更新緊：</b>美東 ${today} 收市後大約一個鐘內會更新，而家顯示嘅係 ${D.asof} 收市。重新整理頁面就會見到新數據。`;
   }
+  // sidebar light: the same three states as the banner above
+  const soft=!box.hidden&&box.classList.contains('soft');
+  $('side-dot').className = box.hidden?'':soft?'w':'b';
+  $('side-st').textContent = box.hidden?`數據正常 · ${D.asof.slice(5)} 收市`:soft?'今日收市更新緊':'數據未更新';
 })();
 
 // ---------- search ----------
@@ -999,15 +1088,15 @@ $('q').oninput = e => { $('q').setCustomValidity(''); if((!e.inputType || e.inpu
 // ---------- router ----------
 const drawn = {};
 function route(){
-  const h = decodeURIComponent(location.hash.slice(1)) || 'market';
-  let v = h.startsWith('s/') ? 'stock' : (['market','pm','ideas','watch','screener','earnings','news','journal','history','about'].includes(h)?h:'market');
-  if(!READY && v!=='market') v='wait';  // needs the stock rows: stocksReady() calls route() again
-  if(v==='stock' && !BY[h.slice(2)]) v='market';
+  const h = decodeURIComponent(location.hash.slice(1)) || 'overview';
+  let v = h.startsWith('s/') ? 'stock' : (['overview','market','pm','ideas','watch','screener','earnings','news','journal','history','about'].includes(h)?h:'overview');
+  if(!READY && v!=='market' && v!=='overview') v='wait';  // needs the stock rows: stocksReady() calls route() again
+  if(v==='stock' && !BY[h.slice(2)]) v='overview';
   document.querySelectorAll('.view').forEach(x=>x.hidden = x.id!=='v-'+v);
   document.querySelectorAll('nav.tabs a').forEach(a=>a.toggleAttribute('aria-current', a.dataset.v===v) || a.removeAttribute('aria-current'));
   document.querySelectorAll('nav.tabs a').forEach(a=>{ if(a.dataset.v===v) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current') });
   if(v==='stock'){ const t=h.slice(2); $('stocktab').hidden=false; $('stocktab').textContent=t; $('stocktab').href='#s/'+t; showStock(t) }
-  navGroups(); navSheet(false);
+  navSheet(false);
   const nav=document.querySelector('nav.tabs'), cur=nav.querySelector('a[aria-current="page"]');
   if(cur && nav.scrollWidth>nav.clientWidth){const a=cur.getBoundingClientRect(), n=nav.getBoundingClientRect(); nav.scrollLeft+=a.left-n.left-(n.width-a.width)/2}
   if(!drawn[v] && DRAW[v]){ DRAW[v](); drawn[v]=true }
@@ -1017,8 +1106,8 @@ const DRAW = {};
 
 // ---------- phones: main pages in the tab row, the rest under 更多 ----------
 function navSheet(open){ const b=$('navmore'), box=$('navsheet');
-  if(open && !box.innerHTML){ const G={look:'睇市',pick:'選股',review:'復盤'};
-    box.innerHTML=Object.entries(G).map(([g,n])=>`<div><span class="eyebrow">${n}</span>${[...document.querySelectorAll(`nav.tabs a[data-g="${g}"]`)].map(a=>`<a href="${a.getAttribute('href')}">${a.textContent}</a>`).join('')}</div>`).join('')
+  if(open && !box.innerHTML){ const G={look:'睇市',pick:'揀股',review:'覆盤'};
+    box.innerHTML=Object.entries(G).map(([g,n])=>`<div><span class="eyebrow">${n}</span>${[...document.querySelectorAll(`nav.tabs a[data-g="${g}"]`)].map(a=>`<a href="${a.getAttribute('href')}">${(a.querySelector('span')||a).textContent}</a>`).join('')}</div>`).join('')
       +'<div><span class="eyebrow">其他</span><a href="#about">說明及數據狀態</a></div>' }
   box.hidden=!open; b.setAttribute('aria-expanded',open);
   const cur=document.querySelector('nav.tabs a[aria-current="page"]');
@@ -1027,23 +1116,22 @@ function navSheet(open){ const b=$('navmore'), box=$('navsheet');
 $('navmore').onclick=()=>navSheet($('navsheet').hidden);
 document.addEventListener('pointerdown', e=>{ if(!$('navsheet').hidden && !e.target.closest('#navsheet,#navmore')) navSheet(false) });
 
-// ---------- sidebar groups (desktop): click a heading to collapse / expand; the current page's group stays open ----------
-const NAVKEY='kcdt-nav-closed';
-let navClosed=[]; try{navClosed=JSON.parse(localStorage.getItem(NAVKEY)||'[]')}catch(e){}
-function navGroups(){
-  const cur=(document.querySelector('nav.tabs a[aria-current="page"]')||{}).dataset?.g;
-  document.querySelectorAll('nav.tabs .navgrp').forEach(b=>{
-    const g=b.dataset.g, open=!navClosed.includes(g)||g===cur;
-    b.setAttribute('aria-expanded',open);
-    document.querySelectorAll(`nav.tabs a[data-g="${g}"]`).forEach(a=>a.classList.toggle('gx',!open));
-  });
-}
-document.querySelectorAll('nav.tabs .navgrp').forEach(b=>b.onclick=()=>{
-  const g=b.dataset.g, open=b.getAttribute('aria-expanded')==='true';
-  navClosed=navClosed.filter(x=>x!==g); if(open) navClosed.push(g);
-  try{localStorage.setItem(NAVKEY,JSON.stringify(navClosed))}catch(e){}
-  if(open){ document.querySelectorAll(`nav.tabs a[data-g="${g}"]`).forEach(a=>a.classList.add('gx')); b.setAttribute('aria-expanded','false') } else navGroups();
-});
+// ---------- sidebar (desktop): one icon per page, theme button ----------
+const NAVICON={
+  overview:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+  market:'<path d="M2 12h5l3-8 4 16 3-8h5"/>',
+  pm:'<path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 5v4M5 9l2 2M19 9l-2 2"/>',
+  news:'<path d="M4 5h13v14H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v8a2 2 0 0 1-2 2H6M8 9h5M8 13h5"/>',
+  earnings:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/>',
+  ideas:'<path d="M13 3 5 14h6l-1 7 8-11h-6z"/>',
+  screener:'<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="var(--side)"/><circle cx="15" cy="12" r="2" fill="var(--side)"/><circle cx="8" cy="18" r="2" fill="var(--side)"/>',
+  watch:'<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/>',
+  journal:'<path d="M6 3h12a1 1 0 0 1 1 1v17H7a2 2 0 0 1-2-2V4a1 1 0 0 1 1-1z"/><path d="M9 8h6M9 12h6"/>',
+  history:'<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8"/><path d="M3.5 3.5V8H8M12 7.5V12l3 2"/>',
+  about:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>'};
+document.querySelectorAll('nav.tabs a[data-v]').forEach(a=>{ const i=NAVICON[a.dataset.v];
+  if(i) a.insertAdjacentHTML('afterbegin',`<svg viewBox="0 0 24 24" aria-hidden="true">${i}</svg>`) });
+$('side-theme').onclick=()=>document.querySelector(`.themesw button[data-theme="${document.documentElement.dataset.theme==='light'?'dark':'light'}"]`).click();
 
 // ---------- shared charts ----------
 function candles(svg, m, {W, H, L=4, R=46, T=6, B=16}){
@@ -1069,6 +1157,61 @@ function lineChart(svg, series, {min,max,ticks,fmt,labels}){
   });
   labels.forEach(([i,t,a])=>el('text',{x:x(i),y:Hh-8,'text-anchor':a},svg).textContent=t);
 }
+
+// ---------- 今日總覽 ----------
+// Every number here is read from the same snapshot (D) and the same helpers as 大市, so the two pages cannot disagree.
+let ovIdx=0;
+function ovChart(m, cw){
+  const C=m.c, n=C.length, W=Math.max(280,Math.min(1100,cw||800)), H=W<500?190:Math.round(Math.min(300,W*0.32)), L=8, R=58, T=12, B=24, lo=Math.min(...C), hi=Math.max(...C), rg=(hi-lo)||1;
+  const x=i=>L+(W-L-R)*i/(n-1), y=v=>T+(H-T-B)*(1-(v-lo)/rg), pts=C.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  const lab=v=>v>=1000?Math.round(v).toLocaleString('en-US'):v.toFixed(1);
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(m.n)} 最近 ${n} 個交易日收市走勢"><defs><linearGradient id="ov-fill" x1="0" y1="0" x2="0" y2="1"><stop stop-color="var(--accent)" stop-opacity=".18"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>`
+    +[hi,(hi+lo)/2,lo].map(v=>`<path d="M${L} ${y(v).toFixed(1)}H${W-R}" stroke="var(--line)" stroke-dasharray="3 6"/><text x="${W-R+6}" y="${(y(v)+4).toFixed(1)}">${lab(v)}</text>`).join('')
+    +`<polygon points="${x(0)},${H-B} ${pts} ${x(n-1)},${H-B}" fill="url(#ov-fill)"/><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/><circle cx="${x(n-1)}" cy="${y(C[n-1]).toFixed(1)}" r="3.5" fill="var(--accent)"/>`
+    +`<text x="${L}" y="${H-5}">${m.d[0]}</text><text x="${W-R}" y="${H-5}" text-anchor="end">${m.d[n-1]}</text></svg>`;
+}
+DRAW.overview = () => {
+  const T=[['大市',D.hist]]; if(D.tech) T.push(['科技股',D.tech.hist]);
+  const Z=T.map(([n,H])=>{const b=H[H.length-1], a=H[H.length-2]; return {n, s:b.score, p:P100(b.score), d:P100(b.score)-P100(a.score), z:zoneOf(b.score)}});
+  const lvl=z=>z.s<=4?0:z.s<=9?1:2, top=Math.max(...Z.map(lvl)), hot=Z.filter(z=>lvl(z)===top).map(z=>z.n).join('同');
+  const head = top===0 ? '大市同科技股都喺低風險' : `${hot}${top===2?'喺高風險區':'喺警戒區'}`;
+  const bn=D.breadth.ndx, n50=ndx50(), H=D.hist, h0=H[H.length-2], dp=h0&&h0.n50!=null?Math.round((n50-h0.n50)*10)/10:null;
+  const now=Date.now(), nx=econRows().filter(e=>e.key&&e.t&&e.t>now).sort((a,b)=>a.t-b.t)[0];
+  const SE=[...(D.sectors||[])].filter(x=>x.d1!=null).sort((a,b)=>b.d1-a.d1), pick=SE.length>6?[...SE.slice(0,4),...SE.slice(-2)]:SE, mx=Math.max(...pick.map(x=>Math.abs(x.d1)),0.01);
+  const M=D.minis||[], m=M[ovIdx]||M[0], k=m?m.c.length:0, mp=m?(m.c[k-1]/m.c[k-2]-1)*100:null;
+  const mine=READY?[...WL.values()].filter(r=>BY[r.id]).sort((a,b)=>(a.added||'').localeCompare(b.added||'')||a.id.localeCompare(b.id)).map(r=>BY[r.id]):[];
+  const wl = !READY ? '<div class="ov-empty">載入緊股票數據…</div>'
+    : !mine.length ? '<div class="ov-empty">未有自選股票。喺選股器、機會頁或者個股頁撳 ☆ 加入，就會喺呢度集中顯示。<br><a href="#screener">去選股器 →</a></div>'
+    : `<div class="tablewrap"><table><thead><tr><th>代號／公司</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">RS</th><th class="r">距 50 日線 %</th><th>下次業績（美東）</th></tr></thead><tbody>${mine.slice(0,8).map(s=>
+        `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${sgn(s.chg,2)}%</td><td class="r num">${s.rsr??'—'}</td><td class="r num ${cls(s.d50)}">${sgn(s.d50,1)}</td><td class="num">${eNext(s)?`${s.edate.slice(5)}${ETIME[s.etime]?' '+ETIME[s.etime]:''}`:'<span class="muted">未知</span>'}</td></tr>`).join('')}</tbody></table></div>${mine.length>8?`<p style="margin-top:10px">顯示頭 8 隻，共 ${mine.length} 隻。</p>`:''}`;
+  $('v-overview').innerHTML = `
+    <header class="ov-head"><div><h2>睇清市況，<span>再聚焦機會。</span></h2><p class="muted small">市場背景、重要事件，同你跟緊嘅股票。</p></div><a class="ov-go" href="#screener">開始選股 →</a></header>
+    <div class="ov-links">${[['pm','盤前需知'],['market','大市完整指標'],['news','經濟及新聞'],['earnings','業績日曆'],['ideas','機會及訊號'],['journal','交易日誌']].map(([h,n])=>`<a href="#${h}">${n} →</a>`).join('')}</div>
+    <div class="ov-date"><b>● 收市數據</b>　${D.asof}${wdZh(D.asof)} 美股收市 · 網站更新 ${hkFmt(D.built)}（香港時間）</div>
+    <div class="ov-3">
+      <article class="ov-card"><div class="ov-lab">趨勢風險 <small>規則分數，唔係跌市機率</small></div><h3>${head}</h3>
+        ${Z.map(z=>`<div class="ov-risk"><span>${z.n}</span><strong class="num">${z.p}<small> /100</small></strong><span class="ov-track"><b style="width:${z.p}%;background:var(${z.z[1]})"></b></span><span class="pill p${lvl(z)}">${z.z[0]}</span></div>`).join('')}
+        <div class="ov-foot"><span>${Z.map(z=>`${z.n}${z.d===0?'同前一日一樣':`較前一日${z.d>0?'升':'跌'} ${Math.abs(z.d)} 分`}`).join(' · ')}</span><a href="#market">點樣計 →</a></div></article>
+      <article class="ov-card"><div class="ov-lab">市場參與度 <small>Nasdaq-100</small></div><div class="ov-num num">${n50.toFixed(1)}<small>%</small></div><p>企喺 50 日線上嘅股票</p>
+        <span class="ov-track big"><b style="width:${n50}%"></b></span>
+        <div class="ov-foot"><span class="num">${bn.a50} ／ ${bn.n} 隻${dp==null?'':` · 較前一日${dp===0?'不變':`${dp>0?'+':'−'}${Math.abs(dp)} 個百分點`}`}</span><a href="#market">市場寬度 →</a></div></article>
+      <article class="ov-card"><div class="ov-lab">下一件大事 <small>香港時間</small></div>
+        ${nx?`<div class="ov-num ev num">${hkFmt(nx.u,true)}</div><h3 style="font-size:15px">${esc(econName(nx))}</h3><p>${[nx.c!=null&&`預期 ${esc(nx.c)}`,nx.p!=null&&`前值 ${esc(nx.p)}`].filter(Boolean).join(' · ')||'重要經濟數據／講話'}</p>`
+            :'<div class="ov-num ev">暫時未有</div><p>未來兩星期未有重要經濟數據</p>'}
+        <div class="ov-foot"><span>日曆擷取 ${hkFmt(D.econ_t||D.news_t)}</span><a href="#news">經濟日曆 →</a></div></article>
+    </div>
+    <div class="ov-2">
+      <article class="ov-card"><div class="ov-lab"><span>市場走勢</span><span class="controls">${M.map((x,i)=>`<button class="tog" data-ovi="${i}" aria-pressed="${i===ovIdx}">${esc(x.n)}</button>`).join('')}</span></div>
+        ${m?`<div class="ov-price num">${f(m.c[k-1])}<small class="${cls(mp)}">${sgn(mp,2)}%</small></div><div class="ov-chart" id="ov-ch"></div>
+        <div class="ov-foot"><span>${esc(m.n)}${m.u?` ${esc(m.u)}`:''} · 最近 ${k} 個交易日收市 · 截至 ${D.asof}</span><a href="#market">K 線同更多圖表 →</a></div>`:'<p>暫時未有走勢資料</p>'}</article>
+      <article class="ov-card"><div class="ov-lab">邊個板塊帶頭？ <small>當日升跌</small></div>
+        <div class="ov-sec">${pick.map(s=>`<div><span>${esc(s.n)} <small>${esc(s.t)}</small></span><span class="ov-track"><b style="width:${Math.abs(s.d1)/mx*100}%;background:var(--${s.d1>=0?'up':'down'})"></b></span><strong class="num ${cls(s.d1)}">${sgn(s.d1,1)}%</strong></div>`).join('')}</div>
+        <div class="ov-foot"><span>用板塊 ETF 代表${SE.length>6?' · 最強 4 個同最弱 2 個':''}</span><a href="#market">全部板塊 →</a></div></article>
+    </div>
+    <article class="ov-card"><div class="ov-lab"><span>我嘅自選清單</span><a href="#watch">查看全部 →</a></div>${wl}</article>`;
+  if(m) $('ov-ch').innerHTML=ovChart(m, $('ov-ch').clientWidth);  // drawn at the card's real width so the labels keep their size
+  $('v-overview').querySelectorAll('[data-ovi]').forEach(b=>b.onclick=()=>{ovIdx=+b.dataset.ovi; DRAW.overview()});
+};
 
 // ---------- 大市 ----------
 DRAW.market = () => {
@@ -1604,7 +1747,7 @@ async function initLogin(){
   btn.onclick=async()=>{ if(auth.currentUser){await A.signOut(auth);return}
     try{await A.signInWithPopup(auth,new A.GoogleAuthProvider())}catch(e){ if(e.code==='auth/popup-blocked') A.signInWithRedirect(auth,new A.GoogleAuthProvider()) } };
   A.onAuthStateChanged(auth, async user=>{
-    if(!user){ DB=LocalDB; btn.textContent='用 Gmail 登入'; btn.title=''; }
+    if(!user){ DB=LocalDB; btn.textContent='用 Gmail 登入'; btn.title=''; $('side-name').textContent='未登入'; $('side-sub').textContent='紀錄存喺呢部機'; $('side-av').textContent='KC'; }
     else {
       const col=c=>F.collection(fs,'users',user.uid,c);
       DB={ where:`儲存位置：雲端帳戶 · ${user.email}`,
@@ -1612,6 +1755,7 @@ async function initLogin(){
         async put(c,rec){await F.setDoc(F.doc(col(c),rec.id),rec)},
         async del(c,id){await F.deleteDoc(F.doc(col(c),id))}};
       btn.textContent='登出'; btn.title=user.email;
+      { const nm=user.displayName||String(user.email||'').split('@')[0]||'已登入'; $('side-name').textContent=nm; $('side-sub').textContent='已登入 · 雲端同步'; $('side-av').textContent=nm.slice(0,2).toUpperCase(); }
       // first sign-in on this browser: move what was saved here into the account
       let moved=0;
       for(const c of ['trades','presets','watch']){ const mine=await LocalDB.all(c); if(!mine.length) continue;
@@ -1759,7 +1903,8 @@ const star = t => `<button class="star" data-w="${t}" aria-pressed="${WL.has(t)}
 function wlMsg(t){ const e=$('toast'); e.textContent=t; e.hidden=false; clearTimeout(wlMsg.t); wlMsg.t=setTimeout(()=>e.hidden=true,3500) }
 function wlStars(){ document.querySelectorAll('.star[data-w]').forEach(b=>{const t=b.dataset.w, on=WL.has(t); b.setAttribute('aria-pressed',on); b.textContent=on?'★':'☆';
   b.title=on?'喺自選清單（撳一下移除）':'加入自選清單'; b.setAttribute('aria-label',`${on?'移除自選':'加入自選'} ${t}`)});
-  const ws=$('s-wl'); if(ws) ws.textContent=WL.has(ws.dataset.w)?'★ 已喺自選（撳一下移除）':'☆ 加入自選' }
+  const ws=$('s-wl'); if(ws) ws.textContent=WL.has(ws.dataset.w)?'★ 已喺自選（撳一下移除）':'☆ 加入自選';
+  $('side-wl').textContent=WL.size; if(drawn.overview) DRAW.overview() }  // sidebar count and the 今日總覽 list follow every change
 async function wlReload(){ try{ const rows=await DB.all('watch'), m=rows.find(r=>r.id==='_lists');
     WLISTS=m&&m.lists&&m.lists.length?m.lists:WL_DEF; WL=new Map(rows.filter(r=>!String(r.id).startsWith('_')).map(r=>[r.id,r])) }catch(e){ WL=new Map(); WLISTS=WL_DEF }
   if(!WLISTS.some(l=>l.id===wlList)) wlList='all';
