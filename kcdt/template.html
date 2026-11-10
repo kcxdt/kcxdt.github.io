@@ -530,6 +530,8 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   </main>
 
   <!-- ===== 機會 ===== -->
+  <main class="view" id="v-wait" hidden><div class="panel muted" id="wait-msg" role="status">載入緊股票數據…</div></main>
+
   <main class="view" id="v-ideas" hidden>
     <section aria-labelledby="h-chg">
       <div class="sechead"><h2 id="h-chg">今日有咩變咗</h2>
@@ -852,7 +854,10 @@ const shortN = n => String(n||'').replace(/\s*-\s*Class [A-Z].*$/i,'').replace(/
 const secZh = s => s.sec?(ZH[s.sec]||s.sec):'未知';
 const indTxt = s => s.ind||'未知';
 $('asof').textContent = D.asof;
-const S = D.stocks, BY = Object.fromEntries(S.map(s=>[s.s,s]));
+// The stock rows (most of the page's weight) come in stocks.js, loaded alongside the page: 大市 draws straight away
+// from D, and everything that reads S waits for stocksReady() further down.
+const S = [], BY = {};
+let READY = false;
 const Store = { // per-browser settings
   get(k,d){try{const v=localStorage.getItem('kcdt.'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
   set(k,v){try{localStorage.setItem('kcdt.'+k,JSON.stringify(v))}catch(e){}}};
@@ -921,21 +926,22 @@ const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
 // "10-29 13:32" (or "10-29（星期四）13:32") in Hong Kong time
 const hkFmt = (iso, wd=false) => { if(!iso) return '—'; const P=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Hong_Kong',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',weekday:'short',hourCycle:'h23'}).formatToParts(new Date(iso)).map(x=>[x.type,x.value]));
   return `${P.month}-${P.day}${wd?`（星期${'日一二三四五六'[['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(P.weekday)]}）`:''} ${P.hour}:${P.minute}` };
-const FTS = S.map(s=>s.fts).filter(Boolean).sort(), fNew = FTS[FTS.length-1];
+let FTS = [], fNew;  // set in stocksReady()
 // Reported after the fundamentals were last fetched: revenue/EPS are still last quarter's (same rule as kcdt/checks.py fund_late)
 const fStale = s => !!(s.erep && s.fts && s.erep>=s.fts);
 const staleTag = s => fStale(s) ? `<span class="fstale" title="${s.erep} 出咗業績，基本面最後更新 ${s.fts}：營收、EPS 等仲係上一季數字，用嚟篩選要小心">業績後待更新</span>` : '';
 // Expected dates up to the last close with no confirmed report (same rule as kcdt/checks.py past_due)
 const pastDue = s => { const d=s.eold || (s.edate===D.asof && !s.econf ? s.edate : null); return !!d && !(s.erep && s.erep>=d) };
 // Fundamentals coverage, one definition everywhere: [any fundamentals, every field the default screener reads]
-const FCOV = D.fcov || [S.filter(s=>s.fts).length, S.filter(s=>['mcap','sq','sa','inst','beta'].every(k=>s[k]!=null)).length];
+let FCOV = D.fcov || [0,0];
 const nfmt = n => n.toLocaleString('en-US');
-const fcovTxt = `${nfmt(FCOV[0])} 隻有部分基本面資料，${nfmt(FCOV[1])} 隻齊備篩選所需資料`;
-$('stamps').innerHTML = [`價格：${D.asof} 美股收市`,
+let fcovTxt = '';
+const drawStamps = () => { $('stamps').innerHTML = [`價格：${D.asof} 美股收市`,
   `基本面：每隻股票約 7 日輪流更新一次${fNew?`，最新 ${fNew.slice(5)}`:''}`,
   `經濟數據擷取：${hkFmt(D.econ_t||D.news_t)}`, `新聞擷取：${hkFmt(D.news_t)}（香港時間）`].map(t=>`<span>${t}</span>`).join('')
   // phones: one short line; the full list is in 說明及數據狀態
-  + `<span class="m">價格 ${D.asof.slice(5)} 收市 · 新聞 ${hkFmt(D.news_t)} · <a href="#about">數據狀態</a></span>`;
+  + `<span class="m">價格 ${D.asof.slice(5)} 收市 · 新聞 ${hkFmt(D.news_t)} · <a href="#about">數據狀態</a></span>`; };
+drawStamps();
 // The close update starts 16:50 New York (backups until ~23:00, plus a Claude check at 17:47) and takes ~10 minutes.
 // From 16:30 on a trading day until 19:00 New York a missing close shows as 「更新緊」; after that it is a warning.
 // Market holidays come from the build (kcdt/mkt.py), so a holiday never counts as a missed day.
@@ -958,7 +964,6 @@ $('stamps').innerHTML = [`價格：${D.asof} 美股收市`,
 })();
 
 // ---------- search ----------
-$('tickers').innerHTML = S.map(s=>`<option value="${s.s}">${s.n||''}</option>`).join('');
 $('searchform').onsubmit = e => {
   e.preventDefault();
   const q=$('q').value.trim().toUpperCase().split(/\s+/)[0]; if(!q) return;
@@ -973,6 +978,7 @@ const drawn = {};
 function route(){
   const h = decodeURIComponent(location.hash.slice(1)) || 'market';
   let v = h.startsWith('s/') ? 'stock' : (['market','pm','ideas','watch','screener','earnings','news','journal','history','about'].includes(h)?h:'market');
+  if(!READY && v!=='market') v='wait';  // needs the stock rows: stocksReady() calls route() again
   if(v==='stock' && !BY[h.slice(2)]) v='market';
   document.querySelectorAll('.view').forEach(x=>x.hidden = x.id!=='v-'+v);
   document.querySelectorAll('nav.tabs a').forEach(a=>a.toggleAttribute('aria-current', a.dataset.v===v) || a.removeAttribute('aria-current'));
@@ -1165,7 +1171,7 @@ function lightChanges(t){ const H=t.hist, a=H[H.length-2], b=H[H.length-1]; if(!
 const lightTxt = c => `<b>${c.r.n}</b> ${LIGHT[c.from]} → <b class="${c.to>c.from?'down':'up'}">${LIGHT[c.to]}</b>（${f(c.v0)}${c.r.u} → ${f(c.v1)}${c.r.u}；警戒 ${ruleCmp(c.r)} ${c.r.y}${c.r.u}，高風險 ${ruleCmp(c.r)} ${c.r.r}${c.r.u}）`;
 const econName = e => (econZh(e.e||'')||e.e||'') + (e.per?`（${e.per}）`:'');
 // Three short lines (risk, breadth, next release); the detail goes under 查看全部變化
-function brief(T){
+function brief(T){ brief.T=T;  // drawn again when the stock rows arrive (the earnings lines need them)
   const L=[], M=[], pp=(a,b)=>{const d=Math.round((b-a)*10)/10; return d===0?'不變':`${d>0?'+':'−'}${Math.abs(d)} 個百分點`};
   const lc=Object.values(T).flatMap(lightChanges);
   L.push('<b>風險分</b>：'+Object.values(T).map(t=>{const H=t.hist, b=H[H.length-1], a=H[H.length-2], d=P100(b.score)-P100(a.score);
@@ -2431,8 +2437,30 @@ function drawStock(){
 }
 [['r-63',63],['r-126',126],['r-260',260]].forEach(([id,k])=>$(id).onclick=()=>{setPressed(['r-63','r-126','r-260'],id);sRange=k;drawStock()});
 
+// ---------- stock rows arrive (stocks.js sets window.KCDT_STOCKS = {asof, k: [keys], r: [[values]]}) ----------
+function stocksReady(){
+  const P=window.KCDT_STOCKS; if(READY || !P) return;
+  if(P.asof!==D.asof){  // page and stock file from different builds (one of them cached): load both again, once
+    let again=false; try{ again=!sessionStorage.getItem('kcdt.rl'); sessionStorage.setItem('kcdt.rl','1') }catch(e){}
+    if(again){ location.reload(); return }
+  } else { try{ sessionStorage.removeItem('kcdt.rl') }catch(e){} }
+  for(const row of P.r){ const s={}; for(let i=0;i<row.length;i++) if(row[i]!==null) s[P.k[i]]=row[i]; S.push(s); BY[s.s]=s }
+  READY=true; window.KCDT_STOCKS=null;
+  FTS=S.map(s=>s.fts).filter(Boolean).sort(); fNew=FTS[FTS.length-1];
+  if(!D.fcov) FCOV=[S.filter(s=>s.fts).length, S.filter(s=>['mcap','sq','sa','inst','beta'].every(k=>s[k]!=null)).length];
+  fcovTxt=`${nfmt(FCOV[0])} 隻有部分基本面資料，${nfmt(FCOV[1])} 隻齊備篩選所需資料`;
+  drawStamps();
+  $('tickers').innerHTML = S.map(s=>`<option value="${s.s}">${s.n||''}</option>`).join('');
+  if(!$('v-wait').hidden) route();
+  wlStars(); if(drawn.market && brief.T) brief(brief.T);
+}
+function stocksFailed(){ if(READY) return;
+  $('wait-msg').innerHTML='<b>股票數據載入唔到。</b>可能係網絡問題，<a href="javascript:location.reload()">重新整理</a>再試。大市頁唔受影響。';
+  $('q').disabled=true; $('q').placeholder='股票數據載入唔到，請重新整理' }
+
 window.addEventListener('hashchange', route);
 route();
 wlReload();
+if(window.KCDT_STOCKS) stocksReady(); else if(window.KCDT_STOCKS_ERR) stocksFailed();
 initLogin().catch(e=>console.warn('login unavailable', e));
 </script>

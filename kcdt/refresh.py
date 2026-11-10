@@ -4,7 +4,7 @@ The full build runs once after the US close; this runs a few times during the US
 (08:30 / 10:00 New York, FOMC at 14:00) show their actual numbers the same evening in Hong Kong."""
 import json
 
-from .__main__ import OUT, now_utc, render
+from .__main__ import OUT, now_utc, write_page
 from .fetch import economic_calendar, headlines
 
 
@@ -18,7 +18,7 @@ def main():
     if news:
         data["news"], data["news_t"] = news, now_utc()
     path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    (OUT / "index.html").write_text(render(data), encoding="utf-8")
+    write_page(data)
     print(f"refreshed: {len(econ)} econ rows, {len(news)} headlines (empty = kept the last good copy)")
 
 

@@ -183,7 +183,7 @@ if __name__ == "__main__":
     d["checks"] = run_checks(d)
     m.OUT = pathlib.Path("site")
     m.OUT.mkdir(exist_ok=True)
-    (m.OUT / "index.html").write_text(m.render(d), encoding="utf-8")
+    m.write_page(d)
     (m.OUT / "data.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
     # The intraday refresh rebuilds the page from data.json; an empty fetch keeps the last good copy
     from kcdt import refresh
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     assert json.loads((m.OUT / "pm" / "index.json").read_text()) == [brief["d"]]
     assert m.keep_history(d, hist) == (brief["t"], brief["d"])  # the next daily build carries the briefs over
     d["pm_t"], d["pm_d"] = brief["t"], brief["d"]
-    (m.OUT / "index.html").write_text(m.render(d), encoding="utf-8")
+    m.write_page(d)
     print("ok", d["asof"], d["hist"][-1]["score"], len(d["stocks"]), d["breadth"])
 
 

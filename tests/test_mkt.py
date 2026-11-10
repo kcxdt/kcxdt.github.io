@@ -33,3 +33,16 @@ def test_drop_open_session():
     assert len(drop_open_session(px, T("2026-11-10 11:00"))["Close"]) == 2   # still trading
     assert len(drop_open_session(px, T("2026-11-10 16:30"))["Close"]) == 3   # closed
     assert len(drop_open_session(px, T("2026-11-11 05:00"))["Close"]) == 3   # next morning
+
+
+def test_pack_stocks():
+    from kcdt.__main__ import pack_stocks, render
+    data = {"asof": "2026-11-09", "built": "2026-11-09T22:05Z",
+            "stocks": [{"s": "AAA", "c": 1.5, "us": None}, {"s": "BBB", "c": 2.0, "ind": "Semis", "x50": False}]}
+    js = pack_stocks(data)
+    body = json.loads(js[len("window.KCDT_STOCKS="):js.index(";if(window.stocksReady)")])
+    rows = [{k: v for k, v in zip(body["k"], r) if v is not None} for r in body["r"]]   # what the page rebuilds
+    assert rows == [{"s": "AAA", "c": 1.5}, {"s": "BBB", "c": 2.0, "ind": "Semis", "x50": False}]
+    assert body["asof"] == "2026-11-09"
+    html = render(data)
+    assert '"stocks"' not in html and "stocks.js?v=20261109T2205Z" in html

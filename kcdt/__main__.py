@@ -45,13 +45,38 @@ def write_static():
     (OUT / "manifest.webmanifest").write_text(json.dumps(MANIFEST, ensure_ascii=False), encoding="utf-8")
 
 
+def pack_stocks(data):
+    """stocks.js: the stock rows as one key list plus value rows (a third smaller than repeating every key), set on
+    window.KCDT_STOCKS for the page's stocksReady(). `asof` lets the page spot a copy from another build."""
+    keys = []
+    for s in data["stocks"]:
+        keys += [k for k in s if k not in keys]
+    rows = [[s.get(k) for k in keys] for s in data["stocks"]]
+    for r in rows:
+        while r and r[-1] is None:
+            r.pop()
+    body = json.dumps({"asof": data["asof"], "k": keys, "r": rows}, ensure_ascii=False, separators=(",", ":"))
+    return f"window.KCDT_STOCKS={body};if(window.stocksReady)stocksReady();"
+
+
+def write_page(data):
+    """site/index.html (everything but the stock rows) and site/stocks.js."""
+    (OUT / "index.html").write_text(render(data), encoding="utf-8")
+    (OUT / "stocks.js").write_text(pack_stocks(data), encoding="utf-8")
+
+
 def render(data):
     tpl = (pathlib.Path(__file__).parent / "template.html").read_text(encoding="utf-8")
-    body = tpl.replace("/*DATA*/", json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+    light = {k: v for k, v in data.items() if k != "stocks"}
+    body = tpl.replace("/*DATA*/", json.dumps(light, ensure_ascii=False, separators=(",", ":")))
+    # fetched while the page itself is still arriving; ?v= so a new build never pairs with yesterday's cached rows
+    ver = "".join(c for c in str(data.get("built") or data.get("asof") or "") if c.isalnum())
+    stocks = (f'<script async src="stocks.js?v={ver}" onerror="window.KCDT_STOCKS_ERR=1;'
+              'if(window.stocksFailed)stocksFailed()"></script>')
     head = ('<!doctype html><html lang="zh-HK"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">' + META +
             "<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}"
-            "body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style></head><body>")
+            "body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>" + stocks + "</head><body>")
     return head + body + "</body></html>"
 
 
@@ -206,7 +231,7 @@ def main():
     for c in data["checks"]:
         print("check:", "ok" if c["lv"] == 0 else "LOOK" if c["lv"] == 1 else "PROBLEM", c["t"])
     (OUT / "data.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    (OUT / "index.html").write_text(render(data), encoding="utf-8")
+    write_page(data)
     write_stock_pages(stock_pages(px, data["stocks"]))
     if out:
         open(out, "a").write("run=true\n")
