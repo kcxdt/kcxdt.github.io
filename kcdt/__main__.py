@@ -40,7 +40,8 @@ MANIFEST = {"name": "KCDT 美股趨勢溫度計", "short_name": "KCDT", "start_u
 
 
 def write_static():
-    for f in (pathlib.Path(__file__).parent / "static").glob("*.png"):
+    # *.js: SheetJS (xlsx.full.min.js, Apache-2.0, v0.18.5) for the journal's Excel import, loaded only when it's used
+    for f in [*(pathlib.Path(__file__).parent / "static").glob("*.png"), *(pathlib.Path(__file__).parent / "static").glob("*.js")]:
         (OUT / f.name).write_bytes(f.read_bytes())
     (OUT / "manifest.webmanifest").write_text(json.dumps(MANIFEST, ensure_ascii=False), encoding="utf-8")
 
@@ -60,7 +61,8 @@ def pack_stocks(data):
 
 
 def write_page(data):
-    """site/index.html (everything but the stock rows) and site/stocks.js."""
+    """site/index.html (everything but the stock rows) and site/stocks.js, plus the static files the page loads."""
+    write_static()  # also from the econ / pre-market refreshes, so a page that needs a new static file never ships without it
     (OUT / "index.html").write_text(render(data), encoding="utf-8")
     (OUT / "stocks.js").write_text(pack_stocks(data), encoding="utf-8")
 
@@ -243,7 +245,6 @@ def main():
     data["built"] = now_utc()
     data["mhol"] = sorted(HOLIDAYS)
     OUT.mkdir(exist_ok=True)
-    write_static()
     data["pm_t"], data["pm_d"] = keep_history(data, hist)
     data["checks"] = run_checks(data)
     for c in data["checks"]:
