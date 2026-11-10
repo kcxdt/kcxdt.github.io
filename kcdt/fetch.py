@@ -139,38 +139,47 @@ def universe(cache="cache"):
     return u
 
 
-def _download(tickers, period):
-    df = yf.download(tickers, period=period, auto_adjust=True, progress=False, threads=False)
+def _download(tickers, period, threads=False):
+    df = yf.download(tickers, period=period, auto_adjust=True, progress=False, threads=threads)
     return {f: df[f] for f in ("Open", "High", "Low", "Close", "Volume")}
 
 
-def prices(tickers, period="2y", chunk=50, pause=3):
-    """Download in small batches with pauses; Yahoo rate-limits big bursts from cloud IPs."""
+def prices(tickers, period="2y", chunk=50, pause=3, fast=(100, 1, 4)):
+    """Download in batches with pauses; Yahoo rate-limits big bursts from cloud IPs.
+
+    The first pass uses `fast` = (batch size, pause, parallel requests): one request at a time took ~9 minutes for
+    2,700 tickers, most of the close update. Whatever that pass misses (or all of it, if Yahoo pushes back) is
+    fetched again the slow way, one request at a time in batches of `chunk`."""
     parts = {f: [] for f in ("Open", "High", "Low", "Close", "Volume")}
     todo = list(tickers)
     missing = []
     for attempt in range(4):
         missing = []
-        for i in range(0, len(todo), chunk):
-            part = todo[i:i + chunk]
+        size, wait, threads = fast if attempt == 0 and fast else (chunk, pause, False)
+        for i in range(0, len(todo), size):
+            part = todo[i:i + size]
             try:
-                got_df = _download(part, period)
+                got_df = _download(part, period, threads)
             except Exception as e:
                 print("batch failed:", e)
                 missing += part
                 time.sleep(pause * 10)
+                if attempt == 0 and len(missing) > max(200, len(tickers) // 5):
+                    # Yahoo is pushing back on the fast pass: stop it here and do the rest the slow way
+                    missing += todo[i + size:]
+                    break
                 continue
             c = got_df["Close"]
             got = [t for t in part if t in c and not c[t].dropna().empty]
             for f in parts:
                 parts[f].append(got_df[f][got])
             missing += [t for t in part if t not in got]
-            time.sleep(pause)
+            time.sleep(wait)
         print(f"attempt {attempt + 1}: {len(tickers) - len(missing)}/{len(tickers)} downloaded")
         if len(missing) <= max(3, len(tickers) // 200):  # a few delisted symbols: not worth minutes of retries
             break
         todo = missing
-        time.sleep(60 * (attempt + 1))
+        time.sleep(60 * (attempt + 1) if attempt else 20)
     if len(missing) > len(tickers) * 0.05:
         raise RuntimeError(f"{len(missing)} tickers missing, e.g. {missing[:10]}")
     out = {}
@@ -395,15 +404,19 @@ def _cap_bn(x):
         return None
 
 
-def _earn_rows(day, tries=3):
+def _earn_rows(day, tries=3, far=False):
     """One day of Nasdaq's earnings calendar. A failed request is tried again: a day lost here would drop every
-    company reporting that day from the calendar (and from 「明日出業績」)."""
+    company reporting that day from the calendar (and from 「明日出業績」).
+    far: a day many weeks ahead, where an answer with no data just means Nasdaq has nothing listed that far out
+    yet, so it isn't asked again (seven such days cost over two minutes of retries per build)."""
     for i in range(tries):
         try:
             r = requests.get(f"https://api.nasdaq.com/api/calendar/earnings?date={day}", headers=NASDAQ_UA, timeout=30)
             r.raise_for_status()
             data = r.json().get("data")
             if data is None:
+                if far:
+                    return []
                 raise ValueError("no data")
             return data.get("rows") or []
         except Exception as e:
@@ -432,16 +445,21 @@ def earnings_calendar(days=63, back=100, cache_file=None, today=None):
         except Exception:
             seen = {}
     recent = (start - pd.Timedelta(days=4)).strftime("%Y-%m-%d")  # late EPS figures still arriving
-    for d in pd.date_range(start - pd.Timedelta(days=back), periods=back + days):
-        if d.weekday() >= 5:
-            continue
+    span = [d for d in pd.date_range(start - pd.Timedelta(days=back), periods=back + days) if d.weekday() < 5]
+    cached = lambda d: d < start and d.strftime("%Y-%m-%d") in seen and d.strftime("%Y-%m-%d") < recent
+    # the days still to ask for, a few at a time (one by one took 5 minutes of a 15-minute build)
+    ask = [d for d in span if not cached(d)]
+    far = start + pd.Timedelta(days=42)
+    with ThreadPoolExecutor(4) as ex:
+        fetched = dict(zip(ask, ex.map(lambda d: _earn_rows(d.strftime("%Y-%m-%d"), far=d >= far), ask)))
+    for d in span:
         day = d.strftime("%Y-%m-%d")
-        if d < start and day in seen and day < recent:
+        if cached(d):
             for sym in seen[day]:
                 done[sym] = max(done.get(sym, day), day)
             continue
         got = []
-        for row in _earn_rows(day):
+        for row in fetched[d]:
             sym = (row.get("symbol") or "").strip().replace(".", "-")
             if not sym:
                 continue
@@ -618,6 +636,56 @@ def fear_greed(cache_file):
         return None
 
 
+def _quotes(symbols, size=400):
+    """Yahoo's batch quote (the numbers on a quote page): {symbol: {regularMarketPrice, ...Open, ...DayHigh,
+    ...DayLow, ...Volume, regularMarketTime}}. 500 symbols come back in one request."""
+    from yfinance.data import YfData
+    yd, out = YfData(), {}
+    for i in range(0, len(symbols), size):
+        try:
+            r = yd.get_raw_json("https://query1.finance.yahoo.com/v7/finance/quote",
+                                params={"symbols": ",".join(symbols[i:i + size])})
+            out.update({q["symbol"]: q for q in r["quoteResponse"]["result"]})
+        except Exception as e:
+            print("quotes failed:", symbols[i], e)
+        time.sleep(0.5)
+    return out
+
+
+def fill_last_day(px, quotes=None):
+    """Fill the newest session's bar from Yahoo's quotes where the daily history left it empty.
+
+    For hours after the close Yahoo's daily candle can be blank for most stocks while the index has one
+    (10 Nov 2026, 5 hours after the close: 80 of 2,711 had Monday's bar, yet every quote showed Monday's close).
+    Only quotes whose last regular trade is on that same New York day are used, so a halted or delisted stock
+    stays empty. Returns how many bars were filled."""
+    close = px["Close"]
+    if "^GSPC" not in close:
+        return 0
+    last = close["^GSPC"].dropna().index[-1]
+    row = close.loc[last]
+    todo = [t for t in close.columns if pd.isna(row[t])]
+    if not todo:
+        return 0
+    got = (quotes or _quotes)(todo)
+    day, n = last.strftime("%Y-%m-%d"), 0
+    fields = (("Close", "regularMarketPrice"), ("Open", "regularMarketOpen"), ("High", "regularMarketDayHigh"),
+              ("Low", "regularMarketDayLow"), ("Volume", "regularMarketVolume"))
+    for t in todo:
+        q = got.get(t) or {}
+        ts, c = q.get("regularMarketTime"), q.get("regularMarketPrice")
+        if not ts or not c or pd.Timestamp(ts, unit="s", tz="UTC").tz_convert("America/New_York").strftime("%Y-%m-%d") != day:
+            continue
+        for f, k in fields:
+            if q.get(k) is not None:
+                px[f].loc[last, t] = float(q[k])
+        n += 1
+    print(f"last day {day}: {len(todo)} stocks had no daily bar, {n} filled from Yahoo quotes")
+    return n
+
+
 def fetch_prices(u):
     extra = [t for t, _ in INDICES] + [t for t, _ in SECTORS] + DOW30 + ["QQQ", "^NDX", "^VXN"]
-    return prices(sorted(set(list(u.index) + extra)))
+    px = prices(sorted(set(list(u.index) + extra)))
+    fill_last_day(px)
+    return px

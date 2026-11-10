@@ -1,5 +1,6 @@
 """Offline checks for the Nasdaq parsers (no network)."""
 import sys, types, pathlib
+import pandas as pd
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 sys.modules.setdefault("yfinance", types.ModuleType("yfinance"))
 from kcdt import fetch
@@ -221,3 +222,25 @@ def test_earn_rows_retries_a_failed_day():
     finally:
         fetch.requests.get, fetch.time.sleep = real_get, real_sleep
     assert len(calls) == 2 and rows[0]["symbol"] == "NVDA"
+
+
+def test_fill_last_day_uses_quotes_from_the_same_day_only():
+    idx = pd.to_datetime(["2026-11-06", "2026-11-09"])
+    nan = float("nan")
+    mk = lambda v: pd.DataFrame({"^GSPC": [1.0, 2.0], "AAPL": [v, nan], "HALT": [v, nan], "OK": [v, v + 1]}, index=idx)
+    px = {f: mk(v) for f, v in (("Open", 340.0), ("High", 346.0), ("Low", 338.0), ("Close", 342.37), ("Volume", 4e7))}
+    mon = int(pd.Timestamp("2026-11-09 16:00", tz="America/New_York").timestamp())
+    fri = int(pd.Timestamp("2026-11-06 16:00", tz="America/New_York").timestamp())
+    asked = []
+
+    def quotes(symbols):
+        asked.extend(symbols)
+        return {"AAPL": dict(regularMarketPrice=350.69, regularMarketOpen=344.935, regularMarketDayHigh=352.28,
+                             regularMarketDayLow=344.78, regularMarketVolume=47499490, regularMarketTime=mon),
+                "HALT": dict(regularMarketPrice=10.0, regularMarketTime=fri)}   # last traded on Friday
+    assert fetch.fill_last_day(px, quotes) == 1 and asked == ["AAPL", "HALT"]
+    last = idx[-1]
+    assert px["Close"].loc[last, "AAPL"] == 350.69 and px["Open"].loc[last, "AAPL"] == 344.935
+    assert px["High"].loc[last, "AAPL"] == 352.28 and px["Volume"].loc[last, "AAPL"] == 47499490
+    assert pd.isna(px["Close"].loc[last, "HALT"]) and px["Close"].loc[last, "OK"] == 343.37
+    assert fetch.fill_last_day({f: df.drop(columns=["HALT"]) for f, df in px.items()}, lambda s: 1 / 0) == 0  # nothing missing

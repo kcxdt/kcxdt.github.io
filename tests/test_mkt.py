@@ -46,3 +46,14 @@ def test_pack_stocks():
     assert body["asof"] == "2026-11-09"
     html = render(data)
     assert '"stocks"' not in html and "stocks.js?v=20261109T2205Z" in html
+
+
+def test_last_day_coverage():
+    from kcdt.__main__ import last_day_coverage
+    idx = pd.to_datetime(["2026-11-05", "2026-11-06", "2026-11-09"])
+    close = pd.DataFrame({"^GSPC": [1.0, 2.0, 3.0], "A": [1.0, 2.0, None], "B": [1.0, 2.0, 3.0],
+                          "C": [1.0, 2.0, None], "D": [1.0, 2.0, None], "NEW": [None, None, 5.0]}, index=idx)
+    cover, day = last_day_coverage({"Close": close})
+    assert day == "2026-11-09" and cover == 0.25      # only B of A-D has Monday's bar; NEW had none on Friday
+    close.loc[idx[-1], ["A", "C", "D"]] = 9.0
+    assert last_day_coverage({"Close": close})[0] == 1.0
