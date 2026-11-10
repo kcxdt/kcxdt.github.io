@@ -36,7 +36,7 @@
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;font-variant-numeric:tabular-nums}
 .wrap{max-width:1180px;margin:0 auto;padding-block:16px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:22px}
 h1,h2,h3{text-wrap:balance;margin:0}
-h1{font-family:var(--f-logo);font-weight:900;font-size:clamp(26px,4vw,34px);letter-spacing:.04em;line-height:1.1}
+h1,.h1{font-family:var(--f-logo);font-weight:900;font-size:clamp(26px,4vw,34px);letter-spacing:.04em;line-height:1.1}
 h2{font-family:var(--f-body);font-weight:600;font-size:21px}
 h3{font-size:16px;font-weight:600}
 p{margin:0}
@@ -65,6 +65,8 @@ a{color:var(--link)}
 .badge{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--panel)}
 .stale{border:1px solid var(--hot);background:color-mix(in srgb,var(--hot) 10%,var(--panel));color:var(--ink);border-radius:10px;padding:10px 14px;font-size:14px}
 .stale b{color:var(--hot)}
+.stale.soft{border-color:var(--line);background:var(--panel)}
+.stale.soft b{color:var(--ink)}
 .wlalert{border-left:3px solid var(--accent);display:grid;gap:6px}
 .wlalert ul{margin:0;padding-left:18px;display:grid;gap:4px}
 .wlalert h2{font-size:16px}
@@ -84,7 +86,7 @@ nav.tabs .side-brand,nav.tabs .side-foot,nav.tabs .navgrp,nav.tabs .navmore,.nav
   nav.tabs a{border:0;margin:0;padding:9px 14px;border-radius:9px;font-size:14px}
   nav.tabs a[aria-current="page"]{background:var(--sel);color:var(--ink);box-shadow:inset 3px 0 0 var(--accent)}
   nav.tabs .side-brand{display:block;padding:4px 6px 18px;text-decoration:none}
-  nav.tabs .side-brand h1{color:var(--ink);font-size:30px}
+  nav.tabs .side-brand .h1{color:var(--ink);font-size:30px}
   nav.tabs .navgrp{display:flex;align-items:center;justify-content:space-between;width:calc(100% - 12px);margin:10px 6px 2px;padding:12px 8px 4px;border:0;border-top:1px solid var(--line);background:none;font:inherit;font-size:13px;color:var(--muted);font-weight:500;cursor:pointer;text-align:left}
   nav.tabs .navgrp:hover{color:var(--ink)}
   nav.tabs .navgrp i{font-style:normal;font-size:12px;width:12px;text-align:center}
@@ -430,7 +432,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
   <div class="stale" id="stale" role="alert" hidden></div>
 
   <nav class="tabs" aria-label="頁面"><div>
-    <a class="side-brand" href="#market"><h1>KCDT</h1><span class="eyebrow">美股趨勢溫度計</span></a>
+    <a class="side-brand" href="#market"><div class="h1">KCDT</div><span class="eyebrow">美股趨勢溫度計</span></a>
     <button type="button" class="navgrp" data-g="look" aria-expanded="true"><span>睇市</span><i aria-hidden="true"></i></button>
     <a href="#market" data-v="market" data-g="look">大市</a>
     <a href="#pm" data-v="pm" data-g="look">盤前需知</a>
@@ -804,7 +806,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
 <div class="toast" id="toast" role="status" hidden></div>
   <footer>
     <p>本網站內容只供數據參考及教育用途，並不構成任何投資建議、要約或招攬。過往表現不代表將來。指標門檻已用 2004 年至今嘅數據回測；分數係風險參考，唔係買賣訊號。</p>
-    <p>每個交易日美股收市後自動更新（約香港時間早上 7 點）；經濟數據同新聞喺美國交易日內再擷取幾次。數據來源：Yahoo Finance、Nasdaq、ForexFactory、CNN、Wikipedia。各項更新時間同覆蓋見<a href="#about">說明及數據狀態</a>。</p>
+    <p>每個交易日美股收市後自動更新（約香港時間早上 6 點）；經濟數據同新聞喺美國交易日內再擷取幾次。數據來源：Yahoo Finance、Nasdaq、ForexFactory、CNN、Wikipedia。各項更新時間同覆蓋見<a href="#about">說明及數據狀態</a>。</p>
   </footer>
 </div>
 
@@ -934,21 +936,25 @@ $('stamps').innerHTML = [`價格：${D.asof} 美股收市`,
   `經濟數據擷取：${hkFmt(D.econ_t||D.news_t)}`, `新聞擷取：${hkFmt(D.news_t)}（香港時間）`].map(t=>`<span>${t}</span>`).join('')
   // phones: one short line; the full list is in 說明及數據狀態
   + `<span class="m">價格 ${D.asof.slice(5)} 收市 · 新聞 ${hkFmt(D.news_t)} · <a href="#about">數據狀態</a></span>`;
-// The update runs at 22:30 UTC Mon–Fri (06:30 Hong Kong); GitHub can start it late, so allow 2.5 hours.
-// Warn only once a run that should have finished hasn't, or when prices are 2+ sessions behind (1 could be a holiday).
+// The close update starts 16:50 New York (backups until ~23:00, plus a Claude check at 17:47) and takes ~10 minutes.
+// From 16:30 on a trading day until 19:00 New York a missing close shows as 「更新緊」; after that it is a warning.
+// Market holidays come from the build (kcdt/mkt.py), so a holiday never counts as a missed day.
 (function(){
-  const now=Date.now(), GRACE=2.5*3600e3, slot=(y,m,d)=>Date.UTC(y,m,d,22,30);
-  let due=null; const t0=new Date();
-  for(let i=0;i<8&&due==null;i++){const t=slot(t0.getUTCFullYear(),t0.getUTCMonth(),t0.getUTCDate()-i), wd=new Date(t).getUTCDay();
-    if(wd>=1&&wd<=5&&t+GRACE<=now) due=t}
-  let missed=0; const d=new Date(D.asof+'T12:00:00Z');
-  for(d.setUTCDate(d.getUTCDate()+1); slot(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())+GRACE<=now; d.setUTCDate(d.getUTCDate()+1)) if(d.getUTCDay()%6) missed++;
-  const late = D.built && due!=null && Date.parse(D.built)<due;
-  if(!late && missed<2) return;
-  $('stale').hidden=false;
-  $('stale').innerHTML = late
-    ? `<b>數據未更新：</b>預定喺 ${hkFmt(new Date(due+GRACE).toISOString())}（香港時間）之前完成嘅自動更新未有出現，而家顯示嘅仲係 ${D.asof} 收市數據。自動更新可能出咗問題，系統已自動發出通知。<a href="#about">數據狀態</a>`
-    : `<b>價格數據可能過期：</b>而家顯示嘅係 ${D.asof} 收市數據，之後已經有 ${missed} 個交易日未更新。<a href="#about">數據狀態</a>`;
+  const HOL=new Set(D.mhol||[]), trading=d=>{const w=new Date(d+'T12:00:00Z').getUTCDay(); return w>0&&w<6&&!HOL.has(d)};
+  const P=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date()).map(x=>[x.type,x.value]));
+  const today=`${P.year}-${P.month}-${P.day}`, mins=(+P.hour)*60+(+P.minute);
+  const back=d=>{const t=new Date(d+'T12:00:00Z'); do{t.setUTCDate(t.getUTCDate()-1)}while(!trading(t.toISOString().slice(0,10))); return t.toISOString().slice(0,10)};
+  const after=trading(today)&&mins>=990, ready=trading(today)&&mins>=1140;
+  const want = ready ? today : back(today), wd=d=>`（星期${'日一二三四五六'[new Date(d+'T12:00:00Z').getUTCDay()]}）`;
+  let missed=0; for(let d=want; d>D.asof; d=back(d)) missed++;
+  const box=$('stale');
+  if(missed>0){
+    box.hidden=false; box.classList.remove('soft');
+    box.innerHTML=`<b>數據未更新：</b>應該已經有美東 ${want}${wd(want)} 收市數據，但而家顯示嘅仲係 ${D.asof} 收市${missed>1?`（遲咗 ${missed} 個交易日）`:''}。系統會自動再試，失敗會發通知。<a href="#about">數據狀態</a>`;
+  } else if(after && !ready && D.asof<today){
+    box.hidden=false; box.classList.add('soft');
+    box.innerHTML=`<b>今日收市數據更新緊：</b>美東 ${today} 收市後大約一個鐘內會更新，而家顯示嘅係 ${D.asof} 收市。重新整理頁面就會見到新數據。`;
+  }
 })();
 
 // ---------- search ----------
@@ -1997,7 +2003,7 @@ function pageChecks(late, past, pmc){
 }
 const spill = (p, t) => `<span class="pill p${p}">${t}</span>`;
 DRAW.about = () => {
-  const n=S.length, stale=!$('stale').hidden;
+  const n=S.length, stale=!$('stale').hidden && !$('stale').classList.contains('soft');
   const old=S.filter(fStale).length;
   const ed=S.filter(s=>eNext(s)), conf=ed.filter(s=>s.econf).length, past=S.filter(pastDue).length;
   const E=econRows(), unc=E.filter(e=>e.unconf).length, late=E.filter(e=>e.state==='late').length;
