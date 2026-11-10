@@ -730,7 +730,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <div class="panel tablewrap"><table id="jtable">
         <thead><tr><th>代號</th><th>方向</th><th>開倉</th><th>平倉</th><th class="r">入場價</th><th class="r">出場價</th><th class="r">數量</th><th class="r">手續費</th><th class="r">成本／名義值</th><th class="r">出場金額</th><th class="r">淨盈虧</th><th class="r">淨盈虧 %</th><th class="r">R</th><th class="r">持倉</th><th>策略</th><th class="r">止盈</th><th class="r">止損</th><th>情緒</th><th class="r">累計盈虧</th><th>截圖</th></tr></thead>
         <tbody id="jbody"></tbody></table></div>
-      <p class="note">撳一行就可以改。未平倉嘅股票用最新收市價計浮動盈虧（斜體）；期貨冇報價，未平倉部分唔計。期貨盈虧 = 點數 × 合約數 × 乘數。「完整備份」係一個 JSON 檔，包晒筆記、截圖、儲咗嘅選股預設同自選清單，可以用「匯入備份」還原（同一單交易會覆蓋，唔會重複）。「匯入 Excel／CSV」會讀你份表嘅欄名，自動對返交易日誌嘅欄位（對唔啱可以自己揀），睇過預覽先至儲；同一單再匯入會覆蓋，唔會重複。CSV 冇截圖。只係你自己嘅紀錄，唔係投資建議。</p>
+      <p class="note">撳一行就可以改。未平倉嘅股票用最新收市價計浮動盈虧（斜體）；期貨冇報價，未平倉部分唔計。期貨盈虧 = 點數 × 合約數 × 乘數。「完整備份」係一個 JSON 檔，包晒筆記、截圖、儲咗嘅選股預設同自選清單，可以用「匯入備份」還原（同一單交易會覆蓋，唔會重複）。「匯入 Excel／CSV」會讀你份表嘅欄名，自動對返交易日誌嘅欄位（對唔啱可以自己揀），Excel 入面每行嘅截圖都會一齊入（每單最多 2 張），睇過預覽先至儲；同一單再匯入會覆蓋，唔會重複。CSV 冇截圖。只係你自己嘅紀錄，唔係投資建議。</p>
     </section>
     <dialog id="j-xl" aria-labelledby="h-jxl"><form method="dialog" class="jxl">
       <div class="sechead"><h2 id="h-jxl">匯入 Excel／CSV</h2><button class="tog" value="no" aria-label="關閉">×</button></div>
@@ -741,7 +741,7 @@ footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);paddin
       <p class="muted small">自動按欄名對好咗；唔啱可以改。最少要有代號、開倉日期、數量同入場價。</p>
       <div class="jgrid" id="jx-map"></div>
       <h3>預覽 <span class="muted small" id="jx-sum"></span></h3>
-      <div class="tablewrap"><table><thead><tr><th>行</th><th>代號</th><th>市場</th><th>方向</th><th>開倉</th><th>平倉</th><th class="r">入場價</th><th class="r">出場價</th><th class="r">數量</th><th class="r">手續費</th><th>策略</th></tr></thead><tbody id="jx-prev"></tbody></table></div>
+      <div class="tablewrap"><table><thead><tr><th>行</th><th>代號</th><th>市場</th><th>方向</th><th>開倉</th><th>平倉</th><th class="r">入場價</th><th class="r">出場價</th><th class="r">數量</th><th class="r">手續費</th><th>策略</th><th>截圖</th></tr></thead><tbody id="jx-prev"></tbody></table></div>
       <ul class="small" id="jx-bad"></ul>
       <div class="cfbar"><button class="tog" type="button" aria-pressed="true" id="jx-go">匯入</button><button class="tog" value="no">取消</button><span class="muted small" id="jx-msg"></span></div>
     </form></dialog>
@@ -2310,8 +2310,8 @@ const JX_F=[  // [field, label, required, synonyms (lower case, no spaces)]
   ['sell','出場價',0,['出場價','賣出價','平倉價','出場價格','賣出價格','平倉價格','exitprice','sellprice','closeprice','exit','avgexit']],
   ['fee','手續費',0,['手續費','佣金','費用','交易費用','fee','fees','commission','commissions','comm']],
   ['strat','策略類型',0,['策略類型','策略','setup','strategy','playbook']],
-  ['tp','預計止盈',0,['預計止盈','止盈','止賺','目標價','takeprofit','target','tp']],
-  ['sl','預計止損',0,['預計止損','止損','止蝕','stoploss','stop','sl']],
+  ['tp','預計止盈',0,['預計止盈','預計盈利','止盈','止賺','止盈價','目標價','takeprofit','target','tp']],
+  ['sl','預計止損',0,['預計止損','預計虧損','止損','止蝕','止損價','stoploss','stop','sl']],
   ['risk','計劃風險',0,['計劃風險','風險','風險金額','risk','plannedrisk','riskamount']],
   ['mood','交易情緒',0,['交易情緒','情緒','心態','emotion','mood']],
   ['why_in','買入理由',0,['買入理由','入場理由','開倉理由','entryreason','reasonin','whyin']],
@@ -2320,7 +2320,7 @@ const JX_F=[  // [field, label, required, synonyms (lower case, no spaces)]
   ['cm','合約月份',0,['合約月份','contractmonth','expiry']],
   ['mult','合約乘數',0,['合約乘數','乘數','multiplier','pointvalue']]];
 const jxNorm = h => String(h??'').toLowerCase().replace(/[（(][^）)]*[）)]/g,'').replace(/[\s_:：*#]/g,'');
-let JX = null;  // {wb, rows, hrow, map:{field: colIndex}, sheet}
+let JX = null;  // {wb, buf, rows, r0, hrow, map:{field: colIndex}, sheet, img}
 function jxLib(){ return window.XLSX ? Promise.resolve(window.XLSX) : new Promise((ok,bad)=>{ const sc=document.createElement('script');
   sc.src=XLSX_JS; sc.onload=()=>ok(window.XLSX); sc.onerror=()=>bad(new Error('lib')); document.head.appendChild(sc) }) }
 // Header row = the row in the first 20 that matches the most known column names
@@ -2383,11 +2383,47 @@ function jxRow(r, M, dmy, tz){ const g=k=>M[k]==null?'':r[M[k]];
   if(t.close&&t.close<t.open) return {bad:'平倉日期早過開倉日期'};
   t.key=[sym,mkt,side,t.open,t.otime,t.qty,t.buy,t.close,t.ctime,t.sell].join('|');
   return t }
-function jxParse(){ const {rows,hrow,map}=JX, body=rows.slice(hrow+1), tz=$('jx-tz').value;
+// Pictures inside an .xlsx: floating ones (anchored to a cell in xl/drawings) and Excel 365's 「放入儲存格」 ones (xl/richData).
+// Returns {row index (0-based, sheet coordinates): [{c: column, type, data: Uint8Array}]}. Not readable → {} (the trades still import).
+function jxImages(buf, sheetName){ try{
+  const z=XLSX.CFB.read(new Uint8Array(buf),{type:'array'}), F={};
+  z.FullPaths.forEach((p,i)=>{ const k=p.replace(/^[^\/]*\//,''); if(k&&!k.endsWith('/')) F[k.toLowerCase()]=z.FileIndex[i] });
+  const raw=p=>{ const e=F[p.toLowerCase()]; return e&&e.content?e.content:null };
+  const txt=p=>{ const b=raw(p); return b?new TextDecoder().decode(b instanceof Uint8Array?b:new Uint8Array(b)):'' };
+  const at=(s,n)=>{ const m=s.match(new RegExp('\\b'+n+'="([^"]*)"')); return m?m[1]:null };
+  const dir=p=>p.replace(/[^\/]*$/,''), relsOf=p=>dir(p)+'_rels/'+p.replace(/^.*\//,'')+'.rels';
+  const go=(base,t)=>{ if(t.startsWith('/')) return t.slice(1); const a=(base+t).split('/'), o=[]; a.forEach(x=>x==='..'?o.pop():x&&x!=='.'&&o.push(x)); return o.join('/') };
+  const rels=p=>{ const R={}; (txt(relsOf(p)).match(/<Relationship\b[^>]*>/g)||[]).forEach(r=>{ R[at(r,'Id')]=go(dir(p),at(r,'Target')||'') }); return R };
+  const mime=p=>/\.png$/i.test(p)?'image/png':/\.jpe?g$/i.test(p)?'image/jpeg':/\.gif$/i.test(p)?'image/gif':/\.bmp$/i.test(p)?'image/bmp':/\.webp$/i.test(p)?'image/webp':null;
+  const out={}, put=(r,c,p)=>{ const d=raw(p), type=mime(p); if(d&&type) (out[r]=out[r]||[]).push({c,type,data:d instanceof Uint8Array?d:new Uint8Array(d)}) };
+  // which file is this sheet
+  const wbRels=rels('xl/workbook.xml'), esc2=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const sh=(txt('xl/workbook.xml').match(/<(?:\w+:)?sheet\b[^>]*>/g)||[]).find(s=>at(s,'name')===esc2(sheetName)||at(s,'name')===sheetName);
+  const sp=sh&&wbRels[at(sh,'r:id')]; if(!sp) return out;
+  const sx=txt(sp), sRels=rels(sp);
+  // 1) floating pictures: the cell under the picture's top-left corner
+  (sx.match(/<(?:\w+:)?drawing\b[^>]*>/g)||[]).forEach(d=>{ const dp=sRels[at(d,'r:id')]; if(!dp) return; const dx=txt(dp), dR=rels(dp);
+    (dx.match(/<(?:\w+:)?(twoCellAnchor|oneCellAnchor)\b[\s\S]*?<\/(?:\w+:)?\1>/g)||[]).forEach(a=>{
+      const fr=(a.match(/<(?:\w+:)?from>([\s\S]*?)<\/(?:\w+:)?from>/)||[])[1]||'', num=t=>+((fr.match(new RegExp('<(?:\\w+:)?'+t+'>(\\d+)<'))||[])[1]);
+      const emb=(a.match(/r:embed="([^"]+)"/)||[])[1]; if(emb&&dR[emb]&&!isNaN(num('row'))) put(num('row'),num('col'),dR[emb]) }) });
+  // 2) pictures placed in a cell: cell vm → metadata → rich value → image relationship
+  const vmCells=(sx.match(/<c\b[^>]*\bvm="\d+"[^>]*>/g)||[]); if(vmCells.length){
+    const md=txt('xl/metadata.xml'), blk=(s,tag)=>{ const m=s.match(new RegExp('<(?:\\w+:)?'+tag+'\\b[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?'+tag+'>')); return m?m[1]:'' };
+    const vBk=(blk(md,'valueMetadata').match(/<(?:\w+:)?bk>[\s\S]*?<\/(?:\w+:)?bk>/g)||[]).map(b=>+at(b.match(/<(?:\w+:)?rc\b[^>]*>/)[0],'v'));
+    const fBk=(blk(md,'futureMetadata').match(/<(?:\w+:)?bk>[\s\S]*?<\/(?:\w+:)?bk>/g)||[]).map(b=>{ const m=b.match(/<(?:\w+:)?rvb\b[^>]*>/); return m?+at(m[0],'i'):null });
+    const st=(txt('xl/richData/rdrichvaluestructure.xml').match(/<s\b[^>]*>[\s\S]*?<\/s>/g)||[]).map(s=>(s.match(/<k\b[^>]*>/g)||[]).map(k=>at(k,'n')).indexOf('_rvRel:LocalImageIdentifier'));
+    const rv=(txt('xl/richData/rdrichvalue.xml').match(/<rv\b[^>]*>[\s\S]*?<\/rv>/g)||[]).map(r=>{ const k=st[+at(r,'s')||0]; const v=(r.match(/<v\b[^>]*>([^<]*)<\/v>/g)||[]).map(x=>x.replace(/<[^>]+>/g,'')); return k>=0&&v[k]!=null?+v[k]:null });
+    const rp='xl/richData/richValueRel.xml', rR=rels(rp), rel=(txt(rp).match(/<(?:\w+:)?rel\b[^>]*>/g)||[]).map(x=>rR[at(x,'r:id')]);
+    vmCells.forEach(c=>{ const ref=XLSX.utils.decode_cell(at(c,'r')), vm=+at(c,'vm'), v=vBk[vm-1], i=v!=null?fBk[v]:null, li=i!=null?rv[i]:null, p=li!=null?rel[li]:null;
+      if(p) put(ref.r,ref.c,p) }) }
+  Object.values(out).forEach(a=>a.sort((x,y)=>x.c-y.c));
+  return out }catch(_){ return {} } }
+function jxParse(){ const {rows,hrow,map,r0}=JX, body=rows.slice(hrow+1), tz=$('jx-tz').value;
   const dmy={open:jxDmy(body.map(r=>map.open==null?'':r[map.open])), close:jxDmy(body.map(r=>map.close==null?'':r[map.close]))};
   // id from the trade's contents (+ which copy it is, so two identical rows stay two trades): the same file imported again overwrites
-  const ok=[], bad=[], nth={}; body.forEach((r,i)=>{ const t=jxRow(r,map,dmy,tz); if(!t) return; if(t.bad){ bad.push([hrow+i+2,t.bad]); return }
-    const c=nth[t.key]=(nth[t.key]||0)+1; t.id='x'+jxHash(t.key+'#'+c); delete t.key; ok.push([hrow+i+2,t]) });
+  const ok=[], bad=[], nth={}; body.forEach((r,i)=>{ const t=jxRow(r,map,dmy,tz); if(!t) return; if(t.bad){ bad.push([r0+hrow+i+2,t.bad]); return }
+    const c=nth[t.key]=(nth[t.key]||0)+1; t.id='x'+jxHash(t.key+'#'+c); delete t.key;
+    t._img=(JX.img[r0+hrow+1+i]||[]).slice(0,2); ok.push([r0+hrow+i+2,t]) });
   return {ok,bad} }
 function jxDraw(){ const head=(JX.rows[JX.hrow]||[]).map(String), cols=Math.max(head.length,...JX.rows.slice(JX.hrow,JX.hrow+50).map(r=>r.length));
   const letter=i=>XLSX.utils.encode_col(i), opts=Array.from({length:cols},(_,i)=>`<option value="${i}">${letter(i)}：${esc(head[i]||'（冇欄名）')}</option>`).join('');
@@ -2396,28 +2432,28 @@ function jxDraw(){ const head=(JX.rows[JX.hrow]||[]).map(String), cols=Math.max(
     if(sel.value==='') delete JX.map[k]; else { for(const f in JX.map) if(JX.map[f]===+sel.value) delete JX.map[f]; JX.map[k]=+sel.value } jxDraw() } });
   $('jx-mapn').textContent=`對到 ${Object.keys(JX.map).length} 個欄位`;
   const miss=JX_F.filter(f=>f[2]&&JX.map[f[0]]==null).map(f=>f[1]);
-  if(miss.length){ $('jx-prev').innerHTML=`<tr><td colspan="11" class="muted">未揀「${miss.join('」、「')}」對應邊一欄。</td></tr>`; $('jx-bad').innerHTML=''; $('jx-sum').textContent=''; $('jx-go').disabled=true; return }
+  if(miss.length){ $('jx-prev').innerHTML=`<tr><td colspan="12" class="muted">未揀「${miss.join('」、「')}」對應邊一欄。</td></tr>`; $('jx-bad').innerHTML=''; $('jx-sum').textContent=''; $('jx-go').disabled=true; return }
   const {ok,bad}=jxParse(), had=new Set(TR.map(x=>x.id)), upd=ok.filter(([,t])=>had.has(t.id)).length, ids=new Set(ok.map(([,t])=>t.id));
   JX.ok=ok;
-  $('jx-sum').textContent=`${ok.length} 單讀到${upd?`（${upd} 單之前匯入過，會用表入面嘅數更新）`:''}${bad.length?`，${bad.length} 行有問題會略過`:''}`;
+  $('jx-sum').textContent=`${ok.length} 單讀到${(n=>n?`，連 ${n} 張截圖`:'')(ok.reduce((a,[,t])=>a+t._img.length,0))}${upd?`（${upd} 單之前匯入過，會用表入面嘅數更新）`:''}${bad.length?`，${bad.length} 行有問題會略過`:''}`;
   $('jx-prev').innerHTML=ok.slice(0,30).map(([n,t])=>`<tr><td class="muted">${n}</td><td><b>${esc(t.sym)}</b></td><td>${t.mkt==='fut'?'期貨':'股票'}</td><td class="${t.side==='S'?'down':'up'}">${SIDE[t.side]}</td>
     <td class="num">${t.open}${t.otime?' '+t.otime:''}</td><td class="num">${t.close?t.close+(t.ctime?' '+t.ctime:''):'<span class="muted">未平倉</span>'}</td>
-    <td class="r num">${f(t.buy,2)}</td><td class="r num">${t.sell==null?'—':f(t.sell,2)}</td><td class="r num">${f(t.qty,0)}</td><td class="r num">${f(t.fee,2)}</td><td>${esc(t.strat)}</td></tr>`).join('')
-    +(ok.length>30?`<tr><td colspan="11" class="muted">……仲有 ${ok.length-30} 單</td></tr>`:'')+(ok.length?'':'<tr><td colspan="11" class="muted">一單都讀唔到。睇下欄位對應啱唔啱，或者「欄名喺第幾行」。</td></tr>');
+    <td class="r num">${f(t.buy,2)}</td><td class="r num">${t.sell==null?'—':f(t.sell,2)}</td><td class="r num">${f(t.qty,0)}</td><td class="r num">${f(t.fee,2)}</td><td>${esc(t.strat)}</td><td>${t._img.length?t._img.length+' 張':''}</td></tr>`).join('')
+    +(ok.length>30?`<tr><td colspan="12" class="muted">……仲有 ${ok.length-30} 單</td></tr>`:'')+(ok.length?'':'<tr><td colspan="12" class="muted">一單都讀唔到。睇下欄位對應啱唔啱，或者「欄名喺第幾行」。</td></tr>');
   $('jx-bad').innerHTML=bad.slice(0,10).map(([n,why])=>`<li>第 ${n} 行：${why}</li>`).join('')+(bad.length>10?`<li>……仲有 ${bad.length-10} 行</li>`:'');
   const after=new Set([...had,...ids]).size; $('jx-go').disabled=!ok.length||after>J_MAX;
   $('jx-go').textContent=`匯入 ${ok.length} 單`;
   $('jx-msg').textContent=after>J_MAX?`匯入之後會有 ${after.toLocaleString('en-US')} 單，超過上限 ${J_MAX.toLocaleString('en-US')} 單。請先刪走啲舊紀錄。`:'';
 }
-function jxSheet(name){ const ws=JX.wb.Sheets[name]; JX.sheet=name;
+function jxSheet(name){ const ws=JX.wb.Sheets[name]; JX.sheet=name; JX.r0=ws['!ref']?XLSX.utils.decode_range(ws['!ref']).s.r:0; JX.img=JX.buf?jxImages(JX.buf,name):{};
   JX.rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:'',blankrows:true}).map(r=>r.map(c=>typeof c==='string'?c.trim():c));
   JX.hrow=jxFindHeader(JX.rows); JX.map=jxAutoMap(JX.rows[JX.hrow]||[]); $('jx-hrow').value=JX.hrow+1; jxDraw() }
 async function jxOpen(fl){
   try{ await jxLib() }catch(_){ jMsg('讀 Excel 嘅元件載入唔到，檢查下網絡再試'); return }
-  let wb; try{ const csv=/\.(csv|tsv|txt)$/i.test(fl.name);
-    wb = csv ? XLSX.read(await fl.text(),{type:'string',raw:true}) : XLSX.read(await fl.arrayBuffer(),{type:'array'}) }catch(_){ jMsg('呢個檔案打唔開（要係 .xlsx、.xls 或者 .csv）'); return }
+  let wb, buf=null; try{ const csv=/\.(csv|tsv|txt)$/i.test(fl.name);
+    if(csv) wb=XLSX.read(await fl.text(),{type:'string',raw:true}); else { buf=await fl.arrayBuffer(); wb=XLSX.read(buf,{type:'array'}) } }catch(_){ jMsg('呢個檔案打唔開（要係 .xlsx、.xls 或者 .csv）'); return }
   if(!wb.SheetNames.length){ jMsg('呢個檔案入面冇工作表'); return }
-  JX={wb}; $('jx-file').textContent=fl.name; $('jx-tz').value=$('j-tz').value; $('jx-msg').textContent='';
+  JX={wb, buf: buf&&/\.xls[xm]$/i.test(fl.name)?buf:null}; $('jx-file').textContent=fl.name; $('jx-tz').value=$('j-tz').value; $('jx-msg').textContent='';
   // pick the sheet whose header looks most like a trade list
   const score=n=>{ const r=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''}); const m=jxAutoMap(r[jxFindHeader(r)]||[]); return JX_F.filter(f=>f[2]&&m[f[0]]!=null).length*10+Object.keys(m).length };
   const best=[...wb.SheetNames].sort((a,b)=>score(b)-score(a))[0];
@@ -2429,7 +2465,9 @@ function jxInit(){
   $('jx-hrow').onchange=()=>{ const n=Math.max(1,Math.min(JX.rows.length,+$('jx-hrow').value||1)); JX.hrow=n-1; JX.map=jxAutoMap(JX.rows[JX.hrow]||[]); jxDraw() };
   $('jx-tz').onchange=jxDraw;
   $('jx-go').onclick=async()=>{ const btn=$('jx-go'); btn.disabled=true; const old=new Map(TR.map(x=>[x.id,x])); let n=0;
-    try{ for(const [,t] of JX.ok){ const o=old.get(t.id), m=o?{...o}:{};
+    try{ for(const [,t0] of JX.ok){ const {_img,...t}=t0, o=old.get(t.id), m=o?{...o}:{};
+        // pictures in the sheet's row become the trade's screenshots (shrunk like ones added on the site)
+        if(_img.length){ t.shots=[]; for(const im of _img){ try{ t.shots.push(await shrink(new Blob([im.data],{type:im.type}))) }catch(_){} } }
         // a trade imported before: the sheet's filled-in cells win; screenshots, fills and notes added on the site stay
         for(const k in t) if(!o||(t[k]!==''&&t[k]!=null&&!(Array.isArray(t[k])&&!t[k].length))) m[k]=t[k];
         await DB.put('trades', {...m, upd:Date.now()}); n++;
