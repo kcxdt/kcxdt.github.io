@@ -11,9 +11,27 @@ def coverage(stocks):
     return part, full
 
 
+# A report covers the fiscal quarter that ended up to ~3 months before it. When the latest quarter in the data ended more
+# than QLAG days before the last report, the data is still the quarter before (a 10-K can come 90 days after year end).
+QLAG = 105
+
+
+def fund_stale(s):
+    """業績後待更新: the company reported, but the revenue/EPS on the site are still the quarter before.
+
+    Judged by the quarter itself (qend = end of the latest quarter in the data) rather than by dates: a fetch on the
+    report day, before Yahoo had the new quarter, used to count as done, and one after it in the same day as late."""
+    erep, fts = s.get("erep"), s.get("fts")
+    if not erep or not fts:
+        return False
+    if s.get("qend"):
+        return (pd.Timestamp(erep) - pd.Timestamp(s["qend"])).days > QLAG
+    return erep >= fts
+
+
 def fund_late(stocks):
-    """Reported after the fundamentals were last fetched: the numbers are still last quarter's (業績後待更新)."""
-    return [s["s"] for s in stocks if s.get("erep") and s.get("fts") and s["erep"] >= s["fts"]]
+    """Reported, but the fundamentals are still last quarter's (業績後待更新)."""
+    return [s["s"] for s in stocks if fund_stale(s)]
 
 
 def past_due(stocks, asof):
@@ -61,6 +79,9 @@ def run(data, today=None, now=None):
     late = len(fund_late(st))
     add(0 if late <= 50 else 1, f"出咗業績但基本面未更新：{late} 隻（選股器代號旁邊標「業績後待更新」，每日優先更新）",
         "late", late)
+    fill = [s["s"] for s in st if s.get("fill")]
+    add(0 if len(fill) <= 30 else 1, f"冇 {data['asof']} 報價、用之前收市補嘅股票：{len(fill)} 隻"
+        + (f"（例如 {'、'.join(fill[:6])}；表入面標「補價」，唔計入升跌家數、成交量同新高新低）" if fill else ""), "fill", len(fill))
     old = len(past_due(st, data["asof"]))
     add(0 if old <= 30 else 1, f"預計業績日已過但未確認公布：{old} 隻（計到 {data['asof']} 為止；下次業績日顯示「未知」）",
         "past", old)

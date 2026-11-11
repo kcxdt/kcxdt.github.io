@@ -100,6 +100,12 @@ def test_build():
     w5, w6 = [t for t in want[5:] if t != "S0001"][:2]  # Nasdaq without a time: w5 Yahoo set another day (Yahoo wins), w6 nobody confirms
     fund[w5].update(edate=pd.Timestamp("2026-11-03 21:00", tz="UTC").timestamp(), eest=False)
     fund[w6].update(edate=pd.Timestamp("2026-11-03 21:00", tz="UTC").timestamp(), eest=True)
+    w7, gap = [t for t in want[10:] if t != "S0001"][:2]  # w7 reported 10-24 but the data is still the June quarter: 業績後待更新
+    rep7 = pd.Timestamp("2026-10-23 21:00", tz="UTC").timestamp()
+    fund[w7].update(qend="2026-06-30", erep=rep7, edate=None, _ts=rep7 + 86400)
+    # one stock without a bar on the last day: its price is filled from the day before
+    for k in px:
+        px[k].loc[pd.Timestamp("2026-10-27"), gap] = np.nan
     d = build(px, meta, fund, fng, {"S0001": ["2026-10-29", "amc"], w4: ["2026-10-30", None, 12.5],
                                     w5: ["2026-11-09", None, 9.0], w6: ["2026-11-09", None, 9.0],
                                     other: ["2026-10-30", "bmo", 321.0]}, {b: "2026-10-22"},
@@ -126,7 +132,14 @@ def test_build():
     assert set(d["panic"]) == {"on", "day"}
     assert set(d["rebound"]) == {"on", "day", "ma20", "close"}
     assert all(1 <= s["prsr"] <= 99 and "pd50" in s and "px50" in s for s in d["stocks"])
-    assert f0["fts"] and f0["qend"] == "2026-09-30" and f0["erep"] >= f0["fts"]  # reported after the last fetch
+    # reported after the last fetch, but the data's latest quarter is recent enough: not 業績後待更新
+    assert f0["fts"] and f0["qend"] == "2026-09-30" and f0["erep"] >= f0["fts"] and "fst" not in f0
+    s7 = next(s for s in d["stocks"] if s["s"] == w7)
+    assert s7["fst"] is True
+    sg = next(s for s in d["stocks"] if s["s"] == gap)
+    assert sg["fill"] == 1 and sg["pxd"] == "2026-10-26" and sg["chg"] is None and sg["vol"] is None and not sg["nh"]
+    assert sg["c"] is not None and sg["d50"] is not None  # the filled close still places it against its averages
+    assert d["breadth"]["usa"]["adv"] + d["breadth"]["usa"]["dec"] <= 1104
     assert f0["eq"] == 114.3 and f0["eqa"] == 114.3 and f0["eqv"] == [1.5, 0.7] and f0["eqd"] == ["2026-09", "2025-09"]
     assert f0["ew"] is None and f0["g3eb"] == "a" and f0["ni"] is not None and f0["ind"]
     so = next(s for s in d["stocks"] if s["s"] == other)
@@ -147,7 +160,8 @@ def test_build():
     assert checks and all(c["lv"] in (0, 1, 2) for c in checks)
     assert not [c for c in checks if c["lv"] == 2], checks
     by = {c.get("k"): c for c in checks}
-    assert by["b50ndx"]["lv"] == 0 and by["late"]["n"] == sum(1 for s in d["stocks"] if s.get("erep") and s.get("fts") and s["erep"] >= s["fts"])
+    assert by["b50ndx"]["lv"] == 0 and by["late"]["n"] == sum(1 for s in d["stocks"] if s.get("fst")) >= 1
+    assert by["fill"]["n"] == 1
     assert by["past"]["n"] >= 1 and by["pm"]["lv"] == 1  # no 盤前需知 in this build
     assert len(d["leaders"]) == 30 and set(d["leaders"]) <= set(DOW30)
     pages = stock_pages(px, d["stocks"])
@@ -248,6 +262,15 @@ def test_checks_helpers():
     st = [dict(s="A", eold="2026-11-03"), dict(s="B", eold="2026-11-03", erep="2026-11-04"),
           dict(s="C", edate="2026-11-06"), dict(s="D", edate="2026-11-06", econf=True), dict(s="E", edate="2026-11-09")]
     assert past_due(st, "2026-11-06") == ["A", "C"]
+
+
+def test_fund_stale_by_quarter():
+    from kcdt.checks import fund_stale
+    assert not fund_stale(dict(erep="2026-11-05", fts="2026-11-05", qend="2026-09-30"))  # fetched on the day, has Q3
+    assert fund_stale(dict(erep="2026-11-05", fts="2026-11-06", qend="2026-06-30"))      # fetched after, still Q2
+    assert not fund_stale(dict(erep="2026-09-28", fts="2026-09-01", qend="2026-06-30"))  # 90 days late filer, current
+    assert fund_stale(dict(erep="2026-11-05", fts="2026-11-01"))  # no quarter date: old rule
+    assert not fund_stale(dict(erep="2026-11-05", qend="2026-06-30"))  # never fetched
 
 
 def test_premarket_marks_bars_still_trading():

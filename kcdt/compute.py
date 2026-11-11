@@ -9,7 +9,7 @@ import math
 import numpy as np
 import pandas as pd
 
-from .checks import coverage
+from .checks import coverage, fund_stale
 
 DOW30 = ["AAPL", "AMGN", "AMZN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS",
          "GS", "HD", "HON", "IBM", "JNJ", "JPM", "KO", "MCD", "MMM", "MRK",
@@ -228,6 +228,10 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
     days = P["Close"].index
     asof = days[-1].strftime("%Y-%m-%d")
     close, high, low, vol = P["Close"], P["High"], P["Low"], P["Volume"]
+    # _clean() fills a missing day from the close before (up to 3 days). Those stocks have no price for the last
+    # session at all: they are marked (fill = days filled) and left out of the day's advance/decline, volume and
+    # new high/low counts, which would otherwise count them as unchanged.
+    raw = px["Close"].sort_index().reindex(days)
 
     # ---- temperature (unchanged method) ----
     ind = indicator_frame(close, high, close["^VIX"]).dropna().tail(HIST_DAYS)
@@ -279,6 +283,12 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             tt=int(sum(bool(x) for x in tt)), rsr=int(rs_rank[t]),
             mvp=int(mvp[t]), mvpm=int(up[t]), mvpv=_f((v15[t] / v15p[t] - 1) * 100, 0), mvpp=_f(ret[15][t], 1),
         )
+        r = raw[t] if t in raw else None
+        if r is not None and pd.isna(r.iloc[-1]):
+            real = r.dropna()
+            row.update(fill=int(r.iloc[::-1].notna().cumsum().eq(0).sum()),
+                       pxd=real.index[-1].strftime("%Y-%m-%d") if len(real) else None,
+                       chg=None, vol=None, rvol=None, nh=False, nl=False)
         # yesterday's technical state: the page works out what changed today
         if not pd.isna(prev[t]) and not pd.isna(ma200p[t]):
             row.update(pd50=_f((prev[t] / ma50p[t] - 1) * 100, 1), pd200=_f((prev[t] / ma200p[t] - 1) * 100, 1),
@@ -312,6 +322,8 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
                     row.pop("econf", None)  # date only, nobody confirms it: shown as 預計
         if done and t in done and done[t] > (row.get("erep") or ""):  # on Nasdaq's calendar with an actual EPS
             row["erep"] = done[t]
+        if fund_stale(row):
+            row["fst"] = True  # 業績後待更新: the page shows this flag, the checks count the same rule
         if row.get("edate") and row["edate"] < asof:
             # an expected date that has passed: the next one is unknown; keep the old date only while no report
             # on or after it (within a few days' slip) is confirmed

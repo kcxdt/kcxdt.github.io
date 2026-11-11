@@ -10,6 +10,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+from .checks import QLAG
 from .compute import DOW30, INDICES, SECTORS
 
 WIKI = "https://en.wikipedia.org/wiki/"
@@ -270,8 +271,27 @@ def reported_after_fetch(rec, report, now):
     return bool(report) and rec.get("_ts", 0) < report + AFTER_REPORT <= now
 
 
+RETRY_AFTER = 12 * 3600  # a record still on the quarter before its last report is fetched again after this long
+RETRY_DAYS = 45  # ... for up to this many days after the report; then it goes back to the normal 7-day turn
+
+
+def quarter_behind(rec, report=None):
+    """True when the latest quarter in the record ended more than QLAG days before the company's last report
+    (Yahoo's own, or Nasdaq's confirmed `report` time): the record is still the quarter before."""
+    rep, q = max(rec.get("erep") or 0, report or 0), rec.get("qend")
+    return bool(rep and q) and rep - pd.Timestamp(q).timestamp() > QLAG * 86400
+
+
+def retry_due(rec, report, now):
+    """Fetched after the report, but Yahoo did not have the new quarter yet: try again (at most every RETRY_AFTER)."""
+    rep = max(rec.get("erep") or 0, report or 0)
+    return (quarter_behind(rec, report) and rep + AFTER_REPORT <= now < rep + RETRY_DAYS * 86400
+            and now - rec.get("_ts", 0) >= RETRY_AFTER)
+
+
 def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, reports=None, first=None):
-    """Refresh stale entries for `tickers`: companies that just reported first, then old schema, then oldest.
+    """Refresh stale entries for `tickers`: companies that just reported first, then the ones whose last fetch was
+    still the quarter before (retried), then old schema, then oldest.
 
     reports: {ticker: unix time} from report_times(): Nasdaq's calendar confirms reports that Yahoo's cached
     earnings date missed (it had already moved on, or had none), so those count as just reported too.
@@ -283,9 +303,12 @@ def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, 
     age = lambda t: (cache.get(t, {}).get("_v", 1) >= SCHEMA, cache.get(t, {}).get("_ts", 0))
     just = {t for t in tickers if reported_since(cache.get(t, {}), now)
             or (t in cache and reported_after_fetch(cache[t], reports.get(t), now))}
-    stale = sorted((t for t in tickers if t in just or age(t)[0] is False or now - age(t)[1] > max_age_days * 86400),
-                   key=lambda t: (t not in just, first is not None and t not in first, age(t)))
-    print(f"fundamentals: {len(just)} reported since last fetch, refreshing those first")
+    retry = {t for t in tickers if t in cache and t not in just and retry_due(cache[t], reports.get(t), now)}
+    stale = sorted((t for t in tickers if t in just or t in retry or age(t)[0] is False
+                    or now - age(t)[1] > max_age_days * 86400),
+                   key=lambda t: (0 if t in just else 1 if t in retry else 2, first is not None and t not in first, age(t)))
+    print(f"fundamentals: {len(just)} reported since last fetch, refreshing those first; "
+          f"{len(retry)} still on the quarter before their report, trying again")
     done = fails = 0
     for t in stale[:max_calls]:
         try:
