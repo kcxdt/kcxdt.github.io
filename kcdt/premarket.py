@@ -226,7 +226,8 @@ def build_brief(data, now=None):
     mkt = [dl[k] for k, _y, _n in MKT if k in dl] + treasury(now)
     world = [dl[k] for k, _y, _n in WORLD if k in dl]
     idx = [dl[k] for k, _y, _n in IDX if k in dl]
-    econ = economic_calendar(labels_file=str(ROOT / "cache" / "econ_labels.json")) or data.get("econ") or []
+    econ = economic_calendar(labels_file=str(ROOT / "cache" / "econ_labels.json"),
+                             days_file=str(ROOT / "cache" / "econ_days.json"), prev=data.get("econ")) or data.get("econ") or []
     for e in econ:
         e["key"] = e.get("imp") == 3 or any(k.lower() in (e.get("e") or "").lower() for k in KEY)
     earn_today, earn_done, earn_next = earnings(today, stocks)
