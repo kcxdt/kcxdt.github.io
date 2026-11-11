@@ -12,28 +12,34 @@ class _Resp:
     def raise_for_status(self): pass
 
 
-def test_economic_calendar_dates_rows_one_day_back():
-    asked = []
-
+def _fake_nasdaq(pages, asked):
     def fake_get(url, **kw):
         if "faireconomy" in url:
             raise OSError("offline")
         day = url.rsplit("=", 1)[1]
         asked.append(day)
-        if day == "2026-10-29":  # Nasdaq returns the 2026-10-28 FOMC decision under the next day's date
-            return _Resp([{"country": "United States", "gmt": "14:00", "eventName": "Fed Interest Rate Decision",
-                           "actual": "4.00%", "consensus": "4.00%", "previous": "4.00%"},
-                          {"country": "United States", "gmt": "14:00", "eventName": "FOMC Statement",
-                           "actual": "&nbsp;", "consensus": " ", "previous": "&nbsp;"},
-                          {"country": "Japan", "gmt": "01:00", "eventName": "CPI", "actual": "1%"}])
-        return _Resp([])
+        return _Resp(pages.get(day, []))
+    return fake_get
 
+
+def _econ(today, pages, now, **kw):
+    asked = []
     real_get, real_sleep = fetch.requests.get, fetch.time.sleep
-    fetch.requests.get, fetch.time.sleep = fake_get, lambda s: None
+    fetch.requests.get, fetch.time.sleep = _fake_nasdaq(pages, asked), lambda s: None
     try:
-        rows = fetch.economic_calendar(today="2026-10-29")
+        return fetch.economic_calendar(today=today, now=now, **kw), asked
     finally:
         fetch.requests.get, fetch.time.sleep = real_get, real_sleep
+
+
+def test_economic_calendar_dates_rows_one_day_back():
+    # Nasdaq returns the 2026-10-28 FOMC decision under the next day's date; asked in winter time it shows 13:00
+    pages = {"2026-10-29": [{"country": "United States", "gmt": "13:00", "eventName": "Fed Interest Rate Decision",
+                             "actual": "4.00%", "consensus": "4.00%", "previous": "4.00%"},
+                            {"country": "United States", "gmt": "13:00", "eventName": "FOMC Statement",
+                             "actual": "&nbsp;", "consensus": " ", "previous": "&nbsp;"},
+                            {"country": "Japan", "gmt": "01:00", "eventName": "CPI", "actual": "1%"}]}
+    rows, asked = _econ("2026-10-29", pages, now="2026-11-11T02:28Z")
     assert asked[0] == "2026-10-27"  # Monday 10-26 is asked for as 10-27
     fed = [r for r in rows if r["e"] == "Fed Interest Rate Decision"][0]
     assert fed["d"] == "2026-10-28" and fed["u"] == "2026-10-28T18:00Z", fed  # 14:00 EDT
@@ -42,6 +48,30 @@ def test_economic_calendar_dates_rows_one_day_back():
     assert all(r["e"] != "CPI" for r in rows)
 
 
+def test_economic_calendar_keeps_a_day_nasdaq_mixes_up(tmp_path=None):
+    import tempfile
+    us = lambda gmt, name, a="&nbsp;", p="1": {"country": "United States", "gmt": gmt, "eventName": name,
+                                               "actual": a, "consensus": "", "previous": p}
+    wed = [us("07:00", "MBA Mortgage Applications", p="-1.2%"), us("05:00", "OPEC Monthly Report")]
+    good = {"2026-11-10": [us("10:00", "Wholesale Inventories", "0.7%")],
+            "2026-11-11": [us("08:30", "CPI", "0.4%", "0.6%")], "2026-11-12": wed,
+            "2026-11-13": [us("08:30", "Initial Jobless Claims", p="189K")]}
+    days = str(pathlib.Path(tempfile.mkdtemp()) / "econ_days.json")
+    rows, _ = _econ("2026-11-10", good, now="2026-11-10T12:00Z", days_file=days)
+    cpi = [r for r in rows if r["e"] == "CPI"][0]
+    assert cpi["d"] == "2026-11-10" and cpi["u"] == "2026-11-10T13:30Z" and cpi["a"] == "0.4%"  # 21:30 Hong Kong
+    # evening of 10 Nov: date=2026-11-11 came back with Wednesday's rows; CPI day keeps the earlier answer
+    bad = dict(good, **{"2026-11-11": wed})
+    rows, _ = _econ("2026-11-10", bad, now="2026-11-10T23:28Z", days_file=days)
+    assert [r["e"] for r in rows if r["d"] == "2026-11-10"] == ["CPI"]
+    assert [r["e"] for r in rows if r["d"] == "2026-11-11"] == ["MBA Mortgage Applications", "OPEC Monthly Report"]
+    # without the file, the rows the site shows now are the fallback
+    shown = [dict(d="2026-11-10", u="2026-11-10T13:30Z", e="CPI", a="0.4%", c=None, p="0.6%", note="x")]
+    rows, _ = _econ("2026-11-10", bad, now="2026-11-10T23:28Z", prev=shown)
+    assert [r["e"] for r in rows if r["d"] == "2026-11-10"] == ["CPI"]
+    # a failed day with nothing to fall back on is left out rather than filled with the wrong day
+    rows, _ = _econ("2026-11-10", bad, now="2026-11-10T23:28Z")
+    assert not [r for r in rows if r["d"] == "2026-11-10"]
 
 
 def test_econ_labels():
@@ -91,10 +121,23 @@ def test_econ_labels_remembered_and_notes():
     assert notes[4]["link"].endswith("fomcpresconf20261028.htm")
 
 
-def test_nasdaq_time_is_utc_minus_4_all_year():
-    # NFP is 08:30 New York time: Nasdaq shows 08:30 in October (EDT) and 09:30 in November (EST)
-    assert fetch._nasdaq_utc("2026-10-02", "08:30") == "2026-10-02T12:30Z"
-    assert fetch._nasdaq_utc("2026-11-06", "09:30") == "2026-11-06T13:30Z"  # = 21:30 Hong Kong
+def test_nasdaq_time_uses_new_yorks_offset_when_asked():
+    # NFP 6 Nov 08:30 EST (13:30Z): asked in October (summer time) Nasdaq showed 09:30, asked in winter 08:30
+    assert fetch._nasdaq_utc("2026-11-06", "09:30", now="2026-10-29T12:00Z") == "2026-11-06T13:30Z"
+    assert fetch._nasdaq_utc("2026-11-06", "08:30", now="2026-11-11T02:28Z") == "2026-11-06T13:30Z"
+    # FOMC 28 Oct 14:00 EDT (18:00Z) asked in winter shows 13:00
+    assert fetch._nasdaq_utc("2026-10-28", "13:00", now="2026-11-11T02:28Z") == "2026-10-28T18:00Z"
+    assert fetch._nasdaq_utc("2026-10-28", " ", now="2026-11-11T02:28Z") is None
+
+
+def test_report_times_mark_fundamentals_a_quarter_behind():
+    rep = fetch.report_times({"AFRM": "2026-11-05"})["AFRM"]  # 16:00 New York = 21:00Z
+    assert rep == 1_793_912_400
+    fetched = {"_ts": rep - 8 * 86400}  # fetched 28 Oct
+    assert not fetch.reported_after_fetch(fetched, rep, rep + fetch.AFTER_REPORT - 1)  # Yahoo may not have it yet
+    assert fetch.reported_after_fetch(fetched, rep, rep + fetch.AFTER_REPORT)
+    assert not fetch.reported_after_fetch({"_ts": rep + fetch.AFTER_REPORT + 60}, rep, rep + 2 * 86400)
+    assert not fetch.reported_after_fetch(fetched, None, rep + 2 * 86400)
 
 
 def test_reported_since():
@@ -108,9 +151,12 @@ def test_reported_since():
 
 if __name__ == "__main__":
     test_economic_calendar_dates_rows_one_day_back()
+    test_economic_calendar_keeps_a_day_nasdaq_mixes_up()
+    test_nasdaq_time_uses_new_yorks_offset_when_asked()
+    test_report_times_mark_fundamentals_a_quarter_behind()
     test_econ_labels()
     test_econ_labels_remembered_and_notes()
-    test_nasdaq_time_is_utc_minus_4_all_year()
+
     test_reported_since()
     print("ok")
 

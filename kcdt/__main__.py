@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 from .checks import run as run_checks
 from .compute import build, stock_pages, wants_fundamentals
 from .mkt import HOLIDAYS, NY, close_due
-from .fetch import (earnings_calendar, earnings_dates, economic_calendar, fear_greed, fetch_prices, fundamentals, headlines, profiles,
-                    nasdaq_quarters, universe)
+from .fetch import (earnings_calendar, earnings_dates, economic_calendar, fear_greed, fetch_prices, fundamentals,
+                    headlines, nasdaq_quarters, profiles, reported_after_fetch, report_times, universe)
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "site"
@@ -216,29 +216,45 @@ def main():
         # exit code 1: the report job opens an issue, and the next backup slot (or the Claude check) tries again
         sys.exit(f"only {cover:.1%} of stocks have a close for {last}: Yahoo hasn't posted the day yet. "
                  "Not publishing, so the site keeps the previous close instead of showing old prices as new.")
+    # Nasdaq's calendar first: its confirmed reports decide which cached fundamentals are a quarter behind
+    earn, done = earnings_calendar(cache_file=ROOT / "cache" / "earnings_done.json")
+    reports = report_times(done)
+    say("earnings calendar")
     want = wants_fundamentals(px, meta)
-    fund = fundamentals(want, ROOT / "cache" / "fundamentals.json", max_calls=budget["fund"])
+    # Stocks outside the screener's pool keep the fundamentals fetched while they were in it; when such a company
+    # reports, refresh it too, so it doesn't sit under 「業績後待更新」 for weeks (10 Nov 2026: 156 stocks, 78 of them
+    # last fetched 28 Oct, while the midday run had nothing to do).
+    fpath = ROOT / "cache" / "fundamentals.json"
+    cached = json.loads(fpath.read_text()) if fpath.exists() else {}
+    now = time.time()
+    extra = {t for t in meta.index if t in cached and reported_after_fetch(cached[t], reports.get(t), now)} - set(want)
+    print(f"fundamentals: {len(extra)} stocks outside the screener pool reported since their last fetch")
+    pool, want = set(want), sorted(set(want) | extra)
+    del cached
+    fund = fundamentals(want, fpath, max_calls=budget["fund"], reports=reports, first=pool)
     say("fundamentals")
-    nq = nasdaq_quarters(want, ROOT / "cache" / "nasdaq_quarters.json", max_calls=budget["nq"],
-                         reports={t: r["erep"] for t, r in fund.items() if r.get("erep")})
+    nq_rep = {t: r["erep"] for t, r in fund.items() if r.get("erep")}
+    for t, ts in reports.items():
+        nq_rep[t] = max(nq_rep.get(t, 0), ts)
+    nq = nasdaq_quarters(want, ROOT / "cache" / "nasdaq_quarters.json", max_calls=budget["nq"], reports=nq_rep)
     fund = {t: {**rec, **nq.get(t, {}), "_ts": max(rec.get("_ts", 0), nq.get(t, {}).get("_ts", 0))}
             for t, rec in fund.items()}
     prof = profiles(list(meta.index), ROOT / "cache" / "profiles.json", have={t for t, r in fund.items() if r.get("ind")},
                     max_calls=budget["prof"])
     say("nasdaq quarters, profiles")
-    earn, done = earnings_calendar(cache_file=ROOT / "cache" / "earnings_done.json")
     # Yahoo's next date for everything without a set one yet (Nasdaq's dates without a time can be projections)
     soon = {t for t, e in earn.items() if e[1]} | {t for t, r in fund.items() if (r.get("edate") or 0) > time.time()}
     # Nasdaq-100 first, then Nasdaq dates without a time (they can be projections: BABA, DELL, ORCL), then by size
     cap = lambda t: (fund.get(t, {}).get("mcap") or 0) / 1e9 or (earn.get(t) or [None] * 3)[2] or 0
     order = sorted(meta.index, key=lambda t: (not meta.at[t, "ndx"], not (t in earn and not earn[t][1]), -cap(t), t))
     ydates = earnings_dates(order, ROOT / "cache" / "earnings_dates.json", known=soon, max_calls=budget["edates"])
-    say("earnings calendar and dates")
+    say("earnings dates")
     if mode == "warm":
         print("warm run: caches refreshed, nothing published")
         return
     data = build(px, meta, fund, fear_greed(ROOT / "cache" / "fear_greed.json"), earn, done, prof, ydates)
-    data["econ"], data["econ_t"] = economic_calendar(labels_file="cache/econ_labels.json"), now_utc()
+    data["econ"], data["econ_t"] = economic_calendar(labels_file="cache/econ_labels.json",
+                                                         days_file="cache/econ_days.json"), now_utc()
     data["news"], data["news_t"] = headlines(), now_utc()
     if len(data["stocks"]) < 1000:
         sys.exit(f"only {len(data['stocks'])} stocks computed, refusing to publish")

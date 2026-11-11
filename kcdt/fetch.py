@@ -259,15 +259,32 @@ def reported_since(rec, now):
     return bool(e) and e + AFTER_REPORT <= now and rec.get("_ts", 0) < e + AFTER_REPORT
 
 
-def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6):
-    """Refresh stale entries for `tickers`: companies that just reported first, then old schema, then oldest."""
+def report_times(done):
+    """{ticker: "YYYY-MM-DD"} of confirmed reports (Nasdaq's calendar) -> {ticker: unix time of 16:00 New York that
+    day}. The time of day isn't known, so take the latest a report can come out (after the close)."""
+    return {t: pd.Timestamp(f"{d} 16:00", tz="America/New_York").timestamp() for t, d in (done or {}).items()}
+
+
+def reported_after_fetch(rec, report, now):
+    """True when a confirmed report (unix time from report_times) came after this cached record was fetched."""
+    return bool(report) and rec.get("_ts", 0) < report + AFTER_REPORT <= now
+
+
+def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, reports=None, first=None):
+    """Refresh stale entries for `tickers`: companies that just reported first, then old schema, then oldest.
+
+    reports: {ticker: unix time} from report_times(): Nasdaq's calendar confirms reports that Yahoo's cached
+    earnings date missed (it had already moved on, or had none), so those count as just reported too.
+    first: among the just-reported, these go first (the screener's pool, ahead of stocks outside it)."""
     path = pathlib.Path(cache_file)
     cache = json.loads(path.read_text()) if path.exists() else {}
     now = time.time()
+    reports = reports or {}
     age = lambda t: (cache.get(t, {}).get("_v", 1) >= SCHEMA, cache.get(t, {}).get("_ts", 0))
-    just = {t for t in tickers if reported_since(cache.get(t, {}), now)}
+    just = {t for t in tickers if reported_since(cache.get(t, {}), now)
+            or (t in cache and reported_after_fetch(cache[t], reports.get(t), now))}
     stale = sorted((t for t in tickers if t in just or age(t)[0] is False or now - age(t)[1] > max_age_days * 86400),
-                   key=lambda t: (t not in just, age(t)))
+                   key=lambda t: (t not in just, first is not None and t not in first, age(t)))
     print(f"fundamentals: {len(just)} reported since last fetch, refreshing those first")
     done = fails = 0
     for t in stale[:max_calls]:
@@ -521,38 +538,84 @@ def earnings_dates(tickers, cache_file, known=(), max_calls=300, recheck_days=3,
 
 # ---- US economic calendar and market headlines (Nasdaq) ----
 
-def _nasdaq_utc(day, hhmm):
-    """The calendar's "gmt" column is New York summer time (UTC-4) all year: NFP at 08:30 ET shows 08:30 in
-    October but 09:30 after the clocks go back, so add 4 hours rather than converting from New York time."""
+def _nasdaq_utc(day, hhmm, now=None):
+    """The calendar's "gmt" column is the release time in UTC shown with New York's offset *at the time of asking*,
+    for every date alike. Asked in October (summer time), NFP at 08:30 ET on 6 Nov showed as 09:30; asked on
+    11 Nov (winter time) the 28 Oct FOMC decision at 14:00 EDT shows as 13:00 and the 10 Nov CPI as 08:30.
+    So undo today's offset, not the offset of the release date."""
     if not (hhmm or "").strip():
         return None
+    now = pd.Timestamp(now) if now is not None else pd.Timestamp.now(tz="UTC")
+    now = now.tz_localize("UTC") if now.tzinfo is None else now
+    off = now.tz_convert("America/New_York").utcoffset()  # -4 h in summer, -5 h in winter
     try:
-        return (pd.Timestamp(f"{day} {hhmm.strip()}") + pd.Timedelta(hours=4)).strftime("%Y-%m-%dT%H:%MZ")
+        return (pd.Timestamp(f"{day} {hhmm.strip()}") - off).strftime("%Y-%m-%dT%H:%MZ")
     except Exception:
         return None
 
 
-def economic_calendar(today=None, labels_file=None):
+def _econ_day(ask, tries=2):
+    """US rows Nasdaq files under date=`ask`, or None when the request failed."""
+    for i in range(tries):
+        try:
+            r = requests.get(f"https://api.nasdaq.com/api/calendar/economicevents?date={ask}", headers=NASDAQ_UA, timeout=30)
+            r.raise_for_status()
+            rows = ((r.json().get("data") or {}).get("rows")) or []
+            return [x for x in rows if x.get("country") == "United States"]
+        except Exception as e:
+            print(f"economic calendar failed ({i + 1}/{tries}):", ask, e)
+            time.sleep(3)
+    return None
+
+
+def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, now=None):
     """US releases for this week and next: [{d, u (UTC time), e (event), a (actual), c (consensus), p (previous)}].
 
     Nasdaq files each day's releases under the next day's date (the 2026-10-28 FOMC decision comes back for
-    date=2026-10-29), so query the day after and date the rows one day earlier."""
+    date=2026-10-29, the 2026-11-10 CPI for date=2026-11-11), so query the day after and date the rows one day
+    earlier. Now and then it answers with another day's rows: on the evening of 10 Nov, date=2026-11-11 gave
+    Wednesday's rows instead of Tuesday's CPI, so the site lost CPI day. A day whose rows are the same as the next
+    day's, or that comes back empty or failed where it had rows before, keeps its last good copy: `prev` (the
+    rows the site shows now), else `days_file` (kept with the builds' cache)."""
     today = pd.Timestamp(today or pd.Timestamp.now(tz="America/New_York").date())
     monday = today - pd.Timedelta(days=today.weekday())
     clean = lambda x: None if (x or "").replace("&nbsp;", "").strip() == "" else x.strip()
-    out = []
-    for d in pd.bdate_range(monday, periods=10):
-        day, ask = d.strftime("%Y-%m-%d"), (d + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    kept = {}
+    dpath = pathlib.Path(days_file) if days_file else None
+    if dpath and dpath.exists():
         try:
-            r = requests.get(f"https://api.nasdaq.com/api/calendar/economicevents?date={ask}", headers=NASDAQ_UA, timeout=30)
-            rows = ((r.json().get("data") or {}).get("rows")) or []
-        except Exception as e:
-            print("economic calendar failed:", day, e)
-            continue
-        out += [dict(d=day, u=_nasdaq_utc(day, x.get("gmt")), e=clean(x.get("eventName")), a=clean(x.get("actual")),
-                     c=clean(x.get("consensus")), p=clean(x.get("previous")))
-                for x in rows if x.get("country") == "United States"]
+            kept = json.loads(dpath.read_text())
+        except Exception:
+            kept = {}
+    shown = {}  # the rows the site shows now
+    for r in prev or []:
+        if r.get("d"):
+            shown.setdefault(r["d"], []).append({k: r.get(k) for k in ("d", "u", "e", "a", "c", "p")})
+    kept = {**kept, **shown}  # the site is never older than the file
+    days = [d.strftime("%Y-%m-%d") for d in pd.bdate_range(monday, periods=10)]
+    got = {}
+    for day in days:
+        got[day] = _econ_day((pd.Timestamp(day) + pd.Timedelta(days=1)).strftime("%Y-%m-%d"))
         time.sleep(0.5)
+    sig = lambda rows: sorted((x.get("gmt"), x.get("eventName"), x.get("previous")) for x in rows) if rows else None
+    out = []
+    for i, day in enumerate(days):
+        rows = got[day]
+        nxt = got[days[i + 1]] if i + 1 < len(days) else None
+        why = ("failed" if rows is None else "same rows as the next day" if rows and sig(rows) == sig(nxt)
+               else "empty" if not rows and kept.get(day) else None)
+        if why:
+            print(f"economic calendar: {day} {why}, keeping the last good copy ({len(kept.get(day) or [])} rows)")
+            out += [dict(r) for r in kept.get(day) or []]
+            continue
+        rows = [dict(d=day, u=_nasdaq_utc(day, x.get("gmt"), now), e=clean(x.get("eventName")),
+                     a=clean(x.get("actual")), c=clean(x.get("consensus")), p=clean(x.get("previous"))) for x in rows]
+        kept[day] = rows
+        out += [dict(r) for r in rows]
+    if dpath:
+        first = (monday - pd.Timedelta(days=21)).strftime("%Y-%m-%d")
+        dpath.parent.mkdir(parents=True, exist_ok=True)
+        dpath.write_text(json.dumps({k: v for k, v in sorted(kept.items()) if k >= first}))
     from .econ import forexfactory, label
     path = pathlib.Path(labels_file) if labels_file else None
     memory = {}

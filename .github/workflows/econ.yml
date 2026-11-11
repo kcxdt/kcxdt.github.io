@@ -8,6 +8,11 @@ on:
     - cron: "50 12,13,14,15 * * 1-5"
     - cron: "20 18,19 * * 1-5"
   workflow_dispatch:
+    inputs:
+      if_due:
+        description: "Sent by the outside timer in timer/ (not used: a refresh is always worth running)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -42,6 +47,11 @@ jobs:
         run: |
           if [ ! -f site/data.json ]; then echo "no saved build yet; the next daily build will create one"; exit 1; fi
           python -m kcdt.refresh
+      # The next econ refresh or brief starts from this copy, so a day kept from an earlier answer stays kept
+      - uses: actions/cache/save@v4
+        with:
+          path: site
+          key: site-${{ github.run_id }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

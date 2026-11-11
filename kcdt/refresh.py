@@ -11,7 +11,8 @@ from .fetch import economic_calendar, headlines
 def main():
     path = OUT / "data.json"
     data = json.loads(path.read_text(encoding="utf-8"))
-    econ = economic_calendar(labels_file="cache/econ_labels.json")
+    econ = economic_calendar(labels_file="cache/econ_labels.json", days_file="cache/econ_days.json",
+                             prev=data.get("econ"))
     if econ:  # keep the last good copy when Nasdaq fails
         data["econ"], data["econ_t"] = econ, now_utc()
     news = headlines()
