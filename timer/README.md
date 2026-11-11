@@ -26,14 +26,15 @@ Worker 頁 → Settings → Variables and Secrets → Add → Type 揀 **Secret*
 
 ### 4. 加鬧鐘時間
 
-Worker 頁 → Settings → Trigger Events → Add → Cron Triggers，加兩條（時間係 UTC）：
+Worker 頁 → Settings → Trigger Events → Add → Cron Triggers，加三條（時間係 UTC）：
 
 ```
 5 10,11,13 * * MON-FRI
 40 20,21,23 * * MON-FRI
+35 17,19 * * MON-FRI
 ```
 
-第一條係盤前（紐約 06:05，夏令冬令各一個，再加一次後備），第二條係收市（紐約 16:40，同樣）。
+第一條係盤前（紐約 06:05，夏令冬令各一個，再加一次後備），第二條係收市（紐約 16:40，同樣）。第三條係中午預先更新基本面（`warm.yml`，第二次係後備）。
 
 ## 點知有冇用
 

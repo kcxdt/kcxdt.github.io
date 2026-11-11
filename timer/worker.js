@@ -7,6 +7,7 @@
 // "Actions: Read and write" only. Cron triggers (UTC):
 //   5 10,11,13 * * MON-FRI   pre-market brief (06:05 New York summer / winter, plus one retry)
 //   40 20,21,23 * * MON-FRI  close update (16:40 New York summer / winter, plus one retry)
+//   35 17,19 * * MON-FRI     midday fundamentals refresh (warm.yml; the second one is a retry)
 const REPO = "kcxdt/kcxdt.github.io";
 
 async function start(env, workflow) {
@@ -27,7 +28,8 @@ async function start(env, workflow) {
 export default {
   async scheduled(event, env, ctx) {
     const hour = new Date(event.scheduledTime).getUTCHours();
-    ctx.waitUntil(start(env, hour >= 9 && hour < 15 ? "premarket.yml" : "daily.yml"));
+    const workflow = hour >= 9 && hour < 15 ? "premarket.yml" : hour >= 16 && hour < 20 ? "warm.yml" : "daily.yml";
+    ctx.waitUntil(start(env, workflow));
   },
   // Opening the Worker's address does nothing on purpose, so nobody else can start updates.
   async fetch() {
