@@ -377,6 +377,12 @@ table.ind{max-width:880px}
 #j-img::backdrop{background:rgb(0 0 0 / .6)}
 #j-xl{border:0;border-radius:10px;padding:16px;background:var(--bg);color:var(--ink);width:min(1720px,96vw);max-height:92vh}  /* as wide as the 新增交易 form, so the grid matches it */
 #j-xl::backdrop{background:rgb(0 0 0 / .6)}
+#j-cl{border:0;border-radius:10px;padding:16px;background:var(--bg);color:var(--ink);width:min(760px,96vw);max-height:92vh}
+#j-cl::backdrop{background:rgb(0 0 0 / .6)}
+.jopen{display:grid;gap:10px}
+#jobody td{white-space:nowrap}
+#jobody tr.tot td{font-weight:600;border-top:1px solid var(--line)}
+#jotable td.frz{background:var(--panel)}
 .jxl{display:grid;gap:10px}
 .jxl h3{margin:6px 0 0}
 #jx-map select,#jx-map2 select{width:100%}
@@ -762,6 +768,14 @@ nav.tabs a em{font-style:normal}
       <div class="sechead"><h2 id="h-jn">交易日誌</h2><span class="small"><span class="badge" id="j-where">儲存位置：呢部機嘅瀏覽器</span> <span class="badge" id="j-count" hidden></span> <span class="muted" id="loginmsg"></span></span></div>
       <div class="stats" id="j-stats"></div>
     </section>
+    <section class="panel jopen" aria-labelledby="h-jo">
+      <div class="sechead"><h3 id="h-jo">未平倉持倉 <span class="muted small" id="jo-n"></span></h3><span class="small" id="jo-tot"></span></div>
+      <p class="muted small" id="jo-empty" hidden>而家冇未平倉交易。新增交易時「平倉日期」同「出場價」留空，就會喺呢度顯示。</p>
+      <div class="tablewrap" id="jo-wrap"><table id="jotable">
+        <thead><tr><th class="frz">代號</th><th>方向</th><th>開倉</th><th class="r">持倉</th><th class="r">未平數量</th><th class="r">平均入場</th><th class="r">最新收市</th><th class="r">今日 %</th><th class="r">市值／名義值</th><th class="r">浮動盈虧</th><th class="r">浮動 %</th><th class="r">止損</th><th class="r">止盈</th><th>策略</th><th></th></tr></thead>
+        <tbody id="jobody"></tbody></table></div>
+      <p class="note" id="jo-note"></p>
+    </section>
     <section class="panel jform" aria-labelledby="h-jf">
       <div class="sechead"><h3 id="h-jf">新增交易</h3><button class="tog" id="j-new" type="button">清空</button></div>
       <form id="jf" autocomplete="off">
@@ -831,6 +845,20 @@ nav.tabs a em{font-style:normal}
       <div class="tablewrap"><table><thead><tr><th>行</th><th>代號</th><th>市場</th><th>方向</th><th>開倉</th><th>平倉</th><th class="r">入場價</th><th class="r">出場價</th><th class="r">數量</th><th class="r">手續費</th><th>策略</th><th>截圖</th></tr></thead><tbody id="jx-prev"></tbody></table></div>
       <ul class="small" id="jx-bad"></ul>
       <div class="cfbar"><button class="tog" type="button" aria-pressed="true" id="jx-go">匯入</button><button class="tog" value="no">取消</button><span class="muted small" id="jx-msg"></span></div>
+    </form></dialog>
+    <dialog id="j-cl" aria-labelledby="h-jcl"><form method="dialog" class="jxl" id="jcf" autocomplete="off">
+      <div class="sechead"><h2 id="h-jcl">平倉</h2><button class="tog" value="no" aria-label="關閉">×</button></div>
+      <p class="muted small" id="jc-info"></p>
+      <div class="jgrid">
+        <label>平倉日期<input name="d" type="date" required></label>
+        <label><span>平倉時間 <span id="jc-tz"></span></span><input name="tm" type="time"></label>
+        <label>出場價<input name="p" type="number" step="any" min="0" required></label>
+        <label><span id="jc-ql">平倉數量</span><input name="q" type="number" step="any" min="0" required></label>
+        <label>呢次手續費（USD）<input name="fee" type="number" step="any" min="0" value="0"></label>
+      </div>
+      <div class="jgrid wide"><label>賣出理由<textarea name="why" rows="3"></textarea></label></div>
+      <p class="muted small" id="jc-prev"></p>
+      <div class="cfbar"><button class="tog" type="button" aria-pressed="true" id="jc-go">確認平倉</button><button class="tog" value="no">取消</button><span class="muted small" id="jc-msg"></span></div>
     </form></dialog>
     <dialog id="j-img"><img alt="交易截圖"><form method="dialog"><button class="tog">關閉</button></form></dialog>
   </main>
@@ -2395,8 +2423,64 @@ function jRender(){
     stat('平均 R', rs.length?`<span class="${cls(rs.reduce((s,t)=>s+t.R,0))}">${sgn(rs.reduce((s,t)=>s+t.R,0)/rs.length,2)}R</span> <span class="muted small">(${rs.length} 單)</span>`:'—'),
     stat('最大回撤', `<span class="down">${usd(-maxDD([...done].sort((a,b)=>((a.close||'')+(a.ctime||'')).localeCompare((b.close||'')+(b.ctime||'')))))}</span>`),
     stat('平均持倉', done.length?f(done.reduce((s,t)=>s+t.hold,0)/done.length,0)+' 日':'—'), stat('未平倉', `${rows.length-done.length} 單`)].join('');
-  jStats(done);
+  jStats(done); jOpenDraw(rows);
 }
+// 未平倉持倉: every trade (or the part of it) not closed yet, valued at the latest close in the site's data
+function jOpenDraw(rows){
+  const L = rows.filter(t=>t.isOpen).sort((a,b)=>(a.open+(a.otime||'')).localeCompare(b.open+(b.otime||'')));
+  let mv=0, fl=0, cost=0, priced=0;
+  const tr = L.map(t=>{ const q=BY[t.sym], live=!t.fut&&q?q.c:null;
+    const val = live!=null?live*t.openQ*t.mult:null, c0 = t.pin!=null?t.pin*t.openQ*t.mult:null;
+    const fp = live!=null&&t.pin!=null?t.dir*(live-t.pin)*t.openQ*t.mult:null, fpp = fp!=null&&c0?fp/c0*100:null;
+    if(fp!=null){ mv+=val; fl+=fp; cost+=c0; priced++ }
+    // distance from the latest close to the stop / target, and whether the close is already beyond it
+    const far = (lvl, stop) => { if(!lvl) return '—'; if(live==null) return px(t,lvl);
+      const d=(lvl/live-1)*100, hit = stop ? t.dir*(live-lvl)<=0 : t.dir*(live-lvl)>=0;
+      return `${px(t,lvl)} <span class="${hit?'warn':stop?'down':'up'}">${hit?(stop?'已穿':'已到'):sgn(d,1)+'%'}</span>` };
+    return `<tr data-id="${t.id}"><td class="frz"><b>${esc(t.sym)}</b>${t.fut?` <span class="badge">期貨${t.cm?' '+esc(t.cm):''}</span>`:''}</td>
+      <td class="small ${t.side==='S'?'down':'up'}">${SIDE[t.side]||'Long'}</td><td class="num small">${t.open}</td><td class="r num">${t.holdTxt}</td>
+      <td class="r num">${f(t.openQ,0)}${t.qOut?` <span class="muted small">已平 ${f(t.qOut,0)}</span>`:''}</td><td class="r num">${px(t,t.pin)}</td>
+      <td class="r num">${live!=null?usd(live):`<span class="muted" title="${t.fut?'期貨冇報價':'呢隻唔喺網站股票名單入面'}">冇報價</span>`}</td>
+      ${live!=null?`<td class="r num ${cls(q.chg)}">${sgn(q.chg,2)}%</td>`:'<td class="r num muted">—</td>'}
+      <td class="r num">${usd(val)}</td><td class="r num ${cls(fp)}">${usd(fp)}</td><td class="r num ${cls(fpp)}">${fpp==null?'—':sgn(fpp,2)+'%'}</td>
+      <td class="r num small">${far(t.sl,true)}</td><td class="r num small">${far(t.tp,false)}</td><td class="small">${esc(t.strat||'')}</td>
+      <td><button class="tog" type="button" data-close="${t.id}">平倉</button></td></tr>` });
+  $('jo-n').textContent = L.length?`${L.length} 單`:'';
+  $('jo-tot').innerHTML = priced?`市值 <b class="num">${usd(mv)}</b> · 浮動盈虧 <b class="num ${cls(fl)}">${usd(fl)}</b> <span class="${cls(fl)}">${cost?sgn(fl/cost*100,2)+'%':''}</span>`:'';
+  $('jobody').innerHTML = tr.join('') + (priced>1?`<tr class="tot"><td class="frz">合計</td><td colspan="7" class="muted small">${priced<L.length?`有報價嘅 ${priced} 單`:''}</td><td class="r num">${usd(mv)}</td><td class="r num ${cls(fl)}">${usd(fl)}</td><td class="r num ${cls(fl)}">${cost?sgn(fl/cost*100,2)+'%':'—'}</td><td colspan="4"></td></tr>`:'');
+  $('jo-wrap').hidden = !L.length; $('jo-empty').hidden = !!L.length; $('jo-note').hidden = !L.length;
+  $('jo-note').textContent = `用 ${D.asof} 美股收市價計（每日收市後自動更新，唔係即時價）。浮動盈虧未扣手續費。止損／止盈旁邊係由收市價去到嗰個價要行幾多 %；「已穿」= 收市價已經過咗止損，「已到」= 已經到咗止盈。撳「平倉」填出場價同數量就得，可以只平一部分。只係你自己嘅紀錄，唔係投資建議。`;
+  $('jobody').querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>jCloseOpen(b.dataset.close));
+  $('jobody').querySelectorAll('tr[data-id]').forEach(r=>r.onclick=e=>{ if(!e.target.closest('button')) jLoad(r.dataset.id) });
+}
+// Close all or part of an open trade without retyping it. A full close of a simple trade fills in 平倉日期／出場價;
+// anything else becomes fills (the original entry plus this exit), so partial closes keep their own price and date.
+let jcId = null;
+function jCloseOpen(id){ const t=TR.find(x=>x.id===id); if(!t) return; const c=calc(t), F=$('jcf').elements; jcId=id;
+  const live=!c.fut&&BY[t.sym]?BY[t.sym].c:null;
+  $('h-jcl').textContent=`平倉：${t.sym}`;
+  $('jc-info').textContent=`${SIDE[t.side]||'Long'} · ${t.open} 開倉 · 平均入場 ${px(c,c.pin)} · 未平 ${f(c.openQ,0)} ${c.fut?'張':'股'}${live!=null?` · ${D.asof} 收市 ${usd(live)}`:''}`;
+  $('jc-tz').textContent = `（${t.tz==='NY'?'美東':'香港'}時間）`; $('jc-ql').textContent = `平倉數量（最多 ${f(c.openQ,0)}）`;
+  F.d.value=ymd(nyNow()); F.tm.value=''; F.p.value=live!=null?live:''; F.q.value=c.openQ; F.q.max=c.openQ; F.fee.value=0; F.why.value=t.why_out||'';
+  $('jc-msg').textContent=''; jcPrev(); $('j-cl').showModal() }
+function jcPrev(){ const t=TR.find(x=>x.id===jcId); if(!t) return; const c=calc(t), F=$('jcf').elements, p=num(F.p.value), q=num(F.q.value);
+  $('jc-prev').innerHTML = p!=null&&q>0&&c.pin!=null ? (()=>{ const pl=c.dir*(p-c.pin)*q*c.mult-(num(F.fee.value)||0);
+    return `呢次平倉盈虧（扣呢次手續費，未扣開倉手續費）：<b class="num ${cls(pl)}">${usd(pl)}</b>${q<c.openQ?` · 平倉後仲有 ${f(c.openQ-q,0)} 未平`:''}` })() : '' }
+async function jcSave(){ const t=TR.find(x=>x.id===jcId); if(!t) return; const c=calc(t), F=$('jcf').elements, M=x=>$('jc-msg').textContent=x;
+  const d=F.d.value, tm=F.tm.value, p=num(F.p.value), q=num(F.q.value), fee=num(F.fee.value)||0;
+  if(!d||p==null||!(q>0)) return M('要填平倉日期、出場價同數量');
+  if(q>c.openQ+1e-9) return M(`最多只可以平 ${f(c.openQ,0)}`);
+  if(d<t.open) return M('平倉日期早過開倉日期');
+  if(tm && t.otime && d===t.open && tm<t.otime) return M('平倉時間早過開倉時間');
+  const u={...t, fee:(t.fee||0)+fee, why_out:F.why.value, upd:Date.now()};
+  if(!(t.fills&&t.fills.length) && Math.abs(q-c.openQ)<1e-9){ u.close=d; u.ctime=tm; u.sell=p }
+  else { const fills=(t.fills&&t.fills.length?t.fills.map(x=>({...x})):[{a:'in',d:t.open,tm:t.otime||'',q:t.qty,p:t.buy}]).concat([{a:'out',d,tm,q,p}]);
+    const ins=fills.filter(x=>x.a==='in'), outs=fills.filter(x=>x.a==='out'), qi=ins.reduce((s,x)=>s+x.q,0), qo=outs.reduce((s,x)=>s+x.q,0);
+    const by=a=>[...a].sort((x,y)=>((x.d||'')+(x.tm||'')).localeCompare((y.d||'')+(y.tm||''))), lo=by(outs).pop(), done=qo>=qi-1e-9;
+    Object.assign(u,{fills, qty:qi, buy:+wavg(ins).toFixed(4), close:done?lo.d:null, ctime:done?lo.tm||'':'', sell:done?+wavg(outs).toFixed(4):null}) }
+  const btn=$('jc-go'); btn.disabled=true;
+  try{ await DB.put('trades', u) }catch(_){ btn.disabled=false; return M('儲唔到：網絡有問題，遲啲再試') }
+  btn.disabled=false; $('j-cl').close(); if(jEdit===t.id) jReset(); await jReload(); jMsg(`${t.sym} 已${q<c.openQ?'部分':''}平倉`) }
 function jZoom(src){const d=$('j-img'); d.querySelector('img').src=src; d.showModal()}
 function jShotsDraw(){ $('j-shots').innerHTML = jShots.map((s,i)=>`<span class="thumb"><img src="${s}" alt="截圖 ${i+1}"><button type="button" data-i="${i}" aria-label="刪除截圖 ${i+1}">×</button></span>`).join('');
   $('j-shots').querySelectorAll('img').forEach(im=>im.onclick=()=>jZoom(im.src));
@@ -2632,6 +2716,7 @@ DRAW.journal = () => {
       if(!jFills.length && F.qty.value && F.buy.value) jFills.push({a:'in', d:F.open.value, tm:F.otime.value, q:num(F.qty.value), p:num(F.buy.value)});
       jFills.push({a:jFills.length?'out':'in', d:F.close.value||F.open.value||ymd(nyNow()), tm:'', q:null, p:null}); jFillsDraw() };
     $('j-new').onclick=jReset;
+    $('jc-go').onclick=jcSave; ['p','q','fee'].forEach(k=>$('jcf').elements[k].oninput=jcPrev);
     $('j-file').onchange=async e=>{ const fl=e.target.files[0]; e.target.value=''; if(!fl) return;
       if(jShots.length>=2){jMsg('最多 2 張截圖');return} try{ jShots.push(await shrink(fl)); jShotsDraw() }catch(_){ jMsg('呢個檔案打唔開') } };
     $('jf').onsubmit=async e=>{ e.preventDefault(); jFillsDerive(); const F=e.target.elements;
