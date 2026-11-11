@@ -5,10 +5,16 @@ name: Midday fundamentals refresh
 # saves the refreshed cache, which the next close update starts from.
 # 17:40 UTC = 12:40 New York in winter, 13:40 in summer: by then Yahoo has the numbers of companies that reported
 # the evening before. 19:40 is a backup in case GitHub drops the first run; it stops when today's run already worked.
+# GitHub dropped both runs on 10 Nov 2026, so the outside timer (timer/) also starts this at 17:35 and 19:35 UTC.
 on:
   schedule:
     - cron: "40 17,19 * * 1-5"
   workflow_dispatch:
+    inputs:
+      if_due:
+        description: "Stop when today's refresh already worked (used by the outside timer in timer/)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -33,7 +39,7 @@ jobs:
         name: Already done today?
         run: |
           today=$(TZ=America/New_York date +%F)
-          if [ "${{ github.event_name }}" = schedule ] && [ "$(cat cache/warm.txt 2>/dev/null)" = "$today" ]; then
+          if [ "${{ github.event_name == 'schedule' || inputs.if_due }}" = true ] && [ "$(cat cache/warm.txt 2>/dev/null)" = "$today" ]; then
             echo "already refreshed today ($today)"; echo "run=false" >> "$GITHUB_OUTPUT"
           else
             echo "run=true" >> "$GITHUB_OUTPUT"
