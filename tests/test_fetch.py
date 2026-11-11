@@ -92,6 +92,49 @@ def test_econ_labels():
     assert not cpi_m.get("per") and cpi_m["unconf"] and cpi_y["unconf"] and cpi_m["ref"] == "2026 年 10 月"
 
 
+def test_econ_housing_percent_row_is_month_on_month():
+    from kcdt.econ import label
+    rows = [dict(d="2026-11-18", u="2026-11-18T13:30Z", e="Housing Starts", a=None, c="1.33M", p="1.31M"),
+            dict(d="2026-11-18", u="2026-11-18T13:30Z", e="Housing Starts", a=None, c=None, p="-5.2%"),
+            dict(d="2026-11-17", u="2026-11-17T13:30Z", e="Retail Sales", a=None, c=None, p="6.29%"),
+            dict(d="2026-11-17", u="2026-11-17T13:30Z", e="Retail Sales", a=None, c=None, p="0.8%")]
+    label(rows, [])
+    assert rows[1]["per"] == "按月" and not rows[1].get("unconf")
+    assert rows[2]["unconf"] and rows[3]["unconf"]  # two % rows: still never guessed
+
+
+def test_econ_pair_confirmed_from_the_bls_index():
+    from kcdt import econ
+    ppi = lambda p: dict(d="2026-11-13", u="2026-11-13T13:30Z", e="PPI ex. Food/Energy/Transport", a=None, c=None, p=p)
+    asked = []
+    idx = lambda names: asked.append(names) or {n: {"按月": {0.5, 0.3, 0.2}, "按年": {5.0, 4.8, 4.9}} for n in names}
+    rows = [ppi("5.0%"), ppi("0.5%")]
+    econ.label(rows, [], {}, idx)
+    assert [r["per"] for r in rows] == ["按年", "按月"] and not any(r.get("unconf") for r in rows)
+    assert asked == [["ppi ex. food/energy/transport"]]
+    rows = [ppi("5.0%"), ppi("0.9%")]  # a number the index doesn't give (revised): not guessed
+    econ.label(rows, [], {}, idx)
+    assert all(r["unconf"] and not r.get("per") for r in rows)
+    rows = [ppi("0.5%"), ppi("0.3%")]  # both look monthly: not guessed
+    econ.label(rows, [], {}, idx)
+    assert all(r["unconf"] for r in rows)
+    # the index itself: seasonally adjusted for the month, unadjusted for 12 months
+    sa = {(2025, 8): 137.021, (2025, 9): 137.328, (2026, 7): 143.182, (2026, 8): 143.555, (2026, 9): 144.255}
+    nsa = {(2025, 8): 136.956, (2025, 9): 137.021, (2026, 8): 143.486, (2026, 9): 143.929}
+    data = lambda d: [dict(year=str(y), period=f"M{m:02d}", value=str(v)) for (y, m), v in d.items()]
+    class R:
+        def json(self):
+            return {"Results": {"series": [{"seriesID": "WPSFD49116", "data": data(sa)},
+                                           {"seriesID": "WPUFD49116", "data": data(nsa) + [dict(year="2025", period="M13", value="1")]}]}}
+    old, econ.requests.post = econ.requests.post, lambda *a, **k: R()
+    try:
+        got = econ.bls_changes(["ppi ex. food/energy/transport", "retail sales"])
+    finally:
+        econ.requests.post = old
+    assert list(got) == ["ppi ex. food/energy/transport"]
+    assert 0.5 in got["ppi ex. food/energy/transport"]["按月"] and got["ppi ex. food/energy/transport"]["按年"] == {4.8, 5.0}
+
+
 def test_econ_labels_remembered_and_notes():
     from kcdt.econ import label
     memory = {"CPI": {"0": "按月"}}  # old row-order format is dropped

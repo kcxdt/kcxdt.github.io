@@ -300,7 +300,10 @@ def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, 
     cache = json.loads(path.read_text()) if path.exists() else {}
     now = time.time()
     reports = reports or {}
-    age = lambda t: (cache.get(t, {}).get("_v", 1) >= SCHEMA, cache.get(t, {}).get("_ts", 0))
+    # a record with quarterly EPS but no quarter end date was saved before that date was collected: it counts as an
+    # old-schema record, so it is fetched again ahead of the normal 7-day turn (11 Nov 2026: 59 such, CRM, DELL, HPQ...)
+    current = lambda r: r.get("_v", 1) >= SCHEMA and not (r.get("epsq") and not r.get("qend"))
+    age = lambda t: (current(cache.get(t, {})), cache.get(t, {}).get("_ts", 0))
     just = {t for t in tickers if reported_since(cache.get(t, {}), now)
             or (t in cache and reported_after_fetch(cache[t], reports.get(t), now))}
     retry = {t for t in tickers if t in cache and t not in just and retry_due(cache[t], reports.get(t), now)}
@@ -639,7 +642,7 @@ def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, n
         first = (monday - pd.Timedelta(days=21)).strftime("%Y-%m-%d")
         dpath.parent.mkdir(parents=True, exist_ok=True)
         dpath.write_text(json.dumps({k: v for k, v in sorted(kept.items()) if k >= first}))
-    from .econ import forexfactory, label
+    from .econ import bls_changes, forexfactory, label
     path = pathlib.Path(labels_file) if labels_file else None
     memory = {}
     if path and path.exists():
@@ -647,7 +650,7 @@ def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, n
             memory = json.loads(path.read_text())
         except Exception:
             memory = {}
-    label(out, forexfactory(), memory)
+    label(out, forexfactory(), memory, bls_changes)
     if path:
         path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps(memory, ensure_ascii=False, indent=1, sort_keys=True))

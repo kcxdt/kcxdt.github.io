@@ -264,6 +264,57 @@ def test_checks_helpers():
     assert past_due(st, "2026-11-06") == ["A", "C"]
 
 
+def test_old_yahoo_dates_are_not_past_due():
+    """Yahoo keeps the last report's date: fetched after it, a set date is the last report and an old guess is nothing."""
+    universe = [f"S{i:04d}" for i in range(300)]
+    tickers = sorted(set(universe + DOW30 + [t for t, _ in INDICES] + [t for t, _ in SECTORS] + ["^NDX", "^VXN", "QQQ"]))
+    px = fake_prices(tickers, seed=4)  # last day 2026-10-27
+    ts = lambda d: pd.Timestamp(d + " 16:00", tz="America/New_York").timestamp()
+    seen = ts("2026-10-25")
+    yd = {"S0001": {"ts": ts("2025-03-07"), "est": False, "_ts": seen},   # closed-end fund: last report long ago
+          "S0002": {"ts": ts("2025-09-01"), "est": True, "_ts": seen},    # an old guess
+          "S0003": {"ts": ts("2026-10-22"), "est": True, "_ts": seen},    # a guess from last week: may be late
+          "S0004": {"ts": ts("2026-10-22"), "est": True, "_ts": ts("2026-10-20")}}  # fetched before it: expected, missed
+    d = build(px, fake_meta(universe), {}, None, {}, {}, {}, yd)
+    s = {x["s"]: x for x in d["stocks"]}
+    assert s["S0001"]["erep"] == "2025-03-07" and "eold" not in s["S0001"] and not s["S0001"].get("edate")
+    assert "eold" not in s["S0002"] and not s["S0002"].get("erep")
+    assert s["S0003"]["eold"] == "2026-10-22" and s["S0004"]["eold"] == "2026-10-22"
+    from kcdt.checks import past_due
+    assert past_due(d["stocks"], d["asof"]) == ["S0003", "S0004"]
+
+
+def test_nasdaq_qend_by_eps_when_revenue_differs():
+    from kcdt.compute import nasdaq_qend
+    bank = dict(qend="2026-09-30", revq=[381e6, 413e6], epsq=[0.94, 1.11, None, None, None],
+                nrev=[555e6, 577e6], neps=[0.94, 1.11, 0.84, 0.81, 0.67])
+    assert nasdaq_qend(bank) == "2026-09-30"
+    assert nasdaq_qend({**bank, "neps": [1.11, 0.84, 0.81]}) is None  # Nasdaq a quarter behind: only one EPS to compare
+    assert nasdaq_qend({**bank, "epsq": [1.3, 0.94, 1.11], "neps": [0.94, 1.11, 0.84]}) == "2026-06-30"
+
+
+def test_nasdaq_qend_by_revenue_cut_to_millions():
+    from kcdt.compute import fundamentals_row, nasdaq_qend
+    # basic against diluted EPS (1.01 / 0.99) but two revenue quarters agree
+    hto = dict(qend="2026-09-30", revq=[250229000.0, 210474000.0, 183293000.0], epsq=[0.99, 0.62, 0.49, 0.45, None],
+               nrev=[250e6, 210e6, 183e6], neps=[1.01, 0.63, 0.49, 0.44, 1.28])
+    assert nasdaq_qend(hto) == "2026-09-30"
+    assert fundamentals_row({**hto, "mcap": 3e9})["eqd"] == ["2026-09", "2025-09"]
+    # Nasdaq a quarter behind, $51.642M shown as 51,000,000
+    prsu = dict(qend="2026-09-30", revq=[251530000.0, 133493000.0, 51642000.0], epsq=[2.95, 0.54, -0.9, -0.91, None],
+                nrev=[133e6, 51e6, 57e6], neps=[0.55, None, None, 2.6, 0.21])
+    assert nasdaq_qend(prsu) == "2026-06-30"
+    assert fundamentals_row({**prsu, "mcap": 1e9})["eqd"] == ["2026-06", "2025-06"]
+    assert nasdaq_qend({**prsu, "nrev": [134e6, 51e6]}) is None  # a million above: not the same quarter
+
+
+def test_issuer_accounts_are_not_a_notes_eps():
+    from kcdt.compute import fundamentals_row
+    rzc = dict(mcap=None, ind=None, _v=2, nrev=[6637e6] * 8, neps=[7.01, 4.98, 6.91, 3.81, 2.7, 4.27, 2.2, 2.34])
+    row = fundamentals_row(rzc)
+    assert row["eqv"] is None and row["g3r"] is None and row["g3e"] is None
+
+
 def test_fund_stale_by_quarter():
     from kcdt.checks import fund_stale
     assert not fund_stale(dict(erep="2026-11-05", fts="2026-11-05", qend="2026-09-30"))  # fetched on the day, has Q3
@@ -294,7 +345,8 @@ def test_yahoo_report_time_in_new_york():
     assert ny_session(mid) is None and ny_day(mid) == "2026-11-19"
     # a fundamentals copy from before the next date was out loses to a newer earnings-date check
     f = {"edate": pd.Timestamp("2026-08-27 20:05", tz="UTC").timestamp(), "_ts": pre - 30 * 86400}
-    assert yahoo_next(f, {"ts": nov, "est": False, "_ts": pre - 86400}) == ("2026-11-17", "amc", True)
-    assert yahoo_next(f, {"ts": nov, "est": True, "_ts": pre - 86400}) == ("2026-11-17", None, False)  # a guess
-    assert yahoo_next({"edate": nov, "eest": False, "_ts": 1}, None) == ("2026-11-17", "amc", True)
-    assert yahoo_next({"edate": nov, "_ts": 1}, None) == ("2026-11-17", None, False)  # older copy: no flag
+    assert yahoo_next(f, {"ts": nov, "est": False, "_ts": pre - 86400}) [:3] == ("2026-11-17", "amc", True)
+    assert yahoo_next(f, {"ts": nov, "est": True, "_ts": pre - 86400})[:3] == ("2026-11-17", None, False)  # a guess
+    assert yahoo_next({"edate": nov, "eest": False, "_ts": 1}, None)[:3] == ("2026-11-17", "amc", True)
+    assert yahoo_next({"edate": nov, "_ts": 1}, None)[:3] == ("2026-11-17", None, False)  # older copy: no flag
+    assert yahoo_next(None, {"ts": nov, "est": False, "_ts": nov + 5 * 86400})[3] == "2026-11-22"  # fetched after it

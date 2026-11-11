@@ -136,12 +136,20 @@ def nasdaq_qend(f):
     nrev, neps = f.get("nrev") or [], f.get("neps") or []
     if not q:
         return None
+    # Nasdaq cuts revenue down to whole millions ($51.642M -> 51,000,000)
+    rev_ok = lambda a, b: _same(a, b, 0.003) or (a is not None and b is not None and a % 1e6 == 0 and 0 <= b - a < 1e6)
+    eps_ok = lambda a, b: _same(a, b, 0.02, 0.011)
     for i in range(2):
-        same = [ok(n[0], y[i]) for n, y, ok in ((nrev, revq, lambda a, b: _same(a, b, 0.003)),
-                                                  (neps, epsq, lambda a, b: _same(a, b, 0.02, 0.011)))
+        same = [ok(n[0], y[i]) for n, y, ok in ((nrev, revq, rev_ok), (neps, epsq, eps_ok))
                 if n and len(y) > i and None not in (n[0], y[i])]
         if same and all(same):
             return (pd.Timestamp(q) - pd.DateOffset(months=3 * i)).strftime("%Y-%m-%d")
+    # One of the two never matches for some companies (banks and REITs define revenue differently; basic against
+    # diluted EPS). Two quarters in a row of the other that agree place Nasdaq's history just as well.
+    for n, y, ok in ((nrev, revq, rev_ok), (neps, epsq, eps_ok)):
+        for i in range(2):
+            if len(n) >= 2 and len(y) > i + 1 and ok(n[0], y[i]) and ok(n[1], y[i + 1]) and n[0] != n[1]:
+                return (pd.Timestamp(q) - pd.DateOffset(months=3 * i)).strftime("%Y-%m-%d")
     return None
 
 
@@ -159,6 +167,10 @@ def fundamentals_row(f):
                        else None)
     # Nasdaq's quarterly history goes back ~3 fiscal years; Yahoo's is the fallback
     nrev, neps, epsh = f.get("nrev") or [], f.get("neps") or [], f.get("epsh") or []
+    if not (f.get("mcap") or f.get("ind") or revq or epsq):
+        # Yahoo knows no company behind the ticker: a preferred share or note (RZC), for which Nasdaq answers
+        # with the issuer's accounts. Those are not this security's revenue and EPS.
+        nrev, neps = [], []
     g3r = yoy3(nrev) if len(nrev) >= 7 else yoy3(revq)
     # GAAP EPS (company accounts: Nasdaq, then Yahoo's income statement) before Yahoo's adjusted reported EPS
     g3e, g3eb = next(((g, b) for g, b in ((yoy3(neps), "g"), (yoy3(epsq), "g"), (yoy3(epsh), "a")) if g is not None),
@@ -209,13 +221,15 @@ def ny_session(ts):
 
 def yahoo_next(f, y):
     """Yahoo's report time for one stock from whichever copy is newer: the fundamentals record `f` or the
-    earnings-date check `y`. Returns (date, "bmo"/"amc"/None, scheduled); the time only when Yahoo says the date
-    is the company's own (not a guess)."""
+    earnings-date check `y`. Returns (date, "bmo"/"amc"/None, scheduled, seen); the time only when Yahoo says the
+    date is the company's own (not a guess). seen: the New York day that copy was fetched; a date already behind
+    it is Yahoo still showing the last report, not an expected one."""
     f, y = f or {}, y or {}
     fresh = y.get("ts") and (not f.get("edate") or f["edate"] <= y.get("_ts", 0) or y.get("_ts", 0) >= f.get("_ts", 0))
     src = y if fresh else {"ts": f.get("edate"), "est": f.get("eest")}
     ts = src.get("ts")
-    return ny_day(ts), (ny_session(ts) if src.get("est") is False else None), src.get("est") is False
+    seen = ny_day(y.get("_ts") if fresh else f.get("_ts"))
+    return ny_day(ts), (ny_session(ts) if src.get("est") is False else None), src.get("est") is False, seen
 
 
 def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates=None):
@@ -299,7 +313,17 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             row["ind"] = p["ind"]
         if fund.get(t, {}).get("_ts"):
             row["fts"] = pd.Timestamp(fund[t]["_ts"], unit="s").strftime("%Y-%m-%d")
-        yd, yt, ysure = yahoo_next(fund.get(t), (ydates or {}).get(t))
+        yd, yt, ysure, yseen = yahoo_next(fund.get(t), (ydates or {}).get(t))
+        # Yahoo keeps showing the last report's date until the company sets the next one. A date that was already
+        # behind us when it was fetched is therefore no expected date: when Yahoo marks it as the company's own it
+        # is the last report (closed-end funds and half-yearly ADRs showed dates from 2020-2025 as 預計日已過);
+        # an estimate that old says nothing, unless it is from the last two weeks and may simply be running late.
+        if yd and yseen and yd < yseen:
+            if ysure:
+                row["erep"] = max(row.get("erep") or "", yd)
+                yd = None
+            elif (pd.Timestamp(asof) - pd.Timestamp(yd)).days > 14:
+                yd = None
         if yd:
             row["edate"], row["etime"] = yd, yt
             if ysure:
