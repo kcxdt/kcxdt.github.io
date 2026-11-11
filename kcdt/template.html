@@ -503,6 +503,25 @@ nav.tabs a em{font-style:normal}
 .ov-co{display:block;color:var(--muted);font-size:12px}
 @media (max-width:1000px){.ov-3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.ov-3>:first-child{grid-column:1/-1}.ov-2{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:640px){.ov-3{grid-template-columns:minmax(0,1fr)}.ov-card{padding:16px}.ov-num{font-size:32px}.ov-risk{grid-template-columns:48px 78px 1fr auto}.ov-go{padding:8px 12px}}
+
+/* ===== step 3 (KC, 2026-11-11): every page in the 今日總覽 card look; data and controls unchanged ===== */
+.view{gap:24px}
+h2{font-size:22px;font-weight:700}
+.view>section:first-child>.sechead:first-child>h2,.view>section:first-child>.sechead:first-child>div>h2,.ovhead h2,.cl-head h2{font-size:26px;line-height:1.4}
+th{padding:9px 10px}
+td{padding:9px 10px}
+button.tog,label.tog{border-radius:7px;padding:5px 12px}
+button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accent)}
+.badge{border-radius:7px}
+@media (min-width:641px){.panel{padding:20px}}
+.cl-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 16px}
+.cl-2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+.cl-list{margin:0;padding-left:18px;display:grid;gap:6px;font-size:14px}
+.cl-bar{display:inline-block;width:min(120px,100%);vertical-align:middle}
+#v-close td:first-child{white-space:nowrap}
+#v-close td .ov-co{white-space:normal;max-width:15em}
+@media (max-width:640px){#v-close .cl-barc{display:none}}
+@media (max-width:900px){.cl-2{grid-template-columns:minmax(0,1fr)}}
 </style>
 
 <div class="wrap">
@@ -533,6 +552,7 @@ nav.tabs a em{font-style:normal}
     <a href="#screener" data-v="screener" data-g="pick"><span>選股器</span></a>
     <a href="#watch" data-v="watch" data-g="pick"><span>自選<em>清單</em></span><span class="wcount num" id="side-wl">0</span></a>
     <span class="navlab">覆盤</span>
+    <a href="#close" data-v="close" data-g="review" class="mx"><span>收市後分析</span></a>
     <a href="#journal" data-v="journal" data-g="review" class="mx"><span>交易日誌</span></a>
     <a href="#history" data-v="history" data-g="review" class="mx"><span>歷史<em>日期</em></span></a>
     <span class="navlab">資料</span>
@@ -550,6 +570,9 @@ nav.tabs a em{font-style:normal}
 
   <!-- ===== 今日總覽 (the landing page; drawn from the same snapshot as 大市) ===== -->
   <main class="view" id="v-overview" hidden></main>
+
+  <!-- ===== 收市後分析 (same snapshot as 大市: the last close, never intraday) ===== -->
+  <main class="view" id="v-close" hidden></main>
 
   <!-- ===== 大市 ===== -->
   <main class="view" id="v-market" hidden>
@@ -984,7 +1007,7 @@ const warnMark = s => (s.ew||[]).some(k=>k!=='turn'&&k!=='loss')?' <span class="
 const epsCell = s => { const t=epsTxt(s); return t==null?'<td class="r num"><span class="muted">—</span></td>'
   : `<td class="r num nowrap ${epsSign(s)?(epsSign(s)==='轉盈'||epsSign(s)==='虧損收窄'?'up':'down'):cls(s.eq)}"${s.ew?` title="${ewTitle(s)}"`:''}>${t}${warnMark(s)}</td>` };
 // Short company name for tight tables (full name stays on the stock page)
-const shortN = n => String(n||'').replace(/\s*\([A-Z]{2}\)$/,'').replace(/\s*-\s*Class [A-Z].*$/i,'').replace(/\s+(Common Stock|Ordinary Shares|Class [A-Z]( Common Stock| Ordinary Shares)?|American Depositary Shares.*|Depositary Shares.*)$/i,'')
+const shortN = n => String(n||'').replace(/\s*\([A-Z]{2}\)$/,'').replace(/\s*-\s*Class [A-Z].*$/i,'').replace(/\s+(Common Stock|Common Shares|Ordinary Shares|Class [A-Z]( Common Stock| Ordinary Shares)?|American Depositary Shares.*|Depositary Shares.*)$/i,'')
   .replace(/,?\s+(Inc\.?|Incorporated|Corp\.?|Corporation|Co\.?|Company|Ltd\.?|Limited|plc|PLC|N\.V\.|S\.A\.|AG|SE|Holdings?|Group|L\.P\.)$/i,'').replace(/,?\s+(Inc\.?|Corp\.?|Holdings?|Group)$/i,'').trim();
 // Sector (板塊) and industry (細分行業) from one source (Yahoo; index lists fill in sectors); missing = 未知
 const secZh = s => s.sec?(ZH[s.sec]||s.sec):'未知';
@@ -1117,8 +1140,8 @@ $('q').oninput = e => { $('q').setCustomValidity(''); if((!e.inputType || e.inpu
 const drawn = {};
 function route(){
   const h = decodeURIComponent(location.hash.slice(1)) || 'overview';
-  let v = h.startsWith('s/') ? 'stock' : (['overview','market','pm','ideas','watch','screener','earnings','news','journal','history','about'].includes(h)?h:'overview');
-  if(!READY && v!=='market' && v!=='overview') v='wait';  // needs the stock rows: stocksReady() calls route() again
+  let v = h.startsWith('s/') ? 'stock' : (['overview','close','market','pm','ideas','watch','screener','earnings','news','journal','history','about'].includes(h)?h:'overview');
+  if(!READY && v!=='market' && v!=='overview' && v!=='close') v='wait';  // needs the stock rows: stocksReady() calls route() again
   if(v==='stock' && !BY[h.slice(2)]) v='overview';
   document.querySelectorAll('.view').forEach(x=>x.hidden = x.id!=='v-'+v);
   document.querySelectorAll('nav.tabs a').forEach(a=>a.toggleAttribute('aria-current', a.dataset.v===v) || a.removeAttribute('aria-current'));
@@ -1154,6 +1177,7 @@ const NAVICON={
   ideas:'<path d="M13 3 5 14h6l-1 7 8-11h-6z"/>',
   screener:'<path d="M4 6h16M4 12h16M4 18h16"/><circle cx="9" cy="6" r="2" fill="var(--side)"/><circle cx="15" cy="12" r="2" fill="var(--side)"/><circle cx="8" cy="18" r="2" fill="var(--side)"/>',
   watch:'<path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.6l6.2-.9Z"/>',
+  close:'<path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/>',
   journal:'<path d="M6 3h12a1 1 0 0 1 1 1v17H7a2 2 0 0 1-2-2V4a1 1 0 0 1 1-1z"/><path d="M9 8h6M9 12h6"/>',
   history:'<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8"/><path d="M3.5 3.5V8H8M12 7.5V12l3 2"/>',
   about:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>'};
@@ -1214,7 +1238,7 @@ DRAW.overview = () => {
         `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${sgn(s.chg,2)}%</td><td class="r num">${s.rsr??'—'}</td><td class="r num ${cls(s.d50)}">${sgn(s.d50,1)}</td><td class="num">${eNext(s)?`${s.edate.slice(5)}${ETIME[s.etime]?' '+ETIME[s.etime]:''}`:'<span class="muted">未知</span>'}</td></tr>`).join('')}</tbody></table></div>${mine.length>8?`<p style="margin-top:10px">顯示頭 8 隻，共 ${mine.length} 隻。</p>`:''}`;
   $('v-overview').innerHTML = `
     <header class="ov-head"><div><h2>睇清市況，<span>再聚焦機會。</span></h2><p class="muted small">市場背景、重要事件，同你跟緊嘅股票。</p></div><a class="ov-go" href="#screener">開始選股 →</a></header>
-    <div class="ov-links">${[['pm','盤前需知'],['market','大市完整指標'],['news','經濟及新聞'],['earnings','業績日曆'],['ideas','機會及訊號'],['journal','交易日誌']].map(([h,n])=>`<a href="#${h}">${n} →</a>`).join('')}</div>
+    <div class="ov-links">${[['pm','盤前需知'],['close','收市後分析'],['market','大市完整指標'],['news','經濟及新聞'],['earnings','業績日曆'],['ideas','機會及訊號'],['journal','交易日誌']].map(([h,n])=>`<a href="#${h}">${n} →</a>`).join('')}</div>
     <div class="ov-date"><b>● 收市數據</b>　${D.asof}${wdZh(D.asof)} 美股收市 · 網站更新 ${hkFmt(D.built)}（香港時間）</div>
     <div class="ov-3">
       <article class="ov-card"><div class="ov-lab">趨勢風險 <small>規則分數，唔係跌市機率</small></div><h3>${head}</h3>
@@ -1239,6 +1263,47 @@ DRAW.overview = () => {
     <article class="ov-card"><div class="ov-lab"><span>我嘅自選清單</span><a href="#watch">查看全部 →</a></div>${wl}</article>`;
   if(m) $('ov-ch').innerHTML=ovChart(m, $('ov-ch').clientWidth);  // drawn at the card's real width so the labels keep their size
   $('v-overview').querySelectorAll('[data-ovi]').forEach(b=>b.onclick=()=>{ovIdx=+b.dataset.ovi; DRAW.overview()});
+};
+
+// ---------- 收市後分析 ----------
+// One page to read after the close. Same snapshot (D) and helpers as 大市 and 今日總覽; nothing here is intraday.
+DRAW.close = () => {
+  const T=[{n:'大市',hist:D.hist,rules:D.rules}]; if(D.tech) T.push({n:'科技股',hist:D.tech.hist,rules:D.tech.rules});
+  const lvl=s=>s<=4?0:s<=9?1:2;
+  const Z=T.map(t=>{const H=t.hist, b=H[H.length-1], a=H[H.length-2]; return {t, p:P100(b.score), d:P100(b.score)-P100(a.score), z:zoneOf(b.score), l:lvl(b.score)}});
+  const lc=T.flatMap(lightChanges);
+  const B=D.breadth.usa||D.breadth.all, bn=D.breadth.ndx, n50=ndx50(), pc=(x,n)=>n?(x/n*100).toFixed(1):'—';
+  const SE=[...(D.sectors||[])].filter(x=>x.d1!=null).sort((a,b)=>b.d1-a.d1), mx=Math.max(...SE.map(x=>Math.abs(x.d1)),0.01);
+  const F=D.fng, vix=(D.idx||[]).find(x=>x.n==='VIX');
+  const N=READY?S.filter(s=>s.ndx&&s.chg!=null).sort((a,b)=>b.chg-a.chg):[];
+  const mv=(L,ttl)=>`<article class="panel"><h3 style="margin-bottom:8px">${ttl}</h3>${!READY?'<p class="muted small">載入緊股票數據…</p>':`<div class="tablewrap"><table><thead><tr><th>代號／公司</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">相對成交</th><th class="r">RS</th></tr></thead><tbody>${L.map(s=>
+    `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${sgn(s.chg,2)}%</td><td class="r num">${s.rvol==null?'—':f(s.rvol,1)+' 倍'}</td><td class="r num">${s.rsr??'—'}</td></tr>`).join('')}</tbody></table></div>`}</article>`;
+  $('v-close').innerHTML = `
+    <header class="cl-head"><h2>收市後分析</h2><span class="muted small">${D.asof}${wdZh(D.asof)} 美股收市 · 網站更新 ${hkFmt(D.built)}（香港時間） · 由收市數據自動整理，唔係建議</span></header>
+    <div class="ov-3">
+      <article class="ov-card"><div class="ov-lab">趨勢風險 <small>規則分數，唔係跌市機率</small></div>
+        ${Z.map(z=>`<div class="ov-risk"><span>${z.t.n}</span><strong class="num">${z.p}<small> /100</small></strong><span class="ov-track"><b style="width:${z.p}%;background:var(${z.z[1]})"></b></span><span class="pill p${z.l}">${z.z[0]}</span></div>`).join('')}
+        <div class="ov-foot"><span>${Z.map(z=>`${z.t.n}${z.d===0?'同前一日一樣':`較前一日${z.d>0?'升':'跌'} ${Math.abs(z.d)} 分`}`).join(' · ')}</span><a href="#market">點樣計 →</a></div></article>
+      <article class="ov-card"><div class="ov-lab">市場寬度 <small>${D.breadth.usa?'全美股':'指數成份股'} ${nfmt(B.n)} 隻</small></div>
+        <div class="ov-num num"><span class="up">${nfmt(B.adv)}</span><small> 升 ／ </small><span class="down">${nfmt(B.dec)}</span><small> 跌</small></div>
+        <p>企 50 日線上 ${pc(B.a50,B.n)}% · 企 200 日線上 ${pc(B.a200,B.n)}%<br>52 週新高 ${nfmt(B.nh)} 隻 · 新低 ${nfmt(B.nl)} 隻</p>
+        <div class="ov-foot"><span class="num">Nasdaq-100 企 50 日線上 ${n50.toFixed(1)}%（${bn.a50}／${bn.n}）</span><a href="#market">市場寬度 →</a></div></article>
+      <article class="ov-card"><div class="ov-lab">情緒同波動 <small>收市</small></div>
+        <div class="ov-num num">${F?Math.round(F.score):'—'}<small> ${F?esc(FNG_ZH[String(F.rating||'').toLowerCase()]||''):''}</small></div>
+        <p>CNN 恐懼與貪婪指數（0 至 100：愈低愈恐懼）${F&&F.prev!=null?`<br>前一日 ${Math.round(F.prev)}`:''}</p>
+        <div class="ov-foot"><span class="num">${vix?`VIX ${f(vix.l)}（前收市 ${f(vix.p)}）`:''}</span><a href="#market">睇走勢 →</a></div></article>
+    </div>
+    ${lc.length?`<section class="panel"><h3 style="margin-bottom:8px">今日轉燈 <span class="muted small">${lc.length} 項指標換咗燈號</span></h3><ul class="cl-list">${lc.map(c=>`<li>${c.t.n}：${lightTxt(c)}</li>`).join('')}</ul></section>`
+      :'<section class="panel"><h3>今日轉燈</h3><p class="muted small" style="margin-top:6px">風險分嘅指標燈號同前一日一樣，冇轉燈。</p></section>'}
+    <div class="cl-2">
+      <article class="panel"><h3 style="margin-bottom:8px">指數收市</h3><div class="tablewrap"><table><thead><tr><th>指數</th><th class="r">收市</th><th class="r">前收市</th><th class="r">升跌</th><th class="r">升跌 %</th></tr></thead><tbody>${(D.idx||[]).map(x=>{const ch=x.l-x.p, pp=x.p?ch/x.p*100:null, v=x.n==='VIX';
+        return `<tr><td>${esc(x.n)}</td><td class="r num">${f(x.l)}</td><td class="r num">${f(x.p)}</td><td class="r num ${v?'':cls(ch)}">${sgn(ch,2)}</td><td class="r num ${v?'':cls(ch)}">${sgn(pp,2)}%</td></tr>`}).join('')}</tbody></table></div>
+        <p class="muted small" style="margin-top:8px">VIX 升代表波動加大，所以唔用紅綠色。</p></article>
+      <article class="panel"><h3 style="margin-bottom:8px">板塊領先同落後 <span class="muted small">用板塊 ETF 代表，按當日排</span></h3><div class="tablewrap"><table><thead><tr><th>板塊</th><th class="r">當日</th><th class="cl-barc" style="min-width:90px"></th><th class="r">5 日</th><th class="r">10 日</th></tr></thead><tbody>${SE.map(s=>
+        `<tr><td>${esc(s.n)} <span class="muted small">${esc(s.t)}</span></td><td class="r num ${cls(s.d1)}">${sgn(s.d1,2)}%</td><td class="cl-barc"><span class="ov-track cl-bar"><b style="width:${Math.abs(s.d1)/mx*100}%;background:var(--${s.d1>=0?'up':'down'})"></b></span></td><td class="r num ${cls(s.d5)}">${sgn(s.d5,2)}%</td><td class="r num ${cls(s.d10)}">${sgn(s.d10,2)}%</td></tr>`).join('')}</tbody></table></div></article>
+    </div>
+    <div class="cl-2">${mv(N.slice(0,5),'Nasdaq-100 今日升得最多')}${mv(N.slice(-5).reverse(),'Nasdaq-100 今日跌得最多')}</div>
+    <section class="panel"><h3 style="margin-bottom:8px">繼續覆盤</h3><div class="ov-links">${[['ideas','今日訊號同 KC 條件股'],['watch','自選清單變化'],['history','歷史日期對比'],['journal','記低自己嘅執行'],['pm','下一個交易日盤前需知']].map(([h,n])=>`<a href="#${h}">${n} →</a>`).join('')}</div></section>`;
 };
 
 // ---------- 大市 ----------
@@ -1875,6 +1940,8 @@ async function drawPre(sel=$('pre').value){ PRE=await DB.all('presets');
   $('pre').innerHTML='<option value="">我的預設…</option>'+PRE.map(p=>p.id).sort().map(n=>`<option${n===sel?' selected':''}>${esc(n)}</option>`).join('');
   $('pre-del').hidden=!PRE.some(p=>p.id===sel)}
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// some feeds send titles with entities already written out (&quot;Meh&quot;): turn them back into characters before escaping
+const unent=t=>String(t).replace(/&(quot|amp|apos|lt|gt|#39|#x27|#(\d+));/g,(m,k,n)=>n?String.fromCharCode(+n):({quot:'"',amp:'&',apos:"'",lt:'<',gt:'>','#39':"'",'#x27':"'"}[k]));
 function preMsg(t){$('pre-msg').textContent=t; clearTimeout(preMsg.t); preMsg.t=setTimeout(()=>$('pre-msg').textContent='',3000)}
 function initPre(){
   drawPre('');
@@ -2338,7 +2405,7 @@ function drawNews(){
   $('newscat').innerHTML=NEWSCAT.map(([k,l])=>`<button class="tog" data-c="${k}" aria-pressed="${k===newsCat}">${l}</button>`).join('');
   $('newscat').querySelectorAll('button').forEach(b=>b.onclick=()=>{newsCat=b.dataset.c;drawNews()});
   const CZ=Object.fromEntries(NEWSCAT);
-  $('news').innerHTML = L.map(n=>`<li><a href="${n.link}" target="_blank" rel="noopener">${esc(n.title)}</a><span class="muted small">${n.t?hkt(n.t):''} · ${CZ[n.cat]||''} · ${esc(n.src)}</span></li>`).join('') || '<li class="muted">今次拎唔到呢類新聞。</li>';
+  $('news').innerHTML = L.map(n=>`<li><a href="${n.link}" target="_blank" rel="noopener">${esc(unent(n.title))}</a><span class="muted small">${n.t?hkFmt(n.t):''} · ${CZ[n.cat]||''} · ${esc(n.src)}</span></li>`).join('') || '<li class="muted">今次拎唔到呢類新聞。</li>';
   $('newsnote').textContent = N.length?`${L.length} 條 · 最後擷取：${D.news_t?hkFmt(D.news_t)+' 香港時間':'—'}`:'';
 }
 DRAW.news = () => {
@@ -2889,6 +2956,7 @@ function stocksReady(){
   $('tickers').innerHTML = S.map(s=>`<option value="${s.s}">${s.n||''}</option>`).join('');
   if(!$('v-wait').hidden) route();
   wlStars(); if(drawn.market && brief.T) brief(brief.T);
+  if(drawn.close) DRAW.close();
 }
 function stocksFailed(){ if(READY) return;
   $('wait-msg').innerHTML='<b>股票數據載入唔到。</b>可能係網絡問題，<a href="javascript:location.reload()">重新整理</a>再試。大市頁唔受影響。';
