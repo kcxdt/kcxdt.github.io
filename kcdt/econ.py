@@ -16,6 +16,16 @@ import requests
 
 FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 PER = {"m/m": "按月", "y/y": "按年", "q/q": "按季（年率）"}
+BLS_URL = "https://api.bls.gov/publicAPI/v1/timeseries/data/"
+# Releases ForexFactory doesn't list in both versions: the BLS index behind each, (seasonally adjusted for the
+# monthly change, unadjusted for the 12-month change), which is how BLS itself quotes them.
+BLS_SERIES = [
+    (r"^ppi ex\.? ?food/energy/transport$", "WPSFD49116", "WPUFD49116"),  # final demand less foods, energy, trade services
+    (r"^core ppi$", "WPSFD49104", "WPUFD49104"),
+    (r"^ppi$", "WPSFD4", "WPUFD4"),
+    (r"^import price index$", "EIUIR", "EIUIR"),
+    (r"^export price index$", "EIUIQ", "EIUIQ"),
+]
 MOM_OF_LEVEL = r"^(existing home sales|new home sales|building permits|housing starts)$"
 
 # Events that have no reference period: say what they are. A callable gets the release date.
@@ -120,6 +130,36 @@ def _num(x):
         return None
 
 
+def bls_changes(names):
+    """The last few months' published changes of each named release, worked out from the BLS index itself:
+    {name: {"按月": {0.5, ...}, "按年": {5.0, ...}}}. Names BLS has no series for, or a failed request, are left out."""
+    want = {n: (sa, nsa) for n in names for pat, sa, nsa in BLS_SERIES if re.search(pat, n, re.I)}
+    if not want:
+        return {}
+    year = pd.Timestamp.now().year
+    try:
+        r = requests.post(BLS_URL, json={"seriesid": sorted({x for v in want.values() for x in v}),
+                                         "startyear": str(year - 2), "endyear": str(year)}, timeout=40)
+        series = {x["seriesID"]: {(int(d["year"]), int(d["period"][1:])): float(d["value"]) for d in x["data"]
+                                  if re.fullmatch(r"M(0[1-9]|1[0-2])", d["period"])}
+                  for x in r.json()["Results"]["series"]}
+    except Exception as e:
+        print("bls failed:", e)
+        return {}
+    out = {}
+    for n, (sa, nsa) in want.items():
+        res = {"按月": set(), "按年": set()}
+        for per, idx, back in (("按月", series.get(sa) or {}, 1), ("按年", series.get(nsa) or {}, 12)):
+            for (y, m) in sorted(idx)[-4:]:
+                m0 = y * 12 + m - 1 - back
+                old = idx.get((m0 // 12, m0 % 12 + 1))
+                if old:
+                    res[per].add(round((idx[(y, m)] / old - 1) * 100, 1))
+        out[n] = res
+    print(f"bls: {len(out)} releases checked against the index")
+    return out
+
+
 def forexfactory():
     """This week's US rows from ForexFactory: [{t (UTC), title, impact, forecast, previous}], or [] on failure."""
     try:
@@ -141,13 +181,15 @@ def forexfactory():
     return out
 
 
-def label(rows, ff, memory=None):
+def label(rows, ff, memory=None, official=None):
     """Add ref (period covered) or note (what the event is), per (按月/按年/按季), unconf (a % row whose
     按月/按年 couldn't be confirmed) and imp (3 high, 2 medium) in place.
 
     memory: {event name: {"v": {number: per}}}, the numbers of rows ForexFactory confirmed. A release's
     "previous" is the last release's actual, so next month's rows are told apart by that number. Nasdaq's
-    row order can't be used: Core CPI came m/m first in February 2026 and y/y first in October."""
+    row order can't be used: Core CPI came m/m first in February 2026 and y/y first in October.
+    official: function(names) -> {name: {"按月": {numbers}, "按年": {numbers}}} (bls_changes), asked only for
+    same-name % pairs the two steps above left without a label."""
     memory = {} if memory is None else memory
     for name in list(memory):  # drop the old row-order format
         if name != name.lower() or not isinstance(memory[name], dict) or not isinstance(memory[name].get("v"), dict):
@@ -187,6 +229,20 @@ def label(rows, ff, memory=None):
     groups = {}
     for r in rows:
         groups.setdefault((r["d"], key(r)), []).append(r)
+    # 2b) The agency's own index: a number that is one of its recent monthly changes and none of its 12-month
+    # changes is 按月, and the other way round. Both rows of a pair must come out different.
+    open_ = sorted({k for (d, k), g in groups.items() if len(g) == 2 and all(pct(x) and not x.get("per") for x in g)})
+    known = official(open_) if official and open_ else {}
+    for (d, k), g in groups.items():
+        if k not in known or len(g) != 2 or any(x.get("per") or not pct(x) for x in g):
+            continue
+        got = []
+        for x in g:
+            v = [n for n in (_num(x.get("p")), _num(x.get("a"))) if n is not None]
+            hit = {per for per, nums in known[k].items() if v and all(round(n, 1) in nums for n in v)}
+            got.append(hit.pop() if len(hit) == 1 else None)
+        if None not in got and got[0] != got[1]:
+            g[0]["per"], g[1]["per"] = got
     # 3) A same-name % pair where one side is known: the other is the opposite
     for g in groups.values():
         if len(g) == 2 and all(pct(x) for x in g):

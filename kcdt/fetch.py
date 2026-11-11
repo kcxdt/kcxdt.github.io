@@ -642,7 +642,7 @@ def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, n
         first = (monday - pd.Timedelta(days=21)).strftime("%Y-%m-%d")
         dpath.parent.mkdir(parents=True, exist_ok=True)
         dpath.write_text(json.dumps({k: v for k, v in sorted(kept.items()) if k >= first}))
-    from .econ import forexfactory, label
+    from .econ import bls_changes, forexfactory, label
     path = pathlib.Path(labels_file) if labels_file else None
     memory = {}
     if path and path.exists():
@@ -650,7 +650,7 @@ def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, n
             memory = json.loads(path.read_text())
         except Exception:
             memory = {}
-    label(out, forexfactory(), memory)
+    label(out, forexfactory(), memory, bls_changes)
     if path:
         path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps(memory, ensure_ascii=False, indent=1, sort_keys=True))

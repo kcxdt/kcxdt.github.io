@@ -136,19 +136,20 @@ def nasdaq_qend(f):
     nrev, neps = f.get("nrev") or [], f.get("neps") or []
     if not q:
         return None
+    # Nasdaq cuts revenue down to whole millions ($51.642M -> 51,000,000)
+    rev_ok = lambda a, b: _same(a, b, 0.003) or (a is not None and b is not None and a % 1e6 == 0 and 0 <= b - a < 1e6)
+    eps_ok = lambda a, b: _same(a, b, 0.02, 0.011)
     for i in range(2):
-        same = [ok(n[0], y[i]) for n, y, ok in ((nrev, revq, lambda a, b: _same(a, b, 0.003)),
-                                                  (neps, epsq, lambda a, b: _same(a, b, 0.02, 0.011)))
+        same = [ok(n[0], y[i]) for n, y, ok in ((nrev, revq, rev_ok), (neps, epsq, eps_ok))
                 if n and len(y) > i and None not in (n[0], y[i])]
         if same and all(same):
             return (pd.Timestamp(q) - pd.DateOffset(months=3 * i)).strftime("%Y-%m-%d")
-    # Banks and REITs: the two sources define revenue differently, so it never matches. Two quarters of EPS in a
-    # row that agree place Nasdaq's history just as well.
-    eps_ok = lambda a, b: _same(a, b, 0.02, 0.011)
-    for i in range(2):
-        if len(neps) >= 2 and len(epsq) > i + 1 and eps_ok(neps[0], epsq[i]) and eps_ok(neps[1], epsq[i + 1]) \
-                and neps[0] != neps[1]:
-            return (pd.Timestamp(q) - pd.DateOffset(months=3 * i)).strftime("%Y-%m-%d")
+    # One of the two never matches for some companies (banks and REITs define revenue differently; basic against
+    # diluted EPS). Two quarters in a row of the other that agree place Nasdaq's history just as well.
+    for n, y, ok in ((nrev, revq, rev_ok), (neps, epsq, eps_ok)):
+        for i in range(2):
+            if len(n) >= 2 and len(y) > i + 1 and ok(n[0], y[i]) and ok(n[1], y[i + 1]) and n[0] != n[1]:
+                return (pd.Timestamp(q) - pd.DateOffset(months=3 * i)).strftime("%Y-%m-%d")
     return None
 
 
@@ -166,6 +167,10 @@ def fundamentals_row(f):
                        else None)
     # Nasdaq's quarterly history goes back ~3 fiscal years; Yahoo's is the fallback
     nrev, neps, epsh = f.get("nrev") or [], f.get("neps") or [], f.get("epsh") or []
+    if not (f.get("mcap") or f.get("ind") or revq or epsq):
+        # Yahoo knows no company behind the ticker: a preferred share or note (RZC), for which Nasdaq answers
+        # with the issuer's accounts. Those are not this security's revenue and EPS.
+        nrev, neps = [], []
     g3r = yoy3(nrev) if len(nrev) >= 7 else yoy3(revq)
     # GAAP EPS (company accounts: Nasdaq, then Yahoo's income statement) before Yahoo's adjusted reported EPS
     g3e, g3eb = next(((g, b) for g, b in ((yoy3(neps), "g"), (yoy3(epsq), "g"), (yoy3(epsh), "a")) if g is not None),

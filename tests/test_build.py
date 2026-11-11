@@ -293,6 +293,28 @@ def test_nasdaq_qend_by_eps_when_revenue_differs():
     assert nasdaq_qend({**bank, "epsq": [1.3, 0.94, 1.11], "neps": [0.94, 1.11, 0.84]}) == "2026-06-30"
 
 
+def test_nasdaq_qend_by_revenue_cut_to_millions():
+    from kcdt.compute import fundamentals_row, nasdaq_qend
+    # basic against diluted EPS (1.01 / 0.99) but two revenue quarters agree
+    hto = dict(qend="2026-09-30", revq=[250229000.0, 210474000.0, 183293000.0], epsq=[0.99, 0.62, 0.49, 0.45, None],
+               nrev=[250e6, 210e6, 183e6], neps=[1.01, 0.63, 0.49, 0.44, 1.28])
+    assert nasdaq_qend(hto) == "2026-09-30"
+    assert fundamentals_row({**hto, "mcap": 3e9})["eqd"] == ["2026-09", "2025-09"]
+    # Nasdaq a quarter behind, $51.642M shown as 51,000,000
+    prsu = dict(qend="2026-09-30", revq=[251530000.0, 133493000.0, 51642000.0], epsq=[2.95, 0.54, -0.9, -0.91, None],
+                nrev=[133e6, 51e6, 57e6], neps=[0.55, None, None, 2.6, 0.21])
+    assert nasdaq_qend(prsu) == "2026-06-30"
+    assert fundamentals_row({**prsu, "mcap": 1e9})["eqd"] == ["2026-06", "2025-06"]
+    assert nasdaq_qend({**prsu, "nrev": [134e6, 51e6]}) is None  # a million above: not the same quarter
+
+
+def test_issuer_accounts_are_not_a_notes_eps():
+    from kcdt.compute import fundamentals_row
+    rzc = dict(mcap=None, ind=None, _v=2, nrev=[6637e6] * 8, neps=[7.01, 4.98, 6.91, 3.81, 2.7, 4.27, 2.2, 2.34])
+    row = fundamentals_row(rzc)
+    assert row["eqv"] is None and row["g3r"] is None and row["g3e"] is None
+
+
 def test_fund_stale_by_quarter():
     from kcdt.checks import fund_stale
     assert not fund_stale(dict(erep="2026-11-05", fts="2026-11-05", qend="2026-09-30"))  # fetched on the day, has Q3
