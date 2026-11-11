@@ -50,3 +50,18 @@ Worker 係睇分鐘數（:05 盤前、:40 收市、:35 基本面＋經濟數據�
 
 - GitHub → Actions，會見到由你個帳戶 `workflow_dispatch` 觸發嘅 run，時間貼近上面嘅鐘數。
 - Cloudflare Worker 頁 → Logs / Observability 可以睇每次有冇成功；見到 `401` 或 `403` 即係鎖匙過期或者權限唔啱。
+
+## 延遲價（自選清單、個股頁、未平倉單）
+
+同一個 Worker 亦俾網站攞「延遲價」：`/quotes?s=AAPL,NVDA` 會答返最少 15 分鐘前嘅價（Yahoo 5 分鐘線，只用 15 分鐘前已經完結嘅一條），盤前、盤後都有。
+只係俾人望吓，所有訊號照用收市價計。唔使任何鎖匙，亦唔會叫 GitHub 做嘢。
+
+開法（一次過）：
+
+1. 打開 <https://dash.cloudflare.com> → 左邊 **Workers & Pages** → 撳 `kcdt-timer`。
+2. 右上 **Edit code** → 刪晒入面嘅字 → 貼入 `timer/worker.js` 全部內容 → **Deploy**。
+3. 返去 `kcdt-timer` 頁，右邊 **Domains & Routes** 見到一個 `https://kcdt-timer.<你個名>.workers.dev` 地址。喺瀏覽器開
+   `https://kcdt-timer.<你個名>.workers.dev/quotes?s=AAPL`，見到類似 `{"t":…,"delay":900,"q":{"AAPL":{"p":…}}}` 就啱。
+4. 網站 `kcdt/template.html` 入面 `const LIVE_URL='';` 要填返呢個地址（唔係秘密，可以放喺網站），填咗先會出「延遲價」一欄。
+
+見到 `"q":{}`（冇價）即係 Yahoo 唔肯答 Cloudflare，Logs 會寫 `Yahoo answered 4xx`。
