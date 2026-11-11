@@ -1081,7 +1081,7 @@ document.addEventListener('click',e=>{ const b=e.target.closest('button.csort');
 // ---------- update times, stale data warning ----------
 const nyNow = () => new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));
 // ---------- delayed prices (at least 15 minutes old) from the kcdt-timer Worker; only for looking, no signal uses them ----------
-const LIVE_URL='';  // the Worker's address, e.g. https://kcdt-timer.<name>.workers.dev ; empty = the feature stays hidden
+const LIVE_URL='https://kcdt-timer.chovy723.workers.dev';  // the Worker's address, e.g. https://kcdt-timer.<name>.workers.dev ; empty = the feature stays hidden
 if(!LIVE_URL) document.documentElement.classList.add('nolive');  // hides the 延遲價 column until the address is set
 const LQ={}, LSESS={pre:'盤前',reg:'',post:'盤後'};
 const lHM=t=>new Date(t*1000).toLocaleTimeString('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit'});
