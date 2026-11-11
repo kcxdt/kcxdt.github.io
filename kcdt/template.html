@@ -328,6 +328,12 @@ table.ind{max-width:880px}
 .cfgrid .rng input{width:100%;min-width:0}
 .filters{display:grid;gap:10px}
 .filters.adv:not([open]){display:block}
+.resbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px}
+.resbar .tog b{margin-left:4px}
+.resbar .res-na[aria-pressed="true"]{border-color:var(--warm)}
+td.frz .why{display:block;font-size:12px;white-space:normal;max-width:340px;color:var(--warm)}
+td.frz .why.no{color:var(--muted)}
+.fstale.fill{color:var(--muted);border-color:var(--line)}
 .fstale{display:inline-block;font-size:11px;line-height:1.5;padding:0 6px;margin-left:4px;border-radius:5px;border:1px solid color-mix(in srgb,var(--warm) 60%,var(--line));color:var(--warm);font-weight:600;white-space:nowrap;vertical-align:1px}
 .inddist{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 14px}
 .inddist button{font:inherit;font-size:13px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
@@ -377,6 +383,8 @@ table.ind{max-width:880px}
 #jbody tr:hover td{background:var(--soft)}
 #jbody td.txt{max-width:0}
 #jbody .open td.pl{font-style:italic}
+#jbody tr.plan td{color:var(--muted)} #jbody tr.plan td b{color:var(--ink)}
+.jplan{display:flex;gap:8px;align-items:flex-start;margin:10px 0 4px}
 #j-img{border:0;border-radius:10px;padding:10px;background:var(--panel);max-width:96vw}
 #j-img img{max-width:92vw;max-height:80vh;display:block;margin-bottom:8px}
 #j-img::backdrop{background:rgb(0 0 0 / .6)}
@@ -450,6 +458,7 @@ nav.tabs a em{font-style:normal}
   .side-status i{width:7px;height:7px;border-radius:50%;background:var(--cool);flex:none}
   .side-status i.w{background:var(--warm)} .side-status i.b{background:var(--hot)}
   nav.tabs a.side-status svg{margin-left:auto;width:14px;height:14px}
+  #side-st small{display:block;font-size:12px;margin-top:2px}
   .side-user{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding:14px 6px 0;font-size:13px;min-width:0}
   .side-user>div{min-width:0;line-height:1.4}
   .side-user b,.side-user small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -471,6 +480,13 @@ nav.tabs a em{font-style:normal}
 .ov-links a:hover{color:var(--accent);border-color:var(--accent)}
 .ov-date{border-bottom:1px solid var(--line);padding-bottom:14px;font-size:13px;color:var(--muted)}
 .ov-date b{color:var(--accent);font-weight:500}
+.intra .stats small{display:block;font-size:12px;margin-top:2px}
+.ov-delta{margin-bottom:16px}
+.ov-delta ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+.ov-delta li{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;font-size:14px;line-height:1.5}
+.ov-delta li>span{color:var(--muted);font-size:13px}
+.ov-more{margin-top:12px}.ov-more summary{cursor:pointer;font-size:13px;color:var(--muted)}
+.ov-more ul{display:block}.ov-more li{display:list-item;margin-left:18px;grid-template-columns:none}
 .ov-3{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:16px}
 .ov-2{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(300px,1fr);gap:16px}
 .ov-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;min-width:0;display:flex;flex-direction:column}
@@ -714,7 +730,6 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
           <button class="tog" id="pre-del" hidden>刪除呢個預設</button>
           <span class="muted small" id="pre-msg"></span>
           <span style="flex:1"></span>
-          <label class="small"><input type="checkbox" id="incl-na"> 包括資料不足股票</label>
           <label class="small" title="出咗業績但基本面未更新嘅股票，營收／EPS 仲係上一季">基本面 <select id="fresh" aria-label="基本面新舊"><option value="all">全部</option><option value="fresh">只睇已更新</option><option value="stale">只睇業績後待更新</option></select></label>
           <button class="tog" id="all-clear">清除全部條件</button></div>
         <p class="muted small" id="scr-na"></p>
@@ -744,6 +759,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
         <div class="colpick" id="colpick" hidden></div>
       </div>
       <div class="panel tablewrap cmp" id="cmp" hidden></div>
+      <div class="panel resbar" id="resbar" role="group" aria-label="篩選結果分組"></div>
       <div class="panel inddist small" id="inddist" hidden></div>
       <div class="panel tablewrap" style="padding:6px 0">
         <table id="stocktable" class="cen">
@@ -805,8 +821,8 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
           <label>開倉時間<input name="otime" type="time"></label>
           <label>平倉日期<input name="close" type="date"></label>
           <label>平倉時間<input name="ctime" type="time"></label>
-          <label><span class="j-stk">股數</span><span class="j-fut">合約數</span><input name="qty" type="number" step="any" min="0" required></label>
-          <label>入場價<input name="buy" type="number" step="any" min="0" required></label>
+          <label><span><span class="j-pl">計劃</span><span class="j-stk">股數</span><span class="j-fut">合約數</span></span><input name="qty" type="number" step="any" min="0" required></label>
+          <label><span><span class="j-pl">計劃</span>入場價</span><input name="buy" type="number" step="any" min="0" required></label>
           <label>出場價<input name="sell" type="number" step="any" min="0"></label>
           <label>手續費（USD）<input name="fee" type="number" step="any" min="0" value="0"></label>
           <label>策略類型<input name="strat" list="j-strats"></label>
@@ -815,6 +831,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
           <label>計劃風險（USD）<input name="risk" type="number" step="any" min="0" placeholder="留空 = 用止損計"></label>
           <label>交易情緒<input name="mood" list="j-moods"></label>
         </div>
+        <label class="small jplan"><input type="checkbox" name="plan"> 只係交易計劃（未成交）：入場價同數量係計劃嘅，成交之後喺交易紀錄撳「確認成交」填實際成交價、數量同時間。計劃唔計入任何統計。</label>
         <div class="fills">
           <div class="cfbar"><span class="muted small">分批進出（可選）：有加倉或者分段平倉先填。填咗嘅話，上面嘅數量、入場價、出場價會自動用加權平均計。</span>
             <button class="tog" type="button" id="j-addfill">加一筆</button></div>
@@ -846,7 +863,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
         <thead><tr><th>代號</th><th>方向</th><th>開倉</th><th>平倉</th><th class="r">入場價</th><th class="r">出場價</th><th class="r">數量</th><th class="r">手續費</th><th class="r">成本／名義值</th><th class="r">出場金額</th><th class="r">淨盈虧</th><th class="r">淨盈虧 %</th><th class="r">R</th><th class="r">持倉</th><th>策略</th><th class="r">止盈</th><th class="r">止損</th><th>情緒</th><th class="r">累計盈虧</th><th>截圖</th></tr>
           <tr class="jflt"><th><input id="jf-sym" type="search" list="jf-syms" placeholder="搵代號" aria-label="篩選代號" autocomplete="off"><datalist id="jf-syms"></datalist></th><th></th>
           <th><select id="jf-mon" aria-label="篩選開倉月份"><option value="">全部月份</option></select></th>
-          <th><select id="jf-st" aria-label="篩選平倉狀態"><option value="">全部</option><option value="done">已平倉</option><option value="open">未平倉</option></select></th>
+          <th><select id="jf-st" aria-label="篩選平倉狀態"><option value="">全部</option><option value="done">已平倉</option><option value="open">未平倉</option><option value="plan">交易計劃</option></select></th>
           <th colspan="16" class="small" id="jf-sum"></th></tr></thead>
         <tbody id="jbody"></tbody></table></div>
       <p class="note">撳一行就可以改。撳欄名可以排序（例如撳「平倉」將未平倉嘅單排埋一齊），撳第三下回復按月排。欄名下面可以篩選代號、開倉月份同已平倉／未平倉，幾樣可以一齊用（例如淨係睇 10 月開倉嘅 PLTR）；篩選時「累計盈虧」只計顯示緊嘅單。未平倉嘅單撳「平倉」填出場價同數量就平倉，可以只平一部分。未平倉嘅單唔計盈虧（出場金額、淨盈虧、R、累計盈虧同上面所有統計都唔計），全部平晒倉先計；部分平咗倉嘅單只會細字顯示「已平部分」，都係等全部平倉先入統計。期貨盈虧 = 點數 × 合約數 × 乘數。「完整備份」係一個 JSON 檔，包晒筆記、截圖、儲咗嘅選股預設同自選清單，可以用「匯入備份」還原（同一單交易會覆蓋，唔會重複）。「匯入 Excel／CSV」會讀你份表嘅欄名，自動對返交易日誌嘅欄位（對唔啱可以自己揀），Excel 入面每行嘅截圖都會一齊入（每單最多 2 張），睇過預覽先至儲；同一單再匯入會覆蓋，唔會重複。CSV 冇截圖。只係你自己嘅紀錄，唔係投資建議。</p>
@@ -879,6 +896,19 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
       <div class="jgrid wide"><label>賣出理由<textarea name="why" rows="3"></textarea></label></div>
       <p class="muted small" id="jc-prev"></p>
       <div class="cfbar"><button class="tog" type="button" aria-pressed="true" id="jc-go">確認平倉</button><button class="tog" value="no">取消</button><span class="muted small" id="jc-msg"></span></div>
+    </form></dialog>
+    <dialog id="j-pf" aria-labelledby="h-jpf"><form method="dialog" class="jxl" id="jpff" autocomplete="off">
+      <div class="sechead"><h2 id="h-jpf">確認成交</h2><button class="tog" value="no" aria-label="關閉">×</button></div>
+      <p class="muted small" id="jp-info"></p>
+      <div class="jgrid">
+        <label>成交日期<input name="d" type="date" required></label>
+        <label><span>成交時間 <span id="jp-tz"></span></span><input name="tm" type="time"></label>
+        <label>實際成交價<input name="p" type="number" step="any" min="0" required></label>
+        <label>實際數量<input name="q" type="number" step="any" min="0" required></label>
+        <label>手續費（USD）<input name="fee" type="number" step="any" min="0" value="0"></label>
+      </div>
+      <p class="muted small" id="jp-prev"></p>
+      <div class="cfbar"><button class="tog" type="button" aria-pressed="true" id="jp-go">確認成交</button><button class="tog" value="no">取消</button><span class="muted small" id="jp-msg"></span></div>
     </form></dialog>
     <dialog id="j-img"><img alt="交易截圖"><form method="dialog"><button class="tog">關閉</button></form></dialog>
   </main>
@@ -945,6 +975,11 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
       </div>
       <svg class="chart" id="schart" viewBox="0 0 960 440" role="img" aria-label="日 K 線圖連 50 日及 200 日線同成交量"></svg>
       <div class="legend"><span><i style="background:var(--accent)"></i>50 日線</span><span><i style="background:var(--warm)"></i>200 日線</span><span>底部：成交量（綠 = 升市日）</span></div>
+    </section>
+    <section class="panel intra" id="s-intra" aria-labelledby="h-intra" hidden>
+      <div class="sechead"><h3 id="h-intra">日內交易資訊 <span class="muted small" id="s-intra-t"></span></h3></div>
+      <div class="stats" id="s-intra-s"></div>
+      <p class="muted small" id="s-intra-n"></p>
     </section>
     <div class="stats" id="s-stats"></div>
     <div class="cols2">
@@ -1083,7 +1118,7 @@ const nyNow = () => new Date(new Date().toLocaleString('en-US',{timeZone:'Americ
 // ---------- delayed prices (at least 15 minutes old) from the kcdt-timer Worker; only for looking, no signal uses them ----------
 const LIVE_URL='https://kcdt-timer.chovy723.workers.dev';  // the Worker's address, e.g. https://kcdt-timer.<name>.workers.dev ; empty = the feature stays hidden
 if(!LIVE_URL) document.documentElement.classList.add('nolive');  // hides the 延遲價 column until the address is set
-const LQ={}, LSESS={pre:'盤前',reg:'',post:'盤後'};
+const LQ={}, LXS=new Set(), LSESS={pre:'盤前',reg:'',post:'盤後'};
 const lHM=t=>new Date(t*1000).toLocaleTimeString('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit'});
 // % change is measured from the site's own official close when it is the right day (Yahoo's last 5-minute bar is not
 // the closing-auction price, so the Worker's "prev" can be a few cents off); the Worker's "prev" is the fallback.
@@ -1103,14 +1138,44 @@ function livePaint(){
   if(!e) return; e.hidden=!q; if(!q) return;
   const c=lChg(q,t), base=q.sess==='post'?'今日收市':'上日收市';
   e.innerHTML=`延遲價 <b class="num" style="color:var(--ink)">${f(q.p)}</b>${c==null?'':` <span class="${cls(c)}">${sgn(c,2)}%</span> 對${base}`}<br>${LSESS[q.sess]||'交易時段'} · 美東 ${lHM(q.at)} · 延遲最少 15 分鐘`;
+  intraPaint(t);
+}
+// 日內交易資訊 on the stock page: each figure says which session it comes from. Today's figures come from the Worker's
+// 15-minute-old 5-minute bars (&x=1); the session before is the site's own daily bar (the official high / low / close).
+function intraPaint(t){ const box=$('s-intra'); if(!box) return;
+  const q=LQ[t]; if(!q||!LIVE_URL){ box.hidden=true; return }
+  const x=q.x, qd=lDay(q.at), hm=lHM(q.at), st=(l,v,sess,cls='')=>`<div${cls?` class="${cls}"`:''}><span>${l}</span><b>${v}</b><small class="muted">${sess}</small></div>`;
+  // the regular session before the quote's day, from the stock page's daily bars
+  let pi=-1; const SD=typeof window.SDX!=='undefined'?window.SDX:null; if(SD&&SD.d) for(let i=SD.d.length-1;i>=0;i--) if(SD.d[i]<qd){pi=i;break}
+  const pc=pi>=0?SD.cl[pi]:q.sess!=='post'?q.prev:null, pd=pi>=0?SD.d[pi]:null;
+  const gap=v=>pc&&v!=null?(v/pc-1)*100:null, L=[];
+  const today=qd===ymd(nyNow());
+  if(x){
+    L.push(st('盤前高／低', x.pre?`${f(x.pre[0])} ／ ${f(x.pre[1])}`:'—', `盤前 04:00–09:30${x.o==null&&x.pre?` · 至 ${hm}`:''}`));
+    if(x.o!=null) L.push(st('開市價 · 裂口 Gap', `${f(x.o)} <span class="${cls(gap(x.o))}">${sgn(gap(x.o),2)}%</span>`, `正常時段 09:30 開市，對${pd?` ${pd.slice(5)} `:'上日'}收市`));
+    else if(q.sess==='pre') L.push(st('盤前裂口（未開市）', `<span class="${cls(gap(q.p))}">${sgn(gap(q.p),2)}%</span>`, `盤前 ${hm} 價 ${f(q.p)} 對上日收市`));
+    if(x.hi!=null) L.push(st('今日高／低', `${f(x.hi)} ／ ${f(x.lo)}`, `正常時段 09:30 至 ${q.sess==='reg'?hm:'16:00'}`));
+    if(x.vwap!=null){ const vp=q.sess==='reg'?(q.p/x.vwap-1)*100:null;
+      L.push(st('VWAP', `${f(x.vwap)}${vp==null?'':` <span class="muted small">現價${vp>=0?'高':'低'}過 ${f(Math.abs(vp),2)}%</span>`}`, `正常時段 09:30 至 ${q.sess==='reg'?hm:'16:00'} 成交量加權`)) }
+    if(x.vol) L.push(st('相對成交量', x.rv!=null?`${f(x.rv,2)} 倍 <span class="muted small">${kvol(x.vol)}</span>`:kvol(x.vol), x.rv!=null?`正常時段至 ${q.sess==='reg'?hm:'16:00'}，對比前 ${x.rvn} 日同一時間`:'正常時段'));
+  }
+  if(pi>=0) L.push(st('前一交易日高／低', `${f(SD.h[pi])} ／ ${f(SD.l[pi])}`, `${pd} 正常時段 · 收市 ${f(SD.cl[pi])}`));
+  box.hidden=!L.length; if(!L.length) return;
+  $('s-intra-t').textContent=`${today?'今日':`最近交易日 ${qd.slice(5)}`} · 美東 ${hm} · 延遲最少 15 分鐘`;
+  $('s-intra-s').innerHTML=L.join('');
+  $('s-intra-n').textContent=!x&&!LXS.has(t)?'':x?'今日數字由 Yahoo 5 分鐘線計（同交易所官方數字可能有少少出入），只供參考，唔用嚟計任何訊號；前一交易日用網站嘅收市日線。'
+    :'盤前高低、開市裂口、VWAP 同相對成交量要 Cloudflare 計時器（kcdt-timer）更新咗新版先會顯示。';
 }
 // Ask for whatever is on screen now: watchlist rows, open journal rows, the stock page. Groups of 25 (the Worker's limit).
 async function liveLoad(){ if(!LIVE_URL||document.hidden) return;
   const want=new Set([...document.querySelectorAll('.view:not([hidden]) [data-live]')].map(e=>e.dataset.live.toUpperCase()));
-  if(location.hash.startsWith('#s/')) want.add(decodeURIComponent(location.hash.slice(3)));
-  const syms=[...want].filter(x=>/^[A-Z0-9.^=-]{1,12}$/.test(x)); if(!syms.length) return;
-  const parts=[]; for(let i=0;i<syms.length;i+=25) parts.push(syms.slice(i,i+25));
-  await Promise.all(parts.map(p=>fetch(`${LIVE_URL}/quotes?s=${p.map(encodeURIComponent).join(',')}`).then(r=>r.ok?r.json():null).then(d=>{ if(d&&d.q) Object.entries(d.q).forEach(([k,v])=>{ if(v) LQ[k]=v }) }).catch(()=>{})));
+  // the stock page's own symbol is asked for separately with &x=1: it also gets the day figures (日內交易資訊)
+  const page=location.hash.startsWith('#s/')?decodeURIComponent(location.hash.slice(3)):null; if(page) want.delete(page);
+  const ok=x=>/^[A-Z0-9.^=-]{1,12}$/.test(x), syms=[...want].filter(ok);
+  const parts=[]; for(let i=0;i<syms.length;i+=25) parts.push(syms.slice(i,i+25).map(encodeURIComponent).join(','));
+  if(page&&ok(page)){ parts.push(encodeURIComponent(page)+'&x=1'); LXS.add(page) }
+  if(!parts.length) return;
+  await Promise.all(parts.map(p=>fetch(`${LIVE_URL}/quotes?s=${p}`).then(r=>r.ok?r.json():null).then(d=>{ if(d&&d.q) Object.entries(d.q).forEach(([k,v])=>{ if(v) LQ[k]=v }) }).catch(()=>{})));
   livePaint();
 }
 function liveSoon(){ clearTimeout(liveSoon.t); liveSoon.t=setTimeout(liveLoad, 300) }
@@ -1123,9 +1188,16 @@ const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-$
 const hkFmt = (iso, wd=false) => { if(!iso) return '—'; const P=Object.fromEntries(new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Hong_Kong',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',weekday:'short',hourCycle:'h23'}).formatToParts(new Date(iso)).map(x=>[x.type,x.value]));
   return `${P.month}-${P.day}${wd?`（星期${'日一二三四五六'[['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(P.weekday)]}）`:''} ${P.hour}:${P.minute}` };
 let FTS = [], fNew;  // set in stocksReady()
-// Reported after the fundamentals were last fetched: revenue/EPS are still last quarter's (same rule as kcdt/checks.py fund_late)
-const fStale = s => !!(s.erep && s.fts && s.erep>=s.fts);
-const staleTag = s => fStale(s) ? `<span class="fstale" title="${s.erep} 出咗業績，基本面最後更新 ${s.fts}：營收、EPS 等仲係上一季數字，用嚟篩選要小心">業績後待更新</span>` : '';
+// 業績後待更新: reported, but the revenue/EPS are still the quarter before. The build sets s.fst with kcdt/checks.py
+// fund_stale (judged by the data's quarter); a build from before that rule only has the dates to go by.
+const NEWFST = (D.checks||[]).some(c=>c.k==='fill');
+const fStale = s => NEWFST ? !!s.fst : !!(s.erep && s.fts && s.erep>=s.fts);
+// "2026 Q3（截至 09-30）": the fiscal quarter the revenue/EPS are from, by its end date
+const qTxt = s => s.qend ? `${s.qend.slice(0,7)} 季` : '未知';
+const staleTag = s => fStale(s) ? `<span class="fstale" title="${s.erep} 出咗業績，但數據仲係截至 ${s.qend||'?'} 嗰季（最後成功更新 ${s.fts}）。系統每 12 小時自動再試，直到拎到新一季；用嚟篩選要小心">業績後待更新</span>` : '';
+// No price for the last session: the close before it is carried forward (up to 3 days), so there is no change, volume or
+// new high/low for the day, and those stocks are left out of the day's counts
+const fillTag = s => s.fill ? `<span class="fstale fill" title="冇 ${D.asof} 報價，用 ${s.pxd||'之前'} 收市價補（補咗 ${s.fill} 日）。今日升跌、成交量同新高新低唔計呢隻">補價</span>` : '';
 // Expected dates up to the last close with no confirmed report (same rule as kcdt/checks.py past_due)
 const pastDue = s => { const d=s.eold || (s.edate===D.asof && !s.econf ? s.edate : null); return !!d && !(s.erep && s.erep>=d) };
 // Fundamentals coverage, one definition everywhere: [any fundamentals, every field the default screener reads]
@@ -1160,7 +1232,10 @@ drawStamps();
   // sidebar light: the same three states as the banner above
   const soft=!box.hidden&&box.classList.contains('soft');
   $('side-dot').className = box.hidden?'':soft?'w':'b';
-  $('side-st').textContent = box.hidden?`數據正常 · ${D.asof.slice(5)} 收市`:soft?'今日收市更新緊':'數據未更新';
+  // prices and fundamentals said separately, so a green light never reads as "every number is complete"
+  const ck=k=>(D.checks||[]).find(c=>c.k===k), late=ck('late'), fill=ck('fill');
+  const sub=[late&&(late.n?`基本面 ${nfmt(late.n)} 隻待更新`:'基本面已更新'), fill&&fill.n?`${fill.n} 隻補價`:''].filter(Boolean).join(' · ');
+  $('side-st').innerHTML = (box.hidden?`價格正常 · ${D.asof.slice(5)} 收市`:soft?'今日收市更新緊':'價格未更新')+(sub?`<small>${sub}</small>`:'');
 })();
 
 // ---------- search ----------
@@ -1188,6 +1263,7 @@ function route(){
   const nav=document.querySelector('nav.tabs'), cur=nav.querySelector('a[aria-current="page"]');
   if(cur && nav.scrollWidth>nav.clientWidth){const a=cur.getBoundingClientRect(), n=nav.getBoundingClientRect(); nav.scrollLeft+=a.left-n.left-(n.width-a.width)/2}
   if(!drawn[v] && DRAW[v]){ DRAW[v](); drawn[v]=true }
+  else if(v==='journal' && window.JPLAN) jPlanFill();
   window.scrollTo(0,0);
 }
 const DRAW = {};
@@ -1259,6 +1335,36 @@ function ovChart(m, cw){
     +`<polygon points="${x(0)},${H-B} ${pts} ${x(n-1)},${H-B}" fill="url(#ov-fill)"/><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/><circle cx="${x(n-1)}" cy="${y(C[n-1]).toFixed(1)}" r="3.5" fill="var(--accent)"/>`
     +`<text x="${L}" y="${H-5}">${m.d[0]}</text><text x="${W-R}" y="${H-5}" text-anchor="end">${m.d[n-1]}</text></svg>`;
 }
+// 較昨日有咩變化: only what moved since the session before, one short line each; the thresholds behind a light
+// change and the full lists are one tap away (收起嘅說明), so the cards below keep their numbers without long text
+function ovDelta(Z, n50, dp){
+  const L=[], up=d=>d>0?'up':d<0?'down':'', pts=(d,u='分')=>d===0?'不變':`${d>0?'升':'跌'} ${Math.abs(d)} ${u}`;
+  L.push(['風險分', Z.map(z=>`${z.n} <b class="num">${z.p}</b>（${z.d===0?'不變':`<span class="${z.d>0?'down':'up'}">${pts(z.d)}</span>`}）`).join(' · ')]);
+  const T=[{n:'大市',hist:D.hist,rules:D.rules}].concat(D.tech?[{n:'科技股',hist:D.tech.hist,rules:D.tech.rules}]:[]), lc=T.flatMap(lightChanges);
+  L.push(['轉燈', lc.length?lc.map(c=>`${c.t.n}「${c.r.n}」${LIGHT[c.from]} → <b class="${c.to>c.from?'down':'up'}">${LIGHT[c.to]}</b>`).join('；'):'<span class="muted">8 個指標燈號同前一日一樣</span>']);
+  const H=D.hist, a=H[H.length-2], b=H[H.length-1], pp=(x,y)=>x==null||y==null?null:Math.round((y-x)*10)/10;
+  const db=pp(a&&a.b50,b.b50);
+  L.push(['參與度', `Nasdaq-100 企 50 日線上 <b class="num">${n50.toFixed(1)}%</b>${dp==null?'':`（<span class="${up(dp)}">${dp===0?'不變':`${dp>0?'+':'−'}${Math.abs(dp)} 個百分點`}</span>）`}`
+    +(db==null?'':` · 全美股 <b class="num">${f(b.b50,1)}%</b>（<span class="${up(db)}">${db===0?'不變':`${db>0?'+':'−'}${Math.abs(db)} 個百分點`}</span>）`)]);
+  const F=D.fng, vix=(D.idx||[]).find(x=>x.n==='VIX'), sent=[];
+  if(F&&F.prev!=null){const d=Math.round(F.score)-Math.round(F.prev); sent.push(`恐懼與貪婪 ${Math.round(F.prev)} → <b class="num">${Math.round(F.score)}</b>`)}
+  if(vix&&vix.p) sent.push(`VIX ${f(vix.p)} → <b class="num">${f(vix.l)}</b>（${sgn((vix.l/vix.p-1)*100,1)}%）`);
+  if(sent.length) L.push(['情緒', sent.join(' · ')]);
+  if(READY){
+    const fl=S.map(s=>[s,kcFlip(s)]).filter(x=>x[1]), ins=fl.filter(x=>x[1].in).map(x=>x[0]), outs=fl.filter(x=>!x[1].in).map(x=>x[0]);
+    const tks=l=>l.sort((x,y)=>(y.mcap||0)-(x.mcap||0)).slice(0,6).map(tk).join(' ')+(l.length>6?` 等 ${l.length} 隻`:'');
+    L.push(['KC 條件', ins.length||outs.length?[ins.length&&`新入選 ${ins.length} 隻：${tks(ins)}`,outs.length&&`跌出 ${outs.length} 隻：${tks(outs)}`].filter(Boolean).join('；')+' <a href="#ideas">原因 →</a>':'<span class="muted">冇股票新入選或者跌出</span>']);
+    const wl=[...WL.keys()].map(t=>BY[t]).filter(Boolean).flatMap(s=>stockChanges(s).filter(c=>c.g!=='in'&&c.g!=='out').map(c=>`${tk(s)} ${c.txt}`));
+    if(WL.size) L.push(['自選', wl.length?wl.slice(0,4).join('；')+(wl.length>4?`；仲有 ${wl.length-4} 項 <a href="#ideas">全部 →</a>`:''):'<span class="muted">自選股冇升穿／跌穿均線，RS 冇大變</span>']);
+  }
+  return `<article class="ov-card ov-delta"><div class="ov-lab">較昨日有咩變化 <small>${D.asof} 收市對上一個交易日</small></div>
+    <ul>${L.map(([k,v])=>`<li><span>${k}</span><div>${v}</div></li>`).join('')}</ul>
+    <details class="ov-more"><summary>收起嘅說明</summary><ul class="small muted">
+      <li>風險分係 8 個指標嘅規則分數（0–100），唔係跌市機率；分數升 = 風險高咗。</li>
+      ${lc.map(c=>`<li>${c.t.n}：${lightTxt(c)}</li>`).join('')}
+      <li>參與度 = 收市企喺 50 日線上嘅股票比例；KC 條件 = 選股器嘅預設條件，今日同上一個交易日比較。</li>
+      <li>只係數據整理，唔係買賣建議。</li></ul></details></article>`;
+}
 DRAW.overview = () => {
   const T=[['大市',D.hist]]; if(D.tech) T.push(['科技股',D.tech.hist]);
   const Z=T.map(([n,H])=>{const b=H[H.length-1], a=H[H.length-2]; return {n, s:b.score, p:P100(b.score), d:P100(b.score)-P100(a.score), z:zoneOf(b.score)}});
@@ -1274,9 +1380,10 @@ DRAW.overview = () => {
     : `<div class="tablewrap"><table><thead><tr><th>代號／公司</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">RS</th><th class="r">距 50 日線 %</th><th>下次業績（美東）</th></tr></thead><tbody>${mine.slice(0,8).map(s=>
         `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${sgn(s.chg,2)}%</td><td class="r num">${s.rsr??'—'}</td><td class="r num ${cls(s.d50)}">${sgn(s.d50,1)}</td><td class="num">${eNext(s)?`${s.edate.slice(5)}${ETIME[s.etime]?' '+ETIME[s.etime]:''}`:'<span class="muted">未知</span>'}</td></tr>`).join('')}</tbody></table></div>${mine.length>8?`<p style="margin-top:10px">顯示頭 8 隻，共 ${mine.length} 隻。</p>`:''}`;
   $('v-overview').innerHTML = `
-    <header class="ov-head"><div><h2>睇清市況，<span>再聚焦機會。</span></h2><p class="muted small">市場背景、重要事件，同你跟緊嘅股票。</p></div><a class="ov-go" href="#screener">開始選股 →</a></header>
+    <header class="ov-head"><div><h2>睇清市況，<span>再聚焦機會。</span></h2></div><a class="ov-go" href="#screener">開始選股 →</a></header>
     <div class="ov-links">${[['pm','盤前需知'],['close','收市後分析'],['market','大市完整指標'],['news','經濟及新聞'],['earnings','業績日曆'],['ideas','機會及訊號'],['journal','交易日誌']].map(([h,n])=>`<a href="#${h}">${n} →</a>`).join('')}</div>
     <div class="ov-date"><b>● 收市數據</b>　${D.asof}${wdZh(D.asof)} 美股收市 · 網站更新 ${hkFmt(D.built)}（香港時間）</div>
+    ${ovDelta(Z, n50, dp)}
     <div class="ov-3">
       <article class="ov-card"><div class="ov-lab">趨勢風險 <small>規則分數，唔係跌市機率</small></div><h3>${head}</h3>
         ${Z.map(z=>`<div class="ov-risk"><span>${z.n}</span><strong class="num">${z.p}<small> /100</small></strong><span class="ov-track"><b style="width:${z.p}%;background:var(${z.z[1]})"></b></span><span class="pill p${lvl(z)}">${z.z[0]}</span></div>`).join('')}
@@ -1692,11 +1799,16 @@ const FB=[ // stronger conditions from KC's notes, off by default
   ['vol1m','成交量 > 100 萬',s=>s.vol>1e6],
   ['pe','P/E 50 以下',s=>s.pe!=null&&s.pe>0&&s.pe<=50],
 ];
-let G3X=50, INCL_NA=false, FRESH='all';
+let G3X=50, FRESH='all';
+// Results in three groups: every condition met (符合), none failed but some can't be checked because the data is missing
+// (因缺資料未能判斷), at least one failed (不符合). Unknown is never counted as a pass.
+let RES='ok', RES_WHY={};
+const RESG=[['ok','符合'],['na','因缺資料未能判斷'],['no','不符合']];
 const freshTest = s => FRESH==='all' || (FRESH==='stale' ? fStale(s) : !!s.fts && !fStale(s));
-// Fundamental fields each chip reads; with 包括資料不足股票 on, a stock missing them passes that chip
-const NA_FIELDS={cap:['mcap'],sq:['sq'],sa:['sa'],inst:['inst'],beta:['beta'],g3:['g3r','g3e'],yr:['yr'],fc:['e0','e1'],pe:['pe'],rev3:['rev3'],eps3:['eps3']};
-const naPass=(k,t)=>NA_FIELDS[k]?(s=>INCL_NA&&NA_FIELDS[k].some(f=>s[f]==null)?true:t(s)):t;
+// Fields each chip reads: a stock missing one of them is 未能判斷 for that chip (null), not a pass or a fail.
+// vol is missing on a day a stock had no quote (補價), d50 before it has 50 days of prices.
+const NA_FIELDS={cap:['mcap'],sq:['sq'],sa:['sa'],inst:['inst'],beta:['beta'],g3:['g3r','g3e'],yr:['yr'],fc:['e0','e1'],pe:['pe'],rev3:['rev3'],eps3:['eps3'],vol:['vol'],vol1m:['vol'],p50:['d50'],dh15:['dh']};
+const triChip=(k,t)=>s=>NA_FIELDS[k]&&NA_FIELDS[k].some(f=>s[f]==null)?null:!!t(s);
 const plain=h=>h.replace(/<span id="g3lab">\d+<\/span>/,G3X).replace(/<[^>]+>/g,'');
 function scrSummary(chipOn, cfOn){
   const n=chipOn.length+cfOn.length;
@@ -1710,7 +1822,7 @@ function scrSummary(chipOn, cfOn){
   const adv=chipOn.filter(x=>FB.includes(x)).length+cfOn.length;
   $('adv-n').textContent = adv ? `已啟用 ${adv} 項` : '加強條件同自訂條件，預設收起';
   if(chipOn.some(x=>FB.includes(x)) && !scrSummary.opened){ $('adv').open=true; scrSummary.opened=true }
-  $('scr-na').textContent = `基本面：${fcovTxt}（市值、營收增長、機構持股、Beta）；其餘 ${nfmt(S.length-FCOV[0])} 隻未有資料，表入面顯示「—」。${INCL_NA?'而家會保留佢哋：缺少嘅數據當係符合條件。':'預設會被基本面條件篩走；剔「包括資料不足股票」就會保留。'}基本面數據每日補一部分，價格同技術數據每日收市後更新。${S.some(fStale)?`有 ${nfmt(S.filter(fStale).length)} 隻出咗業績但基本面未更新（代號旁邊標「業績後待更新」，營收／EPS 仲係上一季），可以用「基本面」揀「只睇已更新」排走佢哋。`:''}`;
+  $('scr-na').textContent = `基本面：${fcovTxt}（市值、營收增長、機構持股、Beta）；其餘 ${nfmt(S.length-FCOV[0])} 隻未有資料，表入面顯示「—」。缺資料嘅股票唔會當係符合，會分開放喺「因缺資料未能判斷」。基本面數據每日補一部分，價格同技術數據每日收市後更新。${S.some(fStale)?`有 ${nfmt(S.filter(fStale).length)} 隻出咗業績但基本面未更新（代號旁邊標「業績後待更新」，營收／EPS 仲係上一季），可以用「基本面」揀「只睇已更新」排走佢哋。`:''}`;
 }
 const pair=(a,b)=>`${a==null?'<span class="muted">—</span>':`<span class="${cls(a)}">${sgn(a,0)}%</span>`} / ${b==null?'<span class="muted">—</span>':`<span class="${cls(b)}">${sgn(b,0)}%</span>`}`;
 const passKC = s => FA.every(x=>x[2](s));
@@ -1755,39 +1867,47 @@ const COLS=[
   ['tt','趨勢',1,s=>`<td>${ttbar(s.tt)}</td>`,s=>s.tt,'趨勢模板 5 項中咗幾多項'],
   ['edate','下次業績（美東）',1,s=>`<td class="num small" style="white-space:nowrap">${edtxt(s)}</td>`,s=>edcsv(s),'美東日期＋盤前／盤後；未有日期就寫「未知」'],
   ['erep','上次業績（美東）',0,s=>`<td class="num small" style="white-space:nowrap">${eltxt(s)}</td>`,s=>eLast(s)||'','已確認公布嘅日子；預計日過咗但未確認會註明'],
+  ['qend','資料季度',0,s=>`<td class="num small nowrap">${s.qend?s.qend.slice(0,7):'<span class="muted">—</span>'}${fStale(s)?' <span class="down">舊</span>':''}<div class="muted">${s.fts?`${s.fts.slice(5)} 更新`:'未有'}</div></td>`,s=>s.qend||'','營收／EPS 屬於邊一季（季度結束月份）；下面係最後成功更新日期。「舊」= 出咗業績但仲係上一季'],
 ];
 const COLK=Object.fromEntries(COLS.map(c=>[c[0],c]));
-const COL_STD=COLS.filter(c=>c[2]).map(c=>c[0]), COL_MINI=['c','chg','rsr','rvol'];
+// 板塊 (Sector) is always shown (on phones it is under the ticker); 細分行業 (Industry) is one switch, kept apart from the sets
+const SECIND=['sec','ind'];
+const COL_STD=COLS.filter(c=>c[2]&&!SECIND.includes(c[0])).map(c=>c[0]), COL_MINI=['c','chg','rsr','rvol'];
 const PHONE=matchMedia('(max-width:640px)').matches;
 // Column sets: one tap swaps the whole set (the checkboxes below still fine-tune it)
 const COL_PRE=[['mini','精簡',COL_MINI,'代號、收市、今日 %、RS、相對成交'],
   ['price','快速睇價',['c','chg','rsr','r21','r63','dh','d50','rvol','tt'],'收市、升跌、RS、距高位同均線、趨勢'],
-  ['fund','基本面',['c','chg','rsr','sq','eq','g3r','e0','pe','fpe','mcap','erep','edate'],'營收、EPS、3 季增長、預測、估值、業績日'],
-  ['ind','行業比較',['sec','ind','c','chg','rsr','r63','sq','eq','pe','mcap'],'板塊、細分行業，同行之間比較'],
+  ['fund','基本面',['c','chg','rsr','sq','eq','g3r','e0','pe','fpe','mcap','qend','erep','edate'],'營收、EPS、3 季增長、預測、估值、資料季度、業績日'],
+  ['ind','行業比較',['c','chg','rsr','r63','sq','eq','pe','mcap'],'同行之間比較（會打開細分行業）',true],
   ['std','標準',COL_STD,'預設嘅一套']];
 // Phones: price, change and RS first; the sector/industry columns (already under the ticker) go last when switched on
 const colOrder = () => PHONE ? COLS.filter(c=>!['sec','ind'].includes(c[0])).concat(COLS.filter(c=>['sec','ind'].includes(c[0]))) : COLS;
-let SHOW=new Set((Store.get('cols',null)||(PHONE?COL_MINI:COL_STD)).filter(k=>COLK[k]));
-// 細分行業 became a standard column once every stock had one: add it once to a saved choice that shows 板塊
-if(!Store.get('colind',0)){ if(SHOW.has('sec')&&!SHOW.has('ind')){SHOW.add('ind'); Store.set('cols',[...SHOW])} Store.set('colind',1) }
+let SHOW=new Set((Store.get('cols',null)||COL_MINI).filter(k=>COLK[k]&&!SECIND.includes(k))), SHOWIND=!!Store.get('colind2',false);
+// Nov 2026: the default became 精簡 for everyone (the wide standard set scrolled sideways); applied once to a saved choice
+if(Store.get('colv',0)<2){ SHOW=new Set(COL_MINI); SHOWIND=false; Store.set('cols',COL_MINI); Store.set('colind2',false); Store.set('colv',2) }
+const visCols = () => colOrder().filter(c=>c[0]==='sec'?!PHONE:c[0]==='ind'?SHOWIND:SHOW.has(c[0]));
+const colSave = () => { Store.set('cols',[...SHOW]); Store.set('colind2',SHOWIND); drawColPick(); drawColBar(); drawHead(); renderStocks() };
 const CMP=new Set();
 let SCR_ROWS=[];
 function drawHead(){
-  $('stockhead').innerHTML=`<th class="frz"><button data-k="s">代號</button></th>`+colOrder().filter(c=>SHOW.has(c[0])).map(c=>`<th class="${['mvp','tt','edate','sec','ind'].includes(c[0])?'':'r'}"><button data-k="${c[0]}"${c[5]?` title="${c[5]}"`:''}>${c[1]}</button></th>`).join('');
+  $('stockhead').innerHTML=`<th class="frz"><button data-k="s">代號</button></th>`+visCols().map(c=>`<th class="${['mvp','tt','edate','sec','ind'].includes(c[0])?'':'r'}"><button data-k="${c[0]}"${c[5]?` title="${c[5]}"`:''}>${c[1]}</button></th>`).join('');
   document.querySelectorAll('#stocktable th button').forEach(b=>{
     if(b.dataset.k===sortK){b.dataset.active='true'; b.textContent+=sortDir<0?' ▾':' ▴'}
     b.onclick=()=>{const k=b.dataset.k; if(sortK===k)sortDir*=-1; else {sortK=k;sortDir=(k==='s'||k==='edate')?1:-1} drawHead(); renderStocks()}});
 }
 function drawColPick(){
   const same=a=>a.length===SHOW.size&&a.every(k=>SHOW.has(k));
-  $('colpick').innerHTML=COLS.map(c=>`<label><input type="checkbox" data-col="${c[0]}"${SHOW.has(c[0])?' checked':''}> ${c[1]}</label>`).join('');
-  $('colpick').querySelectorAll('input').forEach(i=>i.onchange=()=>{i.checked?SHOW.add(i.dataset.col):SHOW.delete(i.dataset.col); Store.set('cols',[...SHOW]); drawColPick(); drawColBar(); drawHead(); renderStocks()});
+  $('colpick').innerHTML=COLS.map(c=>c[0]==='sec'?`<label class="muted"><input type="checkbox" checked disabled> 板塊（常駐）</label>`
+    :`<label><input type="checkbox" data-col="${c[0]}"${(c[0]==='ind'?SHOWIND:SHOW.has(c[0]))?' checked':''}> ${c[1]}</label>`).join('');
+  $('colpick').querySelectorAll('input[data-col]').forEach(i=>i.onchange=()=>{ if(i.dataset.col==='ind') SHOWIND=i.checked; else i.checked?SHOW.add(i.dataset.col):SHOW.delete(i.dataset.col); colSave()});
 }
 // Column-set buttons next to 揀欄位, so a set is one tap without opening the picker
 function drawColBar(){ const e=$('colbar'); if(!e) return;
   const same=a=>a.length===SHOW.size&&a.every(k=>SHOW.has(k));
-  e.innerHTML=COL_PRE.map(([k,n,a,t])=>`<button class="tog" type="button" data-pre="${k}" aria-pressed="${same(a)}" title="${t}">${n}</button>`).join('');
-  e.querySelectorAll('[data-pre]').forEach(b=>b.onclick=()=>{SHOW=new Set(COL_PRE.find(p=>p[0]===b.dataset.pre)[2]); Store.set('cols',[...SHOW]); drawColPick(); drawColBar(); drawHead(); renderStocks()});
+  e.innerHTML=COL_PRE.map(([k,n,a,t])=>`<button class="tog" type="button" data-pre="${k}" aria-pressed="${same(a)}" title="${t}">${n}</button>`).join('')
+    +`<button class="tog" type="button" id="col-ind" aria-pressed="${SHOWIND}" title="顯示／收起細分行業（Industry）欄；板塊（Sector）一直都有">細分行業</button>`;
+  e.querySelectorAll('[data-pre]').forEach(b=>b.onclick=()=>{const P=COL_PRE.find(p=>p[0]===b.dataset.pre); SHOW=new Set(P[2]); if(P[4]) SHOWIND=true; colSave()});
+  $('col-ind').onclick=()=>{SHOWIND=!SHOWIND; colSave()};
 }
 // 篩選結果嘅行業分布: the industries of every matching stock (not only the 200 shown); tap one to keep only it
 function drawIndDist(rows){ const e=$('inddist'); if(!e) return;
@@ -1796,7 +1916,7 @@ function drawIndDist(rows){ const e=$('inddist'); if(!e) return;
   const L=Object.entries(c).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])), top=L.slice(0,6), rest=L.slice(6).reduce((a,x)=>a+x[1],0), mx=top[0][1];
   const cur=(CFS.ind||'').startsWith('=')?CFS.ind.slice(1):null;
   e.hidden=false;
-  e.innerHTML=`<b>${nfmt(rows.length)} 隻符合 · 行業分布：</b>`+top.map(([k,n])=>k==='?'?`<span class="muted">未知 ${n}</span>`
+  e.innerHTML=`<b>${nfmt(rows.length)} 隻${(RESG.find(x=>x[0]===RES)||['','符合'])[1]} · 行業分布：</b>`+top.map(([k,n])=>k==='?'?`<span class="muted">未知 ${n}</span>`
       :`<button type="button" data-ind="${esc(k)}" title="只睇 ${esc(k)}"${cur===k?' aria-pressed="true"':''}>${esc(k)} <b class="num">${n}</b><i class="bar" style="width:${Math.max(4,Math.round(n/mx*36))}px"></i></button>`).join('')
     +(rest?`<span class="muted">其他 ${L.length-6} 個行業 ${rest} 隻</span>`:'')
     +(cur?` <button type="button" data-ind="" title="唔再限細分行業">✕ 顯示全部行業</button>`:'');
@@ -1815,7 +1935,7 @@ function drawCmp(){
 }
 // 指標計法說明 (matches kcdt/compute.py)
 const HOW = () => `
-  <div><h4>股票池（所有指標都喺呢度比較）</h4><p>全美股市值 3 億美元以上、股價 12 美元以上，加埋 Nasdaq-100 同 S&amp;P 500/400/600 成份股，今日共 <b>${(D.nuniv||S.length).toLocaleString('en-US')}</b> 隻。要有最少 253 個交易日（約一年）價格先會計入；上市唔夠一年嘅新股唔喺池入面，所以冇 RS、趨勢模板，選股器都唔會出現。價格係 Yahoo Finance 嘅調整後價格（已計拆股同派息）；個別日子冇報價會用上一日收市補，最多補 3 日。</p></div>
+  <div><h4>股票池（所有指標都喺呢度比較）</h4><p>全美股市值 3 億美元以上、股價 12 美元以上，加埋 Nasdaq-100 同 S&amp;P 500/400/600 成份股，今日共 <b>${(D.nuniv||S.length).toLocaleString('en-US')}</b> 隻。要有最少 253 個交易日（約一年）價格先會計入；上市唔夠一年嘅新股唔喺池入面，所以冇 RS、趨勢模板，選股器都唔會出現。價格係 Yahoo Finance 嘅調整後價格（已計拆股同派息）；個別日子冇報價會用上一日收市補，最多補 3 日；最後一日要補價嘅股票會標「補價」，唔計入當日升跌家數、成交量同 52 週新高新低。</p></div>
   <div><h4>RS（相對強度排名，1–99）</h4><ul>
     <li>先計每隻股票嘅 RS 分 = 3 個月回報 × 40% + 1 個月、6 個月、12 個月回報各 × 20%（即 63、21、126、252 個交易日，用收市價）。近 3 個月比重最大，所以近排強先會排得高。</li>
     <li>然後喺成個股票池按 RS 分由低到高排百分位，換算成 1–99：RS 90 即係強過池入面大約 90% 股票，99 最強、1 最弱。佢係<b>排名</b>，唔係升幅：大市一齊跌，排名都可以唔變。</li>
@@ -1831,7 +1951,7 @@ const HOW = () => `
   <div><h4>基本面同缺數據</h4><ul>
     <li>營收增長 = 最近一季按年。EPS 增長 = <b>GAAP</b>（原本會計盈利）最近一季對去年同季（個股頁寫明比較邊兩季）；另有經調整 EPS（公司公布、分析師比較用）同淨利潤增長可以揀欄位睇。去年同季蝕錢而家賺錢顯示「轉盈」，而家蝕錢就寫「轉虧」、「虧損擴大」或「虧損收窄」；去年基數接近零、或者 GAAP 同經調整相差大（可能有一次性項目）會加 ⚠，百分比要小心睇。</li>
     <li>3 季按年 = 最近 3 季每季按年增長嘅最低值（Nasdaq／Yahoo 季度 GAAP 數據，唔夠先用經調整 EPS）；預測 EPS = 分析師預測（Yahoo）。</li>
-    <li>基本面每隻股票大約 7 日輪流更新一次（個股頁有寫最後更新日期）。拎唔到就顯示「—」：預設會被用到嗰項嘅條件篩走，剔「包括資料不足股票」就當符合。</li>
+    <li>基本面每隻股票大約 7 日輪流更新一次（個股頁有寫最後更新日期）。拎唔到就顯示「—」：用到嗰項嘅條件判斷唔到，股票會放喺「因缺資料未能判斷」，唔會當係符合。出咗業績但數據仲係上一季（睇「資料季度」）會標「業績後待更新」，系統每 12 小時自動再試，最多試 45 日。</li>
     <li>趨勢分同 RS 只用價格，所以每隻都有；基本面：${fcovTxt}（市值、營收增長、機構持股、Beta 都有）。</li></ul></div>`;
 function csvDownload(name, lines){
   const q=v=>v==null?'':/[",\n]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':String(v);
@@ -1839,18 +1959,27 @@ function csvDownload(name, lines){
 }
 function renderStocks(){
   const chipOn=[...FA,...FB].filter(x=>on.has(x[0])), cfOn=Object.entries(CFS).filter(([k,v])=>cfTest(k,v));
-  const tests=chipOn.map(x=>naPass(x[0],x[2])).concat(cfOn.map(([k,v])=>cfTest(k,v)), [freshTest]);
+  // [label, test -> true / false / null (can't tell)]
+  const tests=chipOn.map(x=>[plain(x[1]),triChip(x[0],x[2])]).concat(cfOn.map(([k,v])=>{const x=CFK[k], t=cfTest(k,v); return [x[2].replace(/（[A-Za-z]+）/,''), s=>{const r=t(s); return r==null?null:!!r}]}));
   if($('fresh')) $('fresh').value=FRESH;
   scrSummary(chipOn, cfOn);
-  const rows=S.filter(s=>tests.every(t=>t(s))).sort((a,b)=>{const A=a[sortK],B=b[sortK];if(A==null)return 1;if(B==null)return -1;return (typeof A==='string'?A.localeCompare(B):(A-B))*sortDir});
+  const G={ok:[],na:[],no:[]}; RES_WHY={};
+  S.filter(freshTest).forEach(s=>{ const na=[], no=[];
+    tests.forEach(([lab,t])=>{const r=t(s); if(r===null) na.push(lab); else if(!r) no.push(lab)});
+    const g=no.length?'no':na.length?'na':'ok'; G[g].push(s);
+    if(g!=='ok') RES_WHY[s.s]=g==='na'?`缺資料，判斷唔到：${na.join('、')}`:`唔符合：${no.slice(0,3).join('、')}${no.length>3?` 等 ${no.length} 項`:''}${na.length?`（另外 ${na.length} 項缺資料）`:''}` });
+  const rows=G[RES].sort((a,b)=>{const A=a[sortK],B=b[sortK];if(A==null)return 1;if(B==null)return -1;return (typeof A==='string'?A.localeCompare(B):(A-B))*sortDir});
   SCR_ROWS=rows;
-  $('scr-mini-n').innerHTML=`<b>${chipOn.length+cfOn.length} 項條件</b> · ${rows.length} 隻符合`;
-  $('scrcount').textContent=`${nfmt(S.length)} 隻入面有 ${rows.length} 隻符合（${nfmt(FCOV[1])} 隻齊備基本面資料）`;
-  const vis=colOrder().filter(c=>SHOW.has(c[0]));
+  $('resbar').innerHTML=RESG.map(([k,n])=>`<button class="tog res-${k}" type="button" data-res="${k}" aria-pressed="${k===RES}">${n} <b class="num">${nfmt(G[k].length)}</b></button>`).join('')
+    +`<span class="muted small">${RES==='ok'?'全部條件都有數據而且符合。':RES==='na'?'冇一項唔符合，但有啲條件因為缺數據判斷唔到（每隻下面寫咗缺邊樣），唔可以當係符合。':'最少一項條件唔符合（每隻下面寫咗邊幾項）。'}</span>`;
+  $('resbar').querySelectorAll('[data-res]').forEach(b=>b.onclick=()=>{RES=b.dataset.res; renderStocks()});
+  $('scr-mini-n').innerHTML=`<b>${chipOn.length+cfOn.length} 項條件</b> · ${G.ok.length} 隻符合${G.na.length?` · ${G.na.length} 隻缺資料未能判斷`:''}`;
+  $('scrcount').textContent=`${nfmt(S.length)} 隻入面：${G.ok.length} 隻符合、${G.na.length} 隻因缺資料未能判斷、${G.no.length} 隻不符合`;
+  const vis=visCols();
   drawIndDist(rows);
   $('stockbody').innerHTML = rows.slice(0,200).map(s=>`<tr>
-    <td class="frz"><span style="white-space:nowrap"><input type="checkbox" data-cmp="${s.s}"${CMP.has(s.s)?' checked':''} aria-label="比較 ${s.s}">${star(s.s)}${tk(s)}${s.ndx?' <span class="muted small">N100</span>':''}${staleTag(s)}</span><div class="muted small sub" title="${esc(s.n||'')}"><span class="nm">${esc(s.n||'')}</span><span class="sc">${secZh(s)}${s.ind?` · ${esc(s.ind)}`:''}</span></div></td>
-    ${vis.map(c=>c[3](s)).join('')}</tr>`).join('') || `<tr><td colspan="${vis.length+1}" class="muted">冇股票符合晒而家嘅條件，試下關咗其中一啲。</td></tr>`;
+    <td class="frz"><span style="white-space:nowrap"><input type="checkbox" data-cmp="${s.s}"${CMP.has(s.s)?' checked':''} aria-label="比較 ${s.s}">${star(s.s)}${tk(s)}${s.ndx?' <span class="muted small">N100</span>':''}${staleTag(s)}${fillTag(s)}</span><div class="muted small sub" title="${esc(s.n||'')}"><span class="nm">${esc(s.n||'')}</span><span class="sc">${secZh(s)}${s.ind?` · ${esc(s.ind)}`:''}</span>${RES_WHY[s.s]?`<span class="why ${RES}">${esc(RES_WHY[s.s])}</span>`:''}</div></td>
+    ${vis.map(c=>c[3](s)).join('')}</tr>`).join('') || `<tr><td colspan="${vis.length+1}" class="muted">${RES==='ok'?'冇股票符合晒而家嘅條件，試下關咗其中一啲。':RES==='na'?'冇股票因為缺資料而判斷唔到。':'冇股票唔符合。'}</td></tr>`;
   $('stockbody').querySelectorAll('button.indf').forEach(b=>b.onclick=()=>{CFS.ind='='+b.dataset.ind; drawCF(); renderStocks(); wlMsg(`已加入條件：細分行業 ${b.dataset.ind}（撳 × 可以移除）`)});
   $('stockbody').querySelectorAll('input[data-cmp]').forEach(i=>i.onchange=()=>{const t=i.dataset.cmp;
     if(i.checked){ if(CMP.size>=4){i.checked=false; wlMsg('最多比較 4 隻'); return} CMP.add(t) } else CMP.delete(t); drawCmp()});
@@ -1954,7 +2083,7 @@ let CFS={}, cfTab='基本';
 function cfTest(k,v){const x=CFK[k]; if(!x)return null;
   if(!x[3]){const o=cfPick(x,v); return o?o[1]:null}
   const [a,b]=rng(v); if(a==null&&b==null)return null;
-  return s=>{const n=x[3](s); return n==null?INCL_NA:(a==null||n>=a)&&(b==null||n<=b)}}
+  return s=>{const n=x[3](s); return n==null?null:(a==null||n>=a)&&(b==null||n<=b)}}
 function drawCF(){
   $('cftabs').innerHTML=[...CFG,'全部'].map(g=>`<button class="tog" data-g="${g}" aria-pressed="${g===cfTab}">${g}</button>`).join('');
   $('cftabs').querySelectorAll('button').forEach(b=>b.onclick=()=>{cfTab=b.dataset.g;drawCF()});
@@ -2012,7 +2141,6 @@ DRAW.screener = () => {
   $('g3x').onchange=()=>{G3X=+$('g3x').value;on.add('g3');drawChips();renderStocks()};
   $('f-reset').onclick=()=>{on.clear();FA.forEach(x=>on.add(x[0]));drawChips();renderStocks()};
   $('all-clear').onclick=()=>{on.clear();CFS={};drawCF();drawChips();renderStocks()};
-  $('incl-na').onchange=()=>{INCL_NA=$('incl-na').checked;renderStocks()};
   $('fresh').onchange=()=>{FRESH=$('fresh').value;renderStocks()};
   $('scr-mini-b').onclick=()=>{const o=$('scr-sec').classList.toggle('condclosed'); $('scr-mini-b').setAttribute('aria-expanded',!o); $('scr-mini-b').textContent=o?'修改條件':'收起條件'};
   $('col-btn').onclick=()=>{const o=$('colpick').hidden; $('colpick').hidden=!o; $('col-btn').setAttribute('aria-expanded',o)};
@@ -2108,7 +2236,7 @@ function drawWatch(){
   const gone=[...WL.keys()].filter(t=>!BY[t]);
   wlSummary(all.map(r=>BY[r.id]));
   $('wlbody').innerHTML = rows.map(r=>{const s=BY[r.id], ch=stockChanges(s);
-    return `<tr><td class="frz wltk"><span style="white-space:nowrap">${star(s.s)}${tk(s)}${staleTag(s)}</span><div class="muted small" style="line-height:1.25" title="${esc(s.n||'')}">${esc(shortN(s.n))}</div></td>
+    return `<tr><td class="frz wltk"><span style="white-space:nowrap">${star(s.s)}${tk(s)}${staleTag(s)}${fillTag(s)}</span><div class="muted small" style="line-height:1.25" title="${esc(s.n||'')}">${esc(shortN(s.n))}</div></td>
       ${many?`<td>${wlLs(r).map(id=>`<span class="wltag">${esc(WLISTS.find(l=>l.id===id).n)}</span>`).join('')}</td>`:''}
       <td><select data-st="${s.s}" aria-label="${s.s} 狀態">${Object.entries(WST).map(([k,l])=>`<option value="${k}"${k===r.st?' selected':''}>${l}</option>`).join('')}</select></td>
       <td class="r num">${f(s.c)}</td>${pcell(s.chg,2)}<td class="r num lv" data-live="${s.s}">${liveCell(s.s)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr}</span>${s.prsr!=null&&s.prsr!==s.rsr?` <span class="muted small">${s.rsr>s.prsr?'▲':'▼'}${Math.abs(s.rsr-s.prsr)}</span>`:''}</td>
@@ -2485,6 +2613,11 @@ function nyTime(d, tm, tz){ if(!d||!tm) return null; if(tz==='NY') return tm;
 const SESS = tm => !tm?'未填時間':tm<'09:30'?'盤前（美東 09:30 前）':tm<'10:00'?'開市首 30 分鐘':tm<'12:00'?'上午（10:00–12:00）':tm<'14:00'?'午市（12:00–14:00）':tm<'16:00'?'尾市（14:00–16:00）':'收市後（16:00 後）';
 function calc(t){
   const fut=t.mkt==='fut', mult=fut?(t.mult||20):1, dir=t.side==='S'?-1:1, {ins,outs}=legs(t), fee=t.fee||0;
+  // 交易計劃: nothing has traded yet, so no position, no P&L and no part in any statistic
+  if(t.plan) return {...t, fut, mult, dir, isPlan:true, isOpen:false, qIn:t.qty||0, qOut:0, openQ:0, pin:t.buy, pout:null,
+    cost:t.buy!=null&&t.qty?t.buy*t.qty*mult:null, rev:null, pl:null, realized:0, plp:null, R:null, hold:0, holdD:-1, holdTxt:'—',
+    risk:t.risk||(t.sl&&t.buy!=null&&t.qty?Math.abs(t.buy-t.sl)*t.qty*mult:null), sess:'交易計劃',
+    tpp:t.tp&&t.buy?(t.tp/t.buy-1)*100:null, slp:t.sl&&t.buy?(t.sl/t.buy-1)*100:null};
   const qIn=ins.reduce((s,x)=>s+(x.q||0),0), qOut=Math.min(qIn,outs.reduce((s,x)=>s+(x.q||0),0)), openQ=qIn-qOut;
   const pin=wavg(ins), pout=wavg(outs), live=!fut&&openQ>0&&BY[t.sym]?BY[t.sym].c:null, isOpen=openQ>0;
   const realized=qOut&&pin!=null&&pout!=null?dir*(pout-pin)*qOut*mult:0, floating=openQ>0&&live!=null?dir*(live-pin)*openQ*mult:null;
@@ -2524,7 +2657,7 @@ function jRender(){
   let cum = 0, month = '';
   jFilterOpts(rows);
   const q = JF.sym.trim().toUpperCase(), on = !!(q||JF.mon||JF.st);
-  const shown = rows.filter(t=>(!q||t.sym.includes(q)) && (!JF.mon||t.open.slice(0,7)===JF.mon) && (!JF.st||(JF.st==='open')===t.isOpen));
+  const shown = rows.filter(t=>(!q||t.sym.includes(q)) && (!JF.mon||t.open.slice(0,7)===JF.mon) && (!JF.st||(JF.st==='plan'?!!t.isPlan:JF.st==='open'?t.isOpen:!t.isOpen&&!t.isPlan)));
   if(on){ const d=shown.filter(t=>!t.isOpen&&t.pl!=null), tot=d.reduce((a,t)=>a+t.pl,0), w=d.filter(t=>t.pl>0).length;
     $('jf-sum').innerHTML = `顯示 ${shown.length} / ${rows.length} 單${d.length?` · 已平倉 ${d.length} 單，淨盈虧 <b class="${cls(tot)}">${usd(tot)}</b>，勝率 ${f(w/d.length*100,0)}%`:''} <button class="tog sm" type="button" id="jf-clr">清除篩選</button>`;
     $('jf-clr').onclick=()=>{ JF={sym:'',mon:'',st:''}; $('jf-sym').value=''; jRender() } }
@@ -2532,20 +2665,21 @@ function jRender(){
   // 累計盈虧 runs over the trades shown, so a filter (e.g. PLTR) shows that stock's own running total
   $('jbody').innerHTML = shown.map(t=>{ if(!t.isOpen && t.pl!=null) cum += t.pl;
     const m = t.open.slice(0,7), head = m!==month ? `<tr class="grp"><td colspan="21">${m.slice(0,4)} 年${MON[+m.slice(5)-1]}月</td></tr>` : ''; month = m;
-    return head + `<tr data-id="${t.id}" class="${t.isOpen?'open':''}"><td><b>${esc(t.sym)}</b>${t.fut?` <span class="badge">期貨${t.cm?' '+esc(t.cm):''}</span>`:''}</td>
+    return head + `<tr data-id="${t.id}" class="${t.isOpen?'open':t.isPlan?'open plan':''}"><td><b>${esc(t.sym)}</b>${t.fut?` <span class="badge">期貨${t.cm?' '+esc(t.cm):''}</span>`:''}</td>
       <td class="small ${t.side==='S'?'down':'up'}">${SIDE[t.side]||'Long'}</td>
-      <td class="num small">${t.open}${t.otime?' '+t.otime:''}</td><td class="num small" data-v="${t.isOpen?9e12:((t.close||'')+(t.ctime||'00:00')).replace(/\D/g,'')}">${t.isOpen?`<span class="muted">${t.qOut?`已平 ${f(t.qOut,0)}／`:''}未平倉</span> <button class="tog sm" type="button" data-close="${t.id}">平倉</button>`:(t.close||'')+(t.ctime?' '+t.ctime:'')}</td>
-      <td class="r num">${px(t,t.pin)}</td><td class="r num">${t.pout!=null?px(t,t.pout):t.isOpen&&!t.fut?`<span data-live="${esc(t.sym)}" data-jl="1">${liveCell(t.sym,1)}</span>`:'—'}</td>
+      <td class="num small">${t.open}${t.otime?' '+t.otime:''}</td><td class="num small" data-v="${t.isOpen||t.isPlan?9e12:((t.close||'')+(t.ctime||'00:00')).replace(/\D/g,'')}">${t.isPlan?`<span class="badge">交易計劃</span> <button class="tog sm" type="button" data-fill="${t.id}">確認成交</button>`:t.isOpen?`<span class="muted">${t.qOut?`已平 ${f(t.qOut,0)}／`:''}未平倉</span> <button class="tog sm" type="button" data-close="${t.id}">平倉</button>`:(t.close||'')+(t.ctime?' '+t.ctime:'')}</td>
+      <td class="r num"${t.pbuy!=null&&!t.isPlan?` title="計劃入場價 ${t.pbuy}"`:''}>${t.isPlan?'<span class="muted small">計劃 </span>':''}${px(t,t.pin)}${t.pbuy!=null&&!t.isPlan&&t.pbuy!==t.pin?`<div class="muted small">計劃 ${px(t,t.pbuy)}</div>`:''}</td><td class="r num">${t.pout!=null?px(t,t.pout):(t.isOpen||t.isPlan)&&!t.fut?`<span data-live="${esc(t.sym)}" data-jl="1">${liveCell(t.sym,1)}</span>`:'—'}</td>
       <td class="r num">${f(t.qIn,0)}${t.fills&&t.fills.length?` <span class="muted small">分 ${t.fills.length} 筆</span>`:''}</td><td class="r num">${usd(t.fee||0)}</td>
-      <td class="r num">${usd(t.cost)}</td>${t.isOpen?`<td class="r num">—</td><td class="r num">${t.qOut?`<span class="muted small" title="未計入任何統計，全部平倉先計">已平部分 ${usd(t.realized)}</span>`:'—'}</td><td class="r num">—</td>`
+      <td class="r num">${usd(t.cost)}</td>${t.isOpen||t.isPlan?`<td class="r num">—</td><td class="r num">${t.qOut?`<span class="muted small" title="未計入任何統計，全部平倉先計">已平部分 ${usd(t.realized)}</span>`:'—'}</td><td class="r num">—</td>`
         :`<td class="r num">${usd(t.rev)}</td><td class="r num ${cls(t.pl)}">${usd(t.pl)}</td><td class="r num ${cls(t.plp)}">${t.plp==null?'—':sgn(t.plp,2)+'%'}</td>`}
       <td class="r num ${cls(t.R)}">${t.R==null?'—':sgn(t.R,2)+'R'}</td>
       <td class="r num" data-v="${t.holdD}"><b>${t.holdTxt}</b></td><td class="small">${esc(t.strat||'')}</td>
       <td class="r num small">${t.tp?px(t,t.tp)+` <span class="up">${sgn(t.tpp,1)}%</span>`:'—'}</td><td class="r num small">${t.sl?px(t,t.sl)+` <span class="down">${sgn(t.slp,1)}%</span>`:'—'}</td>
-      <td class="small">${esc(t.mood||'')}</td><td class="r num ${cls(cum)}">${t.isOpen?'':usd(cum)}</td>
+      <td class="small">${esc(t.mood||'')}</td><td class="r num ${cls(cum)}">${t.isOpen||t.isPlan?'':usd(cum)}</td>
       <td><div style="display:flex;gap:4px">${(t.shots||[]).map((s,i)=>`<img src="${s}" alt="截圖 ${i+1}" data-big="1">`).join('')}</div></td></tr>`}).join('') || `<tr><td colspan="21" class="muted">${on?'冇交易符合篩選。':'未有紀錄。喺上面填一單交易就得。'}</td></tr>`;
   sortApply('jl'); liveSoon();
   $('jbody').querySelectorAll('[data-close]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); jCloseOpen(b.dataset.close) });
+  $('jbody').querySelectorAll('[data-fill]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); jPlanFillOpen(b.dataset.fill) });
   $('jbody').querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=e=>{ if(e.target.dataset.big){jZoom(e.target.src);return} jLoad(tr.dataset.id)});
   const done = rows.filter(t=>!t.isOpen && t.pl!=null), win = done.filter(t=>t.pl>0), loss = done.filter(t=>t.pl<0), rs=done.filter(t=>t.R!=null);
   const avg = a => a.length ? a.reduce((s,t)=>s+t.pl,0)/a.length : null, aw=avg(win), al=avg(loss);
@@ -2555,7 +2689,8 @@ function jRender(){
     stat('平均蝕', `<span class="down">${usd(al)}</span>`), stat('盈虧比', aw!=null&&al?f(aw/-al,2):'—'),
     stat('平均 R', rs.length?`<span class="${cls(rs.reduce((s,t)=>s+t.R,0))}">${sgn(rs.reduce((s,t)=>s+t.R,0)/rs.length,2)}R</span> <span class="muted small">(${rs.length} 單)</span>`:'—'),
     stat('最大回撤', `<span class="down">${usd(-maxDD([...done].sort((a,b)=>((a.close||'')+(a.ctime||'')).localeCompare((b.close||'')+(b.ctime||'')))))}</span>`),
-    stat('平均持倉', done.length?f(done.reduce((s,t)=>s+t.hold,0)/done.length,0)+' 日':'—'), stat('未平倉', `${rows.length-done.length} 單`)].join('');
+    stat('平均持倉', done.length?f(done.reduce((s,t)=>s+t.hold,0)/done.length,0)+' 日':'—'), stat('未平倉', `${rows.filter(t=>t.isOpen).length} 單`),
+    stat('交易計劃', `${rows.filter(t=>t.isPlan).length} 單`)].join('');
   jStats(done);
 }
 // Close all or part of an open trade without retyping it. A full close of a simple trade fills in 平倉日期／出場價;
@@ -2586,6 +2721,32 @@ async function jcSave(){ const t=TR.find(x=>x.id===jcId); if(!t) return; const c
   const btn=$('jc-go'); btn.disabled=true;
   try{ await DB.put('trades', u) }catch(_){ btn.disabled=false; return M('儲唔到：網絡有問題，遲啲再試') }
   btn.disabled=false; $('j-cl').close(); if(jEdit===t.id) jReset(); await jReload(); jMsg(`${t.sym} 已${q<c.openQ?'部分':''}平倉`) }
+// 交易計劃 -> 確認成交: the plan's price and size stay as pbuy / pqty, the trade takes the actual fill
+let jpId = null;
+function jPlanFillOpen(id){ const t=TR.find(x=>x.id===id); if(!t) return; const F=$('jpff').elements; jpId=id;
+  const q=LQ[t.sym]; $('h-jpf').textContent=`確認成交：${t.sym}`;
+  $('jp-info').textContent=`${SIDE[t.side]||'Long'} · 計劃入場 ${t.buy!=null?px(t,t.buy):'—'}${t.qty?` · 計劃數量 ${f(t.qty,0)}`:''}${t.sl?` · 止損 ${px(t,t.sl)}`:''}${t.tp?` · 止盈 ${px(t,t.tp)}`:''}${q?` · 延遲價 ${f(q.p)}（美東 ${lHM(q.at)}）`:''}`;
+  $('jp-tz').textContent=`（${t.tz==='NY'?'美東':'香港'}時間）`;
+  F.d.value=ymd(nyNow()); F.tm.value=''; F.p.value=t.buy??''; F.q.value=t.qty??''; F.fee.value=0; $('jp-msg').textContent=''; jpPrev(); $('j-pf').showModal() }
+function jpPrev(){ const t=TR.find(x=>x.id===jpId); if(!t) return; const F=$('jpff').elements, p=num(F.p.value);
+  $('jp-prev').innerHTML = p!=null&&t.buy ? `同計劃價相差 <b class="num">${sgn((p/t.buy-1)*100,2)}%</b>（${px(t,p-t.buy)}）` : '' }
+async function jpSave(){ const t=TR.find(x=>x.id===jpId); if(!t) return; const F=$('jpff').elements, M=x=>$('jp-msg').textContent=x;
+  const d=F.d.value, tm=F.tm.value, p=num(F.p.value), q=num(F.q.value), fee=num(F.fee.value)||0;
+  if(!d||p==null||!(q>0)) return M('要填成交日期、實際成交價同數量');
+  if(!TR.includes(t)) return;
+  const u={...t, plan:false, pbuy:t.buy, pqty:t.qty??null, open:d, otime:tm, buy:p, qty:q, fee:(t.fee||0)+fee, upd:Date.now()};
+  const btn=$('jp-go'); btn.disabled=true;
+  try{ await DB.put('trades', u) }catch(_){ btn.disabled=false; return M('儲唔到：網絡有問題，遲啲再試') }
+  btn.disabled=false; $('j-pf').close(); if(jEdit===t.id) jReset(); await jReload(); jMsg(`${t.sym} 已確認成交，而家係未平倉`) }
+// 計劃 checkbox: the price and size are planned ones, the size may be left blank
+function jPlanUI(){ const F=$('jf').elements, on=F.plan.checked;
+  document.querySelectorAll('#jf .j-pl').forEach(e=>e.hidden=!on); F.qty.required=!on;
+  if(!jEdit) $('h-jf').textContent=on?'新增交易計劃':'新增交易' }
+// From a stock page's「＋ 交易計劃」: open the form with the ticker, Long, today and the latest price filled in
+function jPlanFill(){ const P=window.JPLAN; if(!P) return; window.JPLAN=null; jReset(); const F=$('jf').elements;
+  F.sym.value=P.sym; F.side.value='L'; F.plan.checked=true; if(P.p!=null) F.buy.value=P.p; jPlanUI();
+  $('h-jf').textContent=`新增交易計劃：${P.sym}`; jMsg(`已帶入 ${P.sym}${P.p!=null?`，入場價先填 ${P.src} ${f(P.p)}，改做你計劃嘅價`:''}`);
+  $('h-jf').scrollIntoView({block:'start'}); F.qty.focus({preventScroll:true}) }
 // 交易紀錄 filters (second header row): ticker search, month opened, closed / still open; they combine
 function jFilterOpts(rows){
   const syms=[...new Set(rows.map(t=>t.sym))].sort(), mons=[...new Set(rows.map(t=>t.open.slice(0,7)))].sort().reverse();
@@ -2626,11 +2787,12 @@ function jFillsDraw(){
 }
 function jLoad(id){ const t = TR.find(x=>x.id===id), F=$('jf'); if(!t) return; jEdit=id;
   for(const el of F.elements) if(el.name) el.value = t[el.name] ?? (el.name==='mkt'?'stk':el.name==='side'?'L':'');
+  F.elements.plan.checked=!!t.plan; jPlanUI();
   jShots=[...(t.shots||[])]; jShotsDraw(); jFills=(t.fills||[]).map(x=>({...x})); jFillsDraw(); if(t.tz) $('j-tz').value=t.tz; jMkt();
   $('h-jf').textContent='修改交易：'+t.sym; $('j-del').hidden=false; $('j-save').textContent='儲存修改';
   $('h-jf').scrollIntoView({behavior:'smooth',block:'start'}) }
 function jReset(){ jEdit=null; jShots=[]; jFills=[]; $('jf').reset(); $('jf').elements.open.value=ymd(nyNow()); jShotsDraw(); jFillsDraw(); jMkt();
-  $('j-tz').value=Store.get('jtz','HK'); $('h-jf').textContent='新增交易'; $('j-del').hidden=true; $('j-save').textContent='儲存交易' }
+  $('j-tz').value=Store.get('jtz','HK'); $('h-jf').textContent='新增交易'; $('j-del').hidden=true; $('j-save').textContent='儲存交易'; jPlanUI() }
 // Per-person cap so the shared free Firebase quota (1 GB stored, 50,000 reads a day) lasts; opening the journal reads every trade once
 const J_MAX=1000, PRE_MAX=50, WL_MAX=200;  // per person; presets and watchlist are tiny but the watchlist is read on every visit
 function jCount(){ const e=$('j-count'), n=TR.length; e.hidden=false; e.textContent=`已用 ${n.toLocaleString('en-US')} / ${J_MAX.toLocaleString('en-US')} 單`;
@@ -2828,7 +2990,7 @@ DRAW.journal = () => {
       if(!jFills.length && F.qty.value && F.buy.value) jFills.push({a:'in', d:F.open.value, tm:F.otime.value, q:num(F.qty.value), p:num(F.buy.value)});
       jFills.push({a:jFills.length?'out':'in', d:F.close.value||F.open.value||ymd(nyNow()), tm:'', q:null, p:null}); jFillsDraw() };
     $('j-new').onclick=jReset;
-    $('jc-go').onclick=jcSave;
+    $('jc-go').onclick=jcSave; $('jp-go').onclick=jpSave; $('jpff').elements.p.oninput=jpPrev; $('jf').elements.plan.onchange=jPlanUI;
     $('jf-sym').oninput=e=>{ JF.sym=e.target.value; jRender() };
     $('jf-mon').onchange=e=>{ JF.mon=e.target.value; jRender() };
     $('jf-st').onchange=e=>{ JF.st=e.target.value; jRender() }; ['p','q','fee'].forEach(k=>$('jcf').elements[k].oninput=jcPrev);
@@ -2841,6 +3003,13 @@ DRAW.journal = () => {
         open:F.open.value, otime:F.otime.value, close:F.close.value||null, ctime:F.ctime.value, tz:$('j-tz').value,
         buy:num(F.buy.value), sell:num(F.sell.value), qty:num(F.qty.value), fee:num(F.fee.value)||0, tp:num(F.tp.value), sl:num(F.sl.value), risk:num(F.risk.value),
         strat:F.strat.value.trim(), mood:F.mood.value.trim(), why_in:F.why_in.value, why_out:F.why_out.value, review:F.review.value, shots:jShots, fills, upd:Date.now() };
+      const old=jEdit&&TR.find(x=>x.id===jEdit); if(old&&old.pbuy!=null){ t.pbuy=old.pbuy; t.pqty=old.pqty??null }
+      if(F.plan.checked){ t.plan=true;
+        if(!t.sym || t.buy==null){ jMsg('交易計劃要填代號同計劃入場價'); return }
+        if(fills.length || t.close || t.sell!=null){ jMsg('交易計劃未成交，唔可以有平倉或者分批成交；成交之後撳「確認成交」'); return }
+        if(!jEdit && TR.length>=J_MAX){ jMsg(`已經儲咗 ${J_MAX.toLocaleString('en-US')} 單（上限）。`); return }
+        try{ await DB.put('trades', t) }catch(_){ jMsg('儲唔到，遲啲再試'); return }
+        await jReload(); jReset(); jMsg('已儲存交易計劃'); return }
       if(fills.length && !fills.some(x=>x.a==='in')){ jMsg('分批成交最少要有一筆入場'); return }
       const fq=a=>fills.filter(x=>x.a===a).reduce((s,x)=>s+x.q,0);
       if(fq('out')>fq('in')){ jMsg(`出場數量（${fq('out')}）多過入場（${fq('in')}），請檢查分批成交`); return }
@@ -2874,7 +3043,7 @@ DRAW.journal = () => {
       jMsg(`已匯入 ${n} 單交易${same?`（其中 ${same} 單同現有紀錄一樣 ID，已用備份版本覆蓋，冇重複）`:''}${(bak.presets||[]).length?`、${bak.presets.length} 個選股預設`:''}${(bak.watch||[]).length?`、${bak.watch.length} 隻自選股`:''}`) };
     jxInit(); jReset();
   }
-  jReload();
+  jReload().then(jPlanFill);
 };
 
 // ---------- 個股 ----------
@@ -2889,7 +3058,7 @@ function drawPeers(s){ const box=$('s-peers');
   box.innerHTML=`<div class="sechead"><h3 id="h-peers">同業 <span class="muted small">${esc(s.ind)} · ${P.length} 隻 · 按市值排</span></h3>
       <button class="tog" id="peer-scr" type="button">喺選股器篩選呢個行業</button></div>
     <div class="tablewrap"><table class="cen" data-sort="peer"><thead><tr><th class="frz">代號</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">RS</th><th class="r">3 個月 %</th><th class="r" title="GAAP，最近一季按年">EPS 增長 %</th><th class="r">市值 (億)</th><th>趨勢</th></tr></thead>
-    <tbody>${L.map(x=>`<tr${x===s?' class="me"':''}><td class="frz"><span style="white-space:nowrap">${star(x.s)}${tk(x)}${staleTag(x)}</span><div class="muted small" title="${esc(x.n||'')}">${esc(shortN(x.n))}</div></td>
+    <tbody>${L.map(x=>`<tr${x===s?' class="me"':''}><td class="frz"><span style="white-space:nowrap">${star(x.s)}${tk(x)}${staleTag(x)}${fillTag(x)}</span><div class="muted small" title="${esc(x.n||'')}">${esc(shortN(x.n))}</div></td>
       <td class="r num">${f(x.c)}</td>${pcell(x.chg,2)}<td class="r"><span class="rs" style="color:${rsColor(x.rsr)}">${x.rsr}</span></td>${pcell(x.r63)}${epsCell(x)}<td class="r num">${x.mcap!=null?f(x.mcap*10,0):'—'}</td><td>${ttbar(x.tt)}</td></tr>`).join('')}</tbody></table></div>
     ${P.length>10?`<button class="tog" id="peer-more" type="button">${PEER_ALL?'只顯示頭 10 隻':`顯示全部 ${P.length} 隻`}</button>`:''}`;
   if($('peer-more')) $('peer-more').onclick=()=>{PEER_ALL=!PEER_ALL; drawPeers(s)};
@@ -2901,13 +3070,15 @@ function showStock(t){
   PEER_ALL=false;
   const s=BY[t];
   $('s-tk').textContent=s.s; $('s-name').textContent=s.n||'';
-  $('s-star').innerHTML=`<button class="tog" id="s-wl" data-w="${s.s}" style="font-size:13px;vertical-align:middle"></button>`; wlStars();
+  $('s-star').innerHTML=`<button class="tog" id="s-wl" data-w="${s.s}" style="font-size:13px;vertical-align:middle"></button> <button class="tog" id="s-plan" type="button" style="font-size:13px;vertical-align:middle" title="喺交易日誌開一單交易計劃，帶入代號同最新價；成交之後再確認實際成交價、數量同時間">＋ 交易計劃</button>`; wlStars();
+  $('s-plan').onclick=()=>{ const q=LQ[s.s]; window.JPLAN={sym:s.s, p:q?q.p:s.c, src:q?`延遲價（美東 ${lHM(q.at)}）`:`${D.asof} 收市價`}; location.hash='#journal' };
   $('s-foot').innerHTML=`價格截至 ${D.asof} 收市 · 基本面最後更新：${s.fts||'未有'} · RS、MVP、趨勢模板點計：<a href="#about">說明及數據狀態</a>`;
   $('s-sec').innerHTML=`板塊 ${esc(secZh(s))} · 細分行業 ${s.ind?`<a href="#s-peers" id="s-indl">${esc(s.ind)}</a>`:'未知'}`;
   if($('s-indl')) $('s-indl').onclick=e=>{e.preventDefault(); $('s-peers').scrollIntoView({behavior:'smooth',block:'start'})};
   drawPeers(s); livePaint(); liveSoon();
   $('s-px').textContent=f(s.c); $('s-chg').innerHTML=`<span class="${cls(s.chg)}">${sgn(s.chg,2)}%</span> <span class="muted small">${D.asof}</span>`;
-  const tags=[s.ndx?'Nasdaq-100':null, passKC(s)?'符合 KC 條件':null, s.nh?'今日創 52 週新高':null, s.nl?'今日創 52 週新低':null, s.mvp===3?'MVP 3/3':null, eNext(s)?`下次業績 ${edtxt(s)}`:null, fStale(s)?`<span title="${s.erep} 出咗業績，基本面最後更新 ${s.fts}" style="color:var(--warm)">業績後待更新：營收／EPS 仲係上一季</span>`:null].filter(Boolean);
+  const tags=[s.ndx?'Nasdaq-100':null, passKC(s)?'符合 KC 條件':null, s.nh?'今日創 52 週新高':null, s.nl?'今日創 52 週新低':null, s.mvp===3?'MVP 3/3':null, eNext(s)?`下次業績 ${edtxt(s)}`:null, fStale(s)?`<span title="${s.erep} 出咗業績，數據仲係截至 ${s.qend||'?'} 嗰季，最後成功更新 ${s.fts}" style="color:var(--warm)">業績後待更新：營收／EPS 仲係上一季</span>`:null,
+    s.fill?`<span title="今日升跌、成交量同新高新低唔計呢隻">冇 ${D.asof} 報價，用 ${s.pxd||'之前'} 收市價補</span>`:null].filter(Boolean);
   $('s-tags').innerHTML=tags.map(x=>`<span class="badge">${x}</span>`).join('')+stockChanges(s).map(c=>`<span class="badge" style="border-color:var(--accent);color:var(--ink)">今日：${c.txt.replace(/^今日/,'')}</span>`).join('');
   $('s-stats').innerHTML=[
     stat('RS 排名', `<span style="color:${rsColor(s.rsr)}">${s.rsr}</span>${s.prsr!=null&&s.prsr!==s.rsr?` <span class="muted small">昨日 ${s.prsr}</span>`:''}`), stat('距 52 週高', f(s.dh,1)+'%'),
@@ -2926,7 +3097,7 @@ function showStock(t){
     stat('3 季按年最低（營收 / EPS）', pair(s.g3r,s.g3e)+(s.g3eb==='a'?'<br><span class="muted small">EPS 用經調整數字（GAAP 季度唔夠）</span>':'')), stat('連續 2 年增長', s.yr==null?'—':s.yr?'<span class="up">係</span>':'唔係'),
     stat('預測 EPS（今年 / 明年）', pair(s.e0,s.e1)), stat('預測營收（今年 / 明年）', pair(s.r0,s.r1)),
     stat('上市', s.ipo!=null?f(s.ipo,1)+' 年':'—'), stat('上次公布（美東）', eltxt(s,true)), stat('下次公布（美東）', edtxt(s)),
-    stat('營收／EPS 數據', `${s.qend?`截至 ${s.qend} 嗰季`:'—'}<br><span class="muted small">${s.fts?`${s.fts.slice(5)} 更新`:'未有'}${s.erep&&s.fts&&s.erep>=s.fts?' · <span class="down">上次業績後未更新</span>':''}</span>`),
+    stat('營收／EPS 數據', `${s.qend?`截至 ${s.qend} 嗰季`:'—'}<br><span class="muted small">最後成功更新 ${s.fts||'未有'}${fStale(s)?` · <span class="down">${s.erep} 出咗業績，等緊新一季（每 12 小時自動再試）</span>`:''}</span>`),
   ].join('');
   $('s-ttn').textContent=`${s.tt} / 5`;
   const c=s.c, ok=b=>b?'<span class="ok">✓</span>':'<span class="no">✗</span>';
@@ -2936,10 +3107,10 @@ function showStock(t){
     [s.mvpv!=null&&s.mvpv>=20, `成交量比之前 15 日多 20% 或以上（${sgn(s.mvpv,0)}%）`],
     [s.mvpp!=null&&s.mvpp>=20, `股價升 20% 或以上（${sgn(s.mvpp)}%）`],
   ].map(([b,l])=>`<li>${ok(b)}<span>${l}</span></li>`).join('');
-  $('schart').innerHTML=''; $('ohlc').textContent='載入緊圖表…'; SD=null;
+  $('schart').innerHTML=''; $('ohlc').textContent='載入緊圖表…'; SD=null; window.SDX=null;
   fetch(`s/${encodeURIComponent(t)}.json`).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{
     if(location.hash.slice(3)!==encodeURIComponent(t) && decodeURIComponent(location.hash.slice(3))!==t) return;
-    SD=d; drawStock();
+    SD=d; window.SDX=d; drawStock(); intraPaint(t);
     const n=d.cl.length, m200b=d.m200[n-22];
     $('s-tt').innerHTML=[
       [c>d.m50[n-1], `收市（${f(c)}）高過 50 日線（${f(d.m50[n-1])}）`],
@@ -3005,6 +3176,7 @@ function stocksReady(){
   if(!$('v-wait').hidden) route();
   wlStars(); if(drawn.market && brief.T) brief(brief.T);
   if(drawn.close) DRAW.close();
+  if(drawn.overview) DRAW.overview();  // 較昨日有咩變化 adds the KC-condition and watchlist lines
 }
 function stocksFailed(){ if(READY) return;
   $('wait-msg').innerHTML='<b>股票數據載入唔到。</b>可能係網絡問題，<a href="javascript:location.reload()">重新整理</a>再試。大市頁唔受影響。';
