@@ -12,7 +12,7 @@ from .checks import run as run_checks
 from .compute import build, stock_pages, wants_fundamentals
 from .mkt import HOLIDAYS, NY, close_due
 from .fetch import (earnings_calendar, earnings_dates, economic_calendar, fear_greed, fetch_prices, fundamentals,
-                    headlines, nasdaq_quarters, profiles, reported_after_fetch, report_times, universe)
+                    headlines, nasdaq_quarters, profiles, reported_after_fetch, report_times, retry_due, universe)
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "site"
@@ -227,7 +227,8 @@ def main():
     fpath = ROOT / "cache" / "fundamentals.json"
     cached = json.loads(fpath.read_text()) if fpath.exists() else {}
     now = time.time()
-    extra = {t for t in meta.index if t in cached and reported_after_fetch(cached[t], reports.get(t), now)} - set(want)
+    extra = {t for t in meta.index if t in cached and (reported_after_fetch(cached[t], reports.get(t), now)
+                                                         or retry_due(cached[t], reports.get(t), now))} - set(want)
     print(f"fundamentals: {len(extra)} stocks outside the screener pool reported since their last fetch")
     pool, want = set(want), sorted(set(want) | extra)
     del cached

@@ -27,3 +27,23 @@ assert.equal(pick(r, ny(10, "20:10")).p, val(10, "19:50"));
 q = pick(r, ny(10, "20:18"));
 assert.equal(q.p, 42); assert.equal(q.at, ny(10, "20:02") + 28);
 console.log("worker quotes: unfinished bar checks passed");
+
+// 日內交易資訊: pre-market high/low, regular open, VWAP and volume against the earlier days at the same time
+{
+  const T = [], O = [], H = [], L = [], C = [], V = [];
+  for (const d of [9, 10]) for (let t = ny(d, "04:00"); t < ny(d, "20:00"); t += 300) {
+    const reg = t >= ny(d, "09:30") && t < ny(d, "16:00"), pre = t < ny(d, "09:30");
+    const px = pre ? 100 + (t - ny(d, "04:00")) / 3600 : 110;  // pre-market climbs 100 -> 105.5, then flat 110
+    T.push(t); O.push(px); C.push(px); H.push(px + 1); L.push(px - 1); V.push(reg ? (d === 9 ? 100 : 200) : 5);
+  }
+  const r2 = { timestamp: T, indicators: { quote: [{ open: O, high: H, low: L, close: C, volume: V }] },
+    meta: { gmtoffset: tz, currentTradingPeriod: { regular: { start: ny(10, "09:30"), end: ny(10, "16:00") } } } };
+  let x = pick(r2, ny(10, "10:15")).x;  // bars that ended by 10:00 count: 09:30-09:55, six bars
+  assert.deepEqual(x.pre, [106.4167, 99]); assert.equal(x.o, 110); assert.equal(x.hi, 111); assert.equal(x.lo, 109);
+  assert.equal(x.vwap, 110); assert.equal(x.vol, 1200); assert.equal(x.rv, 2); assert.equal(x.rvn, 1);
+  x = pick(r2, ny(10, "09:00")).x;      // pre-market: no regular session yet
+  assert.equal(x.o, null); assert.equal(x.vwap, null); assert.equal(x.rv, null); assert.equal(x.pre[1], 99);
+  x = pick(r2, ny(10, "18:00")).x;      // after the close: the whole day against whole days
+  assert.equal(x.vol, 78 * 200); assert.equal(x.rv, 2);
+  console.log("worker quotes: day figure checks passed");
+}

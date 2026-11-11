@@ -40,6 +40,7 @@ export default {
   },
   // Opening the Worker's address never starts an update, so nobody else can start one.
   // /quotes?s=AAPL,MSFT gives prices that are at least 15 minutes old, for the site to show (see quotes()).
+  // Add &x=1 for the stock page's 日內交易資訊 (pre-market high/low, open and gap, VWAP, relative volume; see dayFigures()).
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname === "/quotes") return quotes(request, url, ctx);
@@ -75,6 +76,8 @@ async function quotes(request, url, ctx) {
     if (m && now - m.t < 60) { q[s] = m.v; return; }
     try { q[s] = await delayed(s, now); MEM.set(s, { t: now, v: q[s] }); } catch (e) { console.log(`${s}: ${e.message}`); }
   }));
+  // the day figures only when asked for (one stock page), so the watchlist's answer stays small
+  if (url.searchParams.get("x") !== "1") for (const s in q) if (q[s] && q[s].x) q[s] = { ...q[s], x: undefined };
   if (MEM.size > 2000) MEM.clear();
   const body = JSON.stringify({ t: now, delay: DELAY, q });
   return new Response(body, { headers: cors });
@@ -113,6 +116,46 @@ export function pick(r, now) {
     if (c[j] == null || !inReg(ts[j])) continue;
     if (sess === "post" ? day(ts[j]) <= d : day(ts[j]) < d) { base = c[j]; break; }
   }
-  return { p: round(c[i]), at: end(i), sess, prev: base == null ? null : round(base) };
+  return { p: round(c[i]), at: end(i), sess, prev: base == null ? null : round(base),
+    x: dayFigures(r, i, { day, tod, inReg, open, end }) };
+}
+
+// The stock page's 日內交易資訊, from the same 15-minute-old bars as the price (bar i is the last one used):
+// pre: [high, low] of the day's pre-market bars (04:00 to 09:30 New York)
+// o, hi, lo: regular session open and high / low so far; vwap: volume-weighted average price of the regular session
+//   so far, from each bar's (high + low + close) / 3; vol: its volume so far
+// rv: vol divided by the average volume of the earlier days in Yahoo's 5 days up to the same time of day (rvn days)
+// Yahoo's 5-minute bars miss a few odd-lot and auction trades, so these are close to, not exactly, the exchange's.
+function dayFigures(r, i, { day: dayOf, tod, inReg, open, end }) {
+  const ts = r.timestamp, Q = r.indicators.quote[0] || {}, d = dayOf(ts[i]);
+  const H = Q.high || [], L = Q.low || [], C = Q.close || [], O = Q.open || [], V = Q.volume || [];
+  let pre = null, o = null, hi = null, lo = null, pv = 0, vol = 0;
+  for (let k = 0; k <= i; k++) {
+    if (dayOf(ts[k]) !== d || C[k] == null) continue;
+    const h = H[k] ?? C[k], l = L[k] ?? C[k];
+    if (tod(ts[k]) < open) {
+      pre = pre ? [Math.max(pre[0], h), Math.min(pre[1], l)] : [h, l];
+    } else if (inReg(ts[k])) {
+      if (o == null) o = O[k] ?? C[k];
+      hi = hi == null ? h : Math.max(hi, h); lo = lo == null ? l : Math.min(lo, l);
+      vol += V[k] || 0; pv += ((h + l + C[k]) / 3) * (V[k] || 0);
+    }
+  }
+  // relative volume: earlier days' regular volume up to the same time of day as the last bar used
+  let rv = null, rvn = 0;
+  if (o != null) {
+    const upto = inReg(ts[i]) ? tod(end(i)) : Infinity, by = new Map();
+    for (let k = 0; k < ts.length; k++) {
+      const dk = dayOf(ts[k]);
+      if (dk >= d || !inReg(ts[k]) || tod(end(k)) > upto) continue;
+      by.set(dk, (by.get(dk) || 0) + (V[k] || 0));
+    }
+    const past = [...by.values()].filter((x) => x > 0);
+    rvn = past.length;
+    if (rvn) rv = vol / (past.reduce((a, b) => a + b, 0) / rvn);
+  }
+  const R = (x) => (x == null ? null : round(x));
+  return { pre: pre && [R(pre[0]), R(pre[1])], o: R(o), hi: R(hi), lo: R(lo), vwap: vol ? R(pv / vol) : null, vol,
+    rv: rv == null ? null : Math.round(rv * 100) / 100, rvn };
 }
 const round = (x) => Math.round(x * 10000) / 10000;

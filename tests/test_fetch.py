@@ -140,6 +140,17 @@ def test_report_times_mark_fundamentals_a_quarter_behind():
     assert not fetch.reported_after_fetch(fetched, None, rep + 2 * 86400)
 
 
+def test_retry_while_the_new_quarter_is_missing():
+    rep = fetch.report_times({"X": "2026-11-05"})["X"]
+    behind = {"_ts": rep + fetch.AFTER_REPORT, "qend": "2026-06-30"}  # fetched after the report, Yahoo still had Q2
+    now = rep + fetch.AFTER_REPORT + fetch.RETRY_AFTER
+    assert fetch.quarter_behind(behind, rep) and fetch.retry_due(behind, rep, now)
+    assert not fetch.retry_due(behind, rep, now - 60)                      # tried less than 12 hours ago
+    assert not fetch.retry_due({**behind, "qend": "2026-09-30"}, rep, now)  # got the new quarter
+    assert not fetch.retry_due(behind, rep, rep + 50 * 86400)               # gives up after 45 days
+    assert not fetch.retry_due(behind, None, now)                           # no report known
+
+
 def test_reported_since():
     e = 1_800_000_000  # report timestamp
     hold = fetch.AFTER_REPORT
