@@ -990,15 +990,6 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
       </div>
     </div>
     <section class="panel" style="display:grid;gap:8px" aria-label="股價圖">
-      <div class="sechead">
-        <div class="controls" role="group" aria-label="圖表款式"><button class="tog" id="cm-tv" aria-pressed="true">TradingView 互動圖</button><button class="tog" id="cm-k" aria-pressed="false">本站日 K</button></div>
-        <div class="controls" id="s-kctl" hidden><button class="tog" id="r-63" aria-pressed="false">3 個月</button><button class="tog" id="r-126" aria-pressed="true">6 個月</button><button class="tog" id="r-260" aria-pressed="false">1 年</button></div>
-      </div>
-      <div id="s-kbox" style="display:grid;gap:8px" hidden>
-        <span class="num small muted" id="ohlc"></span>
-        <svg class="chart" id="schart" viewBox="0 0 960 440" role="img" aria-label="日 K 線圖連 50 日及 200 日線同成交量"></svg>
-        <div class="legend"><span><i style="background:var(--accent)"></i>50 日線</span><span><i style="background:var(--warm)"></i>200 日線</span><span>底部：成交量（綠 = 升市日）</span></div>
-      </div>
       <div id="s-tvbox" style="display:grid;gap:8px">
         <div class="tvchart" id="tvchart"></div>
         <p class="muted small" id="tv-note">圖表、數據同畫圖工具由 TradingView 提供（美股數據來自 Cboe One，有延遲），只供睇圖；可以喺圖上面揀時間週期（1 分鐘至月線）、加指標、用左邊工具畫線。本站嘅訊號、風險分同選股仍然只用上一個交易日嘅正式收市價。</p>
@@ -3166,7 +3157,7 @@ DRAW.journal = () => {
 };
 
 // ---------- 個股 ----------
-let SD=null, sRange=126;
+let SD=null;
 function stat(label, value, cls=''){return `<div${cls?` class="${cls}"`:''}><span>${label}</span><b>${value}</b></div>`}
 // 同業: other stocks in the same 細分行業 (Yahoo industry), biggest first
 let PEER_ALL=false;
@@ -3226,11 +3217,11 @@ function showStock(t){
     [s.mvpv!=null&&s.mvpv>=20, `成交量比之前 15 日多 20% 或以上（${sgn(s.mvpv,0)}%）`],
     [s.mvpp!=null&&s.mvpp>=20, `股價升 20% 或以上（${sgn(s.mvpp)}%）`],
   ].map(([b,l])=>`<li>${ok(b)}<span>${l}</span></li>`).join('');
-  $('schart').innerHTML=''; $('ohlc').textContent='載入緊圖表…'; SD=null; window.SDX=null;
+  SD=null; window.SDX=null;
   tvPaint();
   fetch(`s/${encodeURIComponent(t)}.json`).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{
     if(location.hash.slice(3)!==encodeURIComponent(t) && decodeURIComponent(location.hash.slice(3))!==t) return;
-    SD=d; window.SDX=d; drawStock(); intraPaint(t);
+    SD=d; window.SDX=d; intraPaint(t);
     const n=d.cl.length, m200b=d.m200[n-22];
     $('s-tt').innerHTML=[
       [c>d.m50[n-1], `收市（${f(c)}）高過 50 日線（${f(d.m50[n-1])}）`],
@@ -3239,55 +3230,16 @@ function showStock(t){
       [m200b!=null&&d.m200[n-1]>m200b, `200 日線比一個月前向上（${f(m200b)} → ${f(d.m200[n-1])}）`],
       [s.dh>=-25, `收市喺 52 週高位 25% 以內（${f(s.dh,1)}%）`],
     ].map(([b,l])=>`<li>${ok(b)}<span>${l}</span></li>`).join('');
-  }).catch(()=>{$('ohlc').textContent='圖表載入唔到，遲啲再試。';$('s-tt').innerHTML='<li class="muted small">載入唔到</li>'});
+  }).catch(()=>{$('s-tt').innerHTML='<li class="muted small">載入唔到</li>'});
 }
-function drawStock(){
-  const svg=$('schart'); svg.innerHTML=''; if(!SD) return;
-  const N=SD.cl.length, a=Math.max(0,N-sRange), idx=[...Array(N-a).keys()].map(i=>i+a), n=idx.length;
-  const W=960,L=8,R=64,T=8,PH=320,VT=342,VB=420,BOT=436, bw=(W-L-R)/n;
-  const vals=idx.flatMap(i=>[SD.h[i],SD.l[i],SD.m50[i],SD.m200[i]]).filter(v=>v!=null);
-  let lo=Math.min(...vals), hi=Math.max(...vals); const pad=(hi-lo)*0.04; lo-=pad; hi+=pad;
-  const y=v=>T+(PH-T)*(1-(v-lo)/(hi-lo)), x=k=>L+k*bw+bw/2;
-  const vmax=Math.max(...idx.map(i=>SD.v[i]||0))||1, vy=v=>VB-(VB-VT)*(v/vmax);
-  const g=el('g',{class:'grid'},svg), step=(hi-lo)/4;
-  for(let j=0;j<=4;j++){const v=lo+step*j;el('line',{x1:L,x2:W-R,y1:y(v),y2:y(v)},g);el('text',{x:W-R+6,y:y(v)+4},svg).textContent=v>=1000?Math.round(v).toLocaleString('en-US'):v.toFixed(2)}
-  el('line',{x1:L,x2:W-R,y1:VB,y2:VB},g);
-  el('text',{x:W-R+6,y:VT+10},svg).textContent=kvol(vmax);
-  idx.forEach((i,k)=>{
-    const o=SD.o[i],c=SD.cl[i],h=SD.h[i],l=SD.l[i]; if(c==null) return;
-    const up=c>=(o??c), col=up?'var(--up)':'var(--down)', xx=x(k);
-    el('line',{x1:xx,x2:xx,y1:y(h??c),y2:y(l??c),stroke:col,'stroke-width':1},svg);
-    const top=y(Math.max(o??c,c)), bot=y(Math.min(o??c,c));
-    el('rect',{x:xx-bw*0.36,y:top,width:Math.max(1,bw*0.72),height:Math.max(1,bot-top),fill:col},svg);
-    const vol=SD.v[i]||0; el('rect',{x:xx-bw*0.36,y:vy(vol),width:Math.max(1,bw*0.72),height:Math.max(0,VB-vy(vol)),fill:col,opacity:.45},svg);
-  });
-  [['m50','var(--accent)'],['m200','var(--warm)']].forEach(([k,col])=>{
-    const pts=idx.map((i,j)=>SD[k][i]==null?null:`${x(j).toFixed(1)},${y(SD[k][i]).toFixed(1)}`).filter(Boolean).join(' ');
-    if(pts) el('polyline',{points:pts,fill:'none',stroke:col,'stroke-width':1.6},svg);
-  });
-  const ticks=[0,Math.floor(n/4),Math.floor(n/2),Math.floor(3*n/4),n-1];
-  ticks.forEach((k,j)=>el('text',{x:x(k),y:BOT,'text-anchor':j===0?'start':j===4?'end':'middle'},svg).textContent=SD.d[idx[k]].slice(2));
-  const cross=el('line',{x1:0,x2:0,y1:T,y2:VB,stroke:'var(--muted)','stroke-dasharray':'3 3',visibility:'hidden'},svg);
-  const info=k=>{const i=idx[k];const ch=i>0&&SD.cl[i-1]?(SD.cl[i]/SD.cl[i-1]-1)*100:null;
-    $('ohlc').innerHTML=`${SD.d[i]}　開 ${f(SD.o[i])}　高 ${f(SD.h[i])}　低 ${f(SD.l[i])}　收 ${f(SD.cl[i])} <span class="${cls(ch)}">${sgn(ch,2)}%</span>　量 ${kvol(SD.v[i])}　<span style="color:var(--accent)">50日 ${f(SD.m50[i])}</span>　<span style="color:var(--warm)">200日 ${f(SD.m200[i])}</span>`};
-  const hit=el('rect',{x:L,y:T,width:W-L-R,height:VB-T,fill:'transparent'},svg);
-  const move=e=>{const r=svg.getBoundingClientRect(), px=(e.clientX-r.left)*W/r.width, k=Math.max(0,Math.min(n-1,Math.floor((px-L)/bw)));
-    cross.setAttribute('x1',x(k));cross.setAttribute('x2',x(k));cross.setAttribute('visibility','visible');info(k)};
-  hit.addEventListener('pointermove',move); hit.addEventListener('pointerdown',move);
-  hit.addEventListener('pointerleave',()=>{cross.setAttribute('visibility','hidden');info(n-1)});
-  info(n-1);
-}
-[['r-63',63],['r-126',126],['r-260',260]].forEach(([id,k])=>$(id).onclick=()=>{setPressed(['r-63','r-126','r-260'],id);sRange=k;drawStock()});
 // TradingView 互動圖 (KC, 11-11): TradingView's free embed widget gives every timeframe (1 minute to month), zoom, crosshair,
 // indicators and drawing tools. Viewing only, with TradingView's own data; the site's signals keep using the official close.
-// Default since KC's pick (11-11); 本站日 K is one click away and the choice is remembered per browser.
-let CMODE=Store.get('cmode','tv'), TVKEY='';
+// The only stock chart since 11-11 (KC: the site's own daily K chart and the switch are not needed).
+let TVKEY='';
 const tvSym=t=>t.replace(/-/g,'.');  // site keeps Yahoo's BRK-B, TradingView writes BRK.B
 function tvPaint(){
-  const on=CMODE==='tv', t=location.hash.startsWith('#s/')?decodeURIComponent(location.hash.slice(3)):null;
-  setPressed(['cm-k','cm-tv'], on?'cm-tv':'cm-k');
-  $('s-kbox').hidden=on; $('s-kctl').hidden=on; $('s-tvbox').hidden=!on;
-  if(!on||!t) return;
+  const t=location.hash.startsWith('#s/')?decodeURIComponent(location.hash.slice(3)):null;
+  if(!t) return;
   const theme=document.documentElement.dataset.theme==='light'?'light':'dark', key=t+'|'+theme;
   if(key===TVKEY) return; TVKEY=key;
   const box=$('tvchart'); box.innerHTML='<div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
@@ -3299,8 +3251,7 @@ function tvPaint(){
     support_host:'https://www.tradingview.com'});
   box.firstChild.appendChild(sc);
 }
-document.querySelectorAll('.themesw button').forEach(b=>b.addEventListener('click',()=>{if(!$('s-tvbox').hidden) tvPaint()}));
-[['cm-k','k'],['cm-tv','tv']].forEach(([id,m])=>$(id).onclick=()=>{CMODE=m; Store.set('cmode',m); tvPaint(); if(m==='k') drawStock()});
+document.querySelectorAll('.themesw button').forEach(b=>b.addEventListener('click',()=>{if(TVKEY) tvPaint()}));
 
 // ---------- stock rows arrive (stocks.js sets window.KCDT_STOCKS = {asof, k: [keys], r: [[values]]}) ----------
 function stocksReady(){
