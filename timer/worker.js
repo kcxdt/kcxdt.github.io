@@ -92,8 +92,10 @@ async function delayed(sym, now) {
 // Exported for the test in tests/test_worker_quotes.mjs.
 export function pick(r, now) {
   const ts = r.timestamp || [], c = (r.indicators.quote[0] || {}).close || [], gran = 300;
+  // A bar's close is the price at its end; Yahoo's newest bar is unfinished and stamped with its last trade's time
+  const end = (k) => (ts[k] % gran ? ts[k] : ts[k] + gran);
   let i = ts.length - 1;
-  while (i >= 0 && (c[i] == null || ts[i] + gran > now - DELAY)) i--;
+  while (i >= 0 && (c[i] == null || end(i) > now - DELAY)) i--;
   if (i < 0) return null;
   const tz = r.meta.gmtoffset || 0, day = (t) => Math.floor((t + tz) / 86400);
   // Regular hours are 09:30 to 16:00 New York; Yahoo gives the day's own times in currentTradingPeriod, but for
@@ -111,6 +113,6 @@ export function pick(r, now) {
     if (c[j] == null || !inReg(ts[j])) continue;
     if (sess === "post" ? day(ts[j]) <= d : day(ts[j]) < d) { base = c[j]; break; }
   }
-  return { p: round(c[i]), at: ts[i] + gran, sess, prev: base == null ? null : round(base) };
+  return { p: round(c[i]), at: end(i), sess, prev: base == null ? null : round(base) };
 }
 const round = (x) => Math.round(x * 10000) / 10000;

@@ -21,3 +21,9 @@ close[close.length - 1] = null;    // a missing last bar is skipped
 assert.equal(pick(r, ny(11, "03:00")).p, val(10, "19:50"));
 assert.equal(pick(r, ny(9, "04:10")), null); // nothing 15 minutes old yet
 console.log("worker quotes: all checks passed");
+// Yahoo's unfinished newest bar is stamped with its last trade time: that price counts once it is 15 minutes old
+ts.push(ny(10, "20:02") + 28); close.push(42);
+assert.equal(pick(r, ny(10, "20:10")).p, val(10, "19:50"));
+q = pick(r, ny(10, "20:18"));
+assert.equal(q.p, 42); assert.equal(q.at, ny(10, "20:02") + 28);
+console.log("worker quotes: unfinished bar checks passed");
