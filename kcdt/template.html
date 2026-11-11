@@ -129,6 +129,8 @@ a.tk:hover{color:var(--accent);text-decoration:underline}
 .legend span{display:inline-flex;align-items:center;gap:6px}
 .legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
 .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tvchart{height:clamp(420px,72vh,700px);border-radius:8px;overflow:hidden;background:var(--panel)}
+.tvchart>div{height:100%}
 button.tog,label.tog{font:inherit;font-size:14px;padding:4px 12px;border-radius:8px;border:1px solid var(--ctlline);background:var(--ctl);color:var(--ink);cursor:pointer}
 button.tog:hover,label.tog:hover{border-color:var(--hover)}
 button.tog[aria-pressed="true"]{background:var(--sel);border-color:var(--selline);color:var(--ink)}
@@ -989,11 +991,18 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
     </div>
     <section class="panel" style="display:grid;gap:8px" aria-label="股價圖">
       <div class="sechead">
-        <span class="num small muted" id="ohlc"></span>
-        <div class="controls"><button class="tog" id="r-63" aria-pressed="false">3 個月</button><button class="tog" id="r-126" aria-pressed="true">6 個月</button><button class="tog" id="r-260" aria-pressed="false">1 年</button></div>
+        <div class="controls" role="group" aria-label="圖表款式"><button class="tog" id="cm-tv" aria-pressed="true">TradingView 互動圖</button><button class="tog" id="cm-k" aria-pressed="false">本站日 K</button></div>
+        <div class="controls" id="s-kctl" hidden><button class="tog" id="r-63" aria-pressed="false">3 個月</button><button class="tog" id="r-126" aria-pressed="true">6 個月</button><button class="tog" id="r-260" aria-pressed="false">1 年</button></div>
       </div>
-      <svg class="chart" id="schart" viewBox="0 0 960 440" role="img" aria-label="日 K 線圖連 50 日及 200 日線同成交量"></svg>
-      <div class="legend"><span><i style="background:var(--accent)"></i>50 日線</span><span><i style="background:var(--warm)"></i>200 日線</span><span>底部：成交量（綠 = 升市日）</span></div>
+      <div id="s-kbox" style="display:grid;gap:8px" hidden>
+        <span class="num small muted" id="ohlc"></span>
+        <svg class="chart" id="schart" viewBox="0 0 960 440" role="img" aria-label="日 K 線圖連 50 日及 200 日線同成交量"></svg>
+        <div class="legend"><span><i style="background:var(--accent)"></i>50 日線</span><span><i style="background:var(--warm)"></i>200 日線</span><span>底部：成交量（綠 = 升市日）</span></div>
+      </div>
+      <div id="s-tvbox" style="display:grid;gap:8px">
+        <div class="tvchart" id="tvchart"></div>
+        <p class="muted small" id="tv-note">圖表、數據同畫圖工具由 TradingView 提供（美股數據來自 Cboe One，有延遲），只供睇圖；可以喺圖上面揀時間週期（1 分鐘至月線）、加指標、用左邊工具畫線。本站嘅訊號、風險分同選股仍然只用上一個交易日嘅正式收市價。</p>
+      </div>
     </section>
     <section class="panel intra" id="s-intra" aria-labelledby="h-intra" hidden>
       <div class="sechead"><h3 id="h-intra">日內交易資訊 <span class="muted small" id="s-intra-t"></span></h3></div>
@@ -3211,6 +3220,7 @@ function showStock(t){
     [s.mvpp!=null&&s.mvpp>=20, `股價升 20% 或以上（${sgn(s.mvpp)}%）`],
   ].map(([b,l])=>`<li>${ok(b)}<span>${l}</span></li>`).join('');
   $('schart').innerHTML=''; $('ohlc').textContent='載入緊圖表…'; SD=null; window.SDX=null;
+  tvPaint();
   fetch(`s/${encodeURIComponent(t)}.json`).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{
     if(location.hash.slice(3)!==encodeURIComponent(t) && decodeURIComponent(location.hash.slice(3))!==t) return;
     SD=d; window.SDX=d; drawStock(); intraPaint(t);
@@ -3261,6 +3271,29 @@ function drawStock(){
   info(n-1);
 }
 [['r-63',63],['r-126',126],['r-260',260]].forEach(([id,k])=>$(id).onclick=()=>{setPressed(['r-63','r-126','r-260'],id);sRange=k;drawStock()});
+// TradingView 互動圖 (KC, 11-11): TradingView's free embed widget gives every timeframe (1 minute to month), zoom, crosshair,
+// indicators and drawing tools. Viewing only, with TradingView's own data; the site's signals keep using the official close.
+// Default since KC's pick (11-11); 本站日 K is one click away and the choice is remembered per browser.
+let CMODE=Store.get('cmode','tv'), TVKEY='';
+const tvSym=t=>t.replace(/-/g,'.');  // site keeps Yahoo's BRK-B, TradingView writes BRK.B
+function tvPaint(){
+  const on=CMODE==='tv', t=location.hash.startsWith('#s/')?decodeURIComponent(location.hash.slice(3)):null;
+  setPressed(['cm-k','cm-tv'], on?'cm-tv':'cm-k');
+  $('s-kbox').hidden=on; $('s-kctl').hidden=on; $('s-tvbox').hidden=!on;
+  if(!on||!t) return;
+  const theme=document.documentElement.dataset.theme==='light'?'light':'dark', key=t+'|'+theme;
+  if(key===TVKEY) return; TVKEY=key;
+  const box=$('tvchart'); box.innerHTML='<div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
+  const sc=document.createElement('script');
+  sc.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js'; sc.async=true; sc.type='text/javascript';
+  sc.text=JSON.stringify({autosize:true, symbol:tvSym(t), interval:'D', timezone:'America/New_York', theme, style:'1',
+    locale:'zh_TW', backgroundColor:getComputedStyle($('tvchart')).backgroundColor, allow_symbol_change:true, calendar:false,
+    hide_side_toolbar:false, withdateranges:true, details:false, hotlist:false, save_image:true,
+    support_host:'https://www.tradingview.com'});
+  box.firstChild.appendChild(sc);
+}
+document.querySelectorAll('.themesw button').forEach(b=>b.addEventListener('click',()=>{if(!$('s-tvbox').hidden) tvPaint()}));
+[['cm-k','k'],['cm-tv','tv']].forEach(([id,m])=>$(id).onclick=()=>{CMODE=m; Store.set('cmode',m); tvPaint(); if(m==='k') drawStock()});
 
 // ---------- stock rows arrive (stocks.js sets window.KCDT_STOCKS = {asof, k: [keys], r: [[values]]}) ----------
 function stocksReady(){
