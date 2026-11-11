@@ -92,6 +92,17 @@ def test_econ_labels():
     assert not cpi_m.get("per") and cpi_m["unconf"] and cpi_y["unconf"] and cpi_m["ref"] == "2026 年 10 月"
 
 
+def test_econ_housing_percent_row_is_month_on_month():
+    from kcdt.econ import label
+    rows = [dict(d="2026-11-18", u="2026-11-18T13:30Z", e="Housing Starts", a=None, c="1.33M", p="1.31M"),
+            dict(d="2026-11-18", u="2026-11-18T13:30Z", e="Housing Starts", a=None, c=None, p="-5.2%"),
+            dict(d="2026-11-17", u="2026-11-17T13:30Z", e="Retail Sales", a=None, c=None, p="6.29%"),
+            dict(d="2026-11-17", u="2026-11-17T13:30Z", e="Retail Sales", a=None, c=None, p="0.8%")]
+    label(rows, [])
+    assert rows[1]["per"] == "按月" and not rows[1].get("unconf")
+    assert rows[2]["unconf"] and rows[3]["unconf"]  # two % rows: still never guessed
+
+
 def test_econ_labels_remembered_and_notes():
     from kcdt.econ import label
     memory = {"CPI": {"0": "按月"}}  # old row-order format is dropped

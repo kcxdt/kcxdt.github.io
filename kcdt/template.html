@@ -2458,12 +2458,15 @@ DRAW.about = () => {
   const n=S.length, stale=!$('stale').hidden && !$('stale').classList.contains('soft');
   const old=S.filter(fStale).length;
   const ed=S.filter(s=>eNext(s)), conf=ed.filter(s=>s.econf).length, past=S.filter(pastDue).length;
-  const E=econRows(), unc=E.filter(e=>e.unconf).length, late=E.filter(e=>e.state==='late').length;
+  // 按月／按年 is confirmed from ForexFactory, which only lists the current week: next week's rows can't be confirmed
+  // before Monday, so only this week's unconfirmed rows count as something to look at
+  const wkEnd=(()=>{const n=nyNow(); n.setDate(n.getDate()+(6-n.getDay())); return ymd(n)})();
+  const E=econRows(), unc=E.filter(e=>e.unconf&&e.d<=wkEnd).length, uncNext=E.filter(e=>e.unconf&&e.d>wkEnd).length, late=E.filter(e=>e.state==='late').length;
   const rows=[
     ['價格、指數、市場寬度','Yahoo Finance',hkFmt(D.built),`${n.toLocaleString('en-US')} 隻股票，價格截至 ${D.asof} 收市`, stale?spill(2,'過期'):spill(0,'正常')],
     ['營收／EPS（基本面）','Nasdaq、Yahoo Finance',fNew?`最新 ${fNew}，最舊 ${FTS[0]}`:'—',`共 ${nfmt(n)} 隻：${fcovTxt}（市值、營收增長、機構持股、Beta）· 每隻約 7 日輪流更新，出咗業績嘅優先`, old?spill(1,`${old} 隻出咗業績未更新`)+' <a class="small" href="#screener" id="ab-stale">喺選股器睇</a>':spill(0,'正常')],
     ['業績日','Nasdaq 業績日曆、Yahoo Finance（公司已定＝已排期，其餘＝預計）',hkFmt(D.built),`美東日期＋盤前／盤後 · ${nfmt(ed.length)} 隻有下次日期，${nfmt(conf)} 隻已排期`, past?spill(1,`${past} 隻預計日已過，未確認公布（計到 ${D.asof}）`):spill(0,'正常')],
-    ['美國經濟數據','Nasdaq、ForexFactory（對照按月／按年）',hkFmt(D.econ_t||D.news_t),`今個星期同下個星期 ${E.length} 項`, late||unc?spill(1,[late&&`${late} 項等數據源更新`,unc&&`${unc} 項按月／按年未確認`].filter(Boolean).join('，')):spill(0,'正常')],
+    ['美國經濟數據','Nasdaq、ForexFactory（對照按月／按年）',hkFmt(D.econ_t||D.news_t),`今個星期同下個星期 ${E.length} 項${uncNext?` · 下星期有 ${uncNext} 項要到下星期一先分得出按月定按年（對照來源只出當週）`:''}`, late||unc?spill(1,[late&&`${late} 項等數據源更新`,unc&&`${unc} 項按月／按年未確認`].filter(Boolean).join('，')):spill(0,'正常')],
     ['市場新聞','Nasdaq',hkFmt(D.news_t),`${(D.news||[]).length} 條`, (D.news||[]).length?spill(0,'正常'):spill(2,'拎唔到')],
     ['盤前需知','Yahoo Finance（延遲報價）、US Treasury、Nasdaq','<span id="ab-pm-t">讀取中…</span>','美股交易日紐約時間約 05:50 整理一次 · <span id="ab-pm">讀取中…</span>','<span id="ab-pm-st"></span>'],
     ['恐懼與貪婪指數','CNN',hkFmt(D.built),D.fng?`${Math.round(D.fng.score)}`:'—', D.fng?spill(0,'正常'):spill(2,'拎唔到')],
@@ -2567,6 +2570,7 @@ function nextFetch(){ const now=new Date();
 const ESTATE={done:['已公布','up'],late:['已到公布時間，等數據源更新','muted'],wait:['待公布','muted'],bad:['資料異常','down'],
   out:['已發布','up'],ended:['已結束','up'],live:['進行中','up'],soon:['未開始','muted']};
 const ELINK=e=>e.link&&['out','ended','live'].includes(e.state)?` · <a href="${e.link}" target="_blank" rel="noopener">${/Press Conference/i.test(e.e)?'睇記者會（聯儲局網站）':/Minutes/i.test(e.e)?'聯儲局議息頁':'睇聲明原文（聯儲局網站）'}</a>`:'';
+const econWkEnd=()=>{const n=nyNow(); n.setDate(n.getDate()+(6-n.getDay())); return ymd(n)};
 function drawEcon(){
   const E=econRows().filter(e=>econAll||e.key), days={};
   const hkDay=e=>(e.t?new Date(e.t):new Date(e.d+'T12:00:00Z')).toLocaleDateString('en-CA',{timeZone:'Asia/Hong_Kong'});
@@ -2576,7 +2580,7 @@ function drawEcon(){
   const next=E.filter(e=>e.key&&e.t&&e.t>now).sort((a,b)=>a.t-b.t)[0];
   const card=d=>{const dd=new Date(d+'T12:00:00');
     return `<div class="panel tablewrap" style="padding:10px 12px"${d===today?' id="econ-today"':''}><h3 style="margin-bottom:6px"><span class="num">${d.slice(5)}</span> <span class="muted small">星期${WD[dd.getDay()]}${d===today?' · 今日':''}</span></h3><table><thead><tr><th>時間</th><th>數據</th><th>狀態</th><th class="r">實際</th><th class="r">預期</th><th class="r">前值</th></tr></thead><tbody>${days[d].sort((a,b)=>(a.t||0)-(b.t||0)).map(e=>{const z=econZh(e.e||''), [st,sc]=ESTATE[e.state];
-      return `<tr${e===next?' class="nextev"':''}><td class="num small">${hkTime(e)}</td><td class="small">${e.key?'<b>★</b> ':''}${z?`<b>${z}${e.per?`（${e.per}）`:''}</b> <span class="muted">${esc(e.e)}</span>`:`${esc(e.e||'')}${e.per?` <b>（${e.per}）</b>`:''}`}${e.unconf?` <span class="badge" title="今個星期 ForexFactory 未有呢項，前值又對唔到之前確認過嘅數字">按月／按年未確認</span>`:''}${e.ref?`<div class="muted small">統計期（按公布時間表推算）：${e.ref}</div>`:e.note?`<div class="muted small">${e.note}${ELINK(e)}</div>`:''}${e.state==='late'?`<div class="muted small">網站下次擷取約 ${hkFmt(nextFetch())}（香港時間）${e.src?` · <a href="${e.src}" target="_blank" rel="noopener">官方發布頁</a>`:''}</div>`:''}${e===next?' <span class="badge">下一項重要</span>':''}</td>
+      return `<tr${e===next?' class="nextev"':''}><td class="num small">${hkTime(e)}</td><td class="small">${e.key?'<b>★</b> ':''}${z?`<b>${z}${e.per?`（${e.per}）`:''}</b> <span class="muted">${esc(e.e)}</span>`:`${esc(e.e||'')}${e.per?` <b>（${e.per}）</b>`:''}`}${e.unconf?` <span class="badge" title="${e.d>econWkEnd()?'對照來源（ForexFactory）只出當週，下星期一先確認到':'今個星期 ForexFactory 未有呢項，前值又對唔到之前確認過嘅數字'}">${e.d>econWkEnd()?'按月／按年下星期確認':'按月／按年未確認'}</span>`:''}${e.ref?`<div class="muted small">統計期（按公布時間表推算）：${e.ref}</div>`:e.note?`<div class="muted small">${e.note}${ELINK(e)}</div>`:''}${e.state==='late'?`<div class="muted small">網站下次擷取約 ${hkFmt(nextFetch())}（香港時間）${e.src?` · <a href="${e.src}" target="_blank" rel="noopener">官方發布頁</a>`:''}</div>`:''}${e===next?' <span class="badge">下一項重要</span>':''}</td>
       <td class="small ${sc}" style="white-space:nowrap">${st}</td><td class="r num"><b>${e.a||'—'}</b></td><td class="r num muted">${e.c||'—'}</td><td class="r num muted">${e.p||'—'}</td></tr>`}).join('')}</tbody></table></div>`};
   const ks=Object.keys(days).sort(), past=ks.filter(d=>d<today), rest=ks.filter(d=>d>=today);
   $('econ').innerHTML = (past.length?`<details class="panel" style="padding:10px 12px"><summary class="small" style="cursor:pointer">之前 ${past.length} 日嘅數據</summary><div style="display:grid;gap:12px;margin-top:10px">${past.map(card).join('')}</div></details>`:'')

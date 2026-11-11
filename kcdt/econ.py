@@ -16,6 +16,7 @@ import requests
 
 FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
 PER = {"m/m": "按月", "y/y": "按年", "q/q": "按季（年率）"}
+MOM_OF_LEVEL = r"^(existing home sales|new home sales|building permits|housing starts)$"
 
 # Events that have no reference period: say what they are. A callable gets the release date.
 NOTES = [
@@ -195,6 +196,11 @@ def label(rows, ff, memory=None):
                     y["per"] = "按年" if x["per"] == "按月" else "按月"
             if a.get("imp") or b.get("imp"):
                 a["imp"] = b["imp"] = max(a.get("imp") or 0, b.get("imp") or 0) or None
+    # 3b) Housing counts come as the level ("1.33M") plus one % row, which is the change from the month before
+    for g in groups.values():
+        p = [x for x in g if pct(x)]
+        if len(g) > 1 and len(p) == 1 and not p[0].get("per") and re.search(MOM_OF_LEVEL, key(p[0]), re.I):
+            p[0]["per"] = "按月"
     # 4) Remember the numbers of every known row; a number seen in both 按月 and 按年 rows is useless
     for r in rows:
         if r.get("per") and pct(r):

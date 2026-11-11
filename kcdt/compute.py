@@ -142,6 +142,13 @@ def nasdaq_qend(f):
                 if n and len(y) > i and None not in (n[0], y[i])]
         if same and all(same):
             return (pd.Timestamp(q) - pd.DateOffset(months=3 * i)).strftime("%Y-%m-%d")
+    # Banks and REITs: the two sources define revenue differently, so it never matches. Two quarters of EPS in a
+    # row that agree place Nasdaq's history just as well.
+    eps_ok = lambda a, b: _same(a, b, 0.02, 0.011)
+    for i in range(2):
+        if len(neps) >= 2 and len(epsq) > i + 1 and eps_ok(neps[0], epsq[i]) and eps_ok(neps[1], epsq[i + 1]) \
+                and neps[0] != neps[1]:
+            return (pd.Timestamp(q) - pd.DateOffset(months=3 * i)).strftime("%Y-%m-%d")
     return None
 
 
@@ -209,13 +216,15 @@ def ny_session(ts):
 
 def yahoo_next(f, y):
     """Yahoo's report time for one stock from whichever copy is newer: the fundamentals record `f` or the
-    earnings-date check `y`. Returns (date, "bmo"/"amc"/None, scheduled); the time only when Yahoo says the date
-    is the company's own (not a guess)."""
+    earnings-date check `y`. Returns (date, "bmo"/"amc"/None, scheduled, seen); the time only when Yahoo says the
+    date is the company's own (not a guess). seen: the New York day that copy was fetched; a date already behind
+    it is Yahoo still showing the last report, not an expected one."""
     f, y = f or {}, y or {}
     fresh = y.get("ts") and (not f.get("edate") or f["edate"] <= y.get("_ts", 0) or y.get("_ts", 0) >= f.get("_ts", 0))
     src = y if fresh else {"ts": f.get("edate"), "est": f.get("eest")}
     ts = src.get("ts")
-    return ny_day(ts), (ny_session(ts) if src.get("est") is False else None), src.get("est") is False
+    seen = ny_day(y.get("_ts") if fresh else f.get("_ts"))
+    return ny_day(ts), (ny_session(ts) if src.get("est") is False else None), src.get("est") is False, seen
 
 
 def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates=None):
@@ -299,7 +308,17 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             row["ind"] = p["ind"]
         if fund.get(t, {}).get("_ts"):
             row["fts"] = pd.Timestamp(fund[t]["_ts"], unit="s").strftime("%Y-%m-%d")
-        yd, yt, ysure = yahoo_next(fund.get(t), (ydates or {}).get(t))
+        yd, yt, ysure, yseen = yahoo_next(fund.get(t), (ydates or {}).get(t))
+        # Yahoo keeps showing the last report's date until the company sets the next one. A date that was already
+        # behind us when it was fetched is therefore no expected date: when Yahoo marks it as the company's own it
+        # is the last report (closed-end funds and half-yearly ADRs showed dates from 2020-2025 as 預計日已過);
+        # an estimate that old says nothing, unless it is from the last two weeks and may simply be running late.
+        if yd and yseen and yd < yseen:
+            if ysure:
+                row["erep"] = max(row.get("erep") or "", yd)
+                yd = None
+            elif (pd.Timestamp(asof) - pd.Timestamp(yd)).days > 14:
+                yd = None
         if yd:
             row["edate"], row["etime"] = yd, yt
             if ysure:
