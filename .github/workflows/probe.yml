@@ -1,0 +1,25 @@
+name: probe
+on:
+  push:
+    branches: [claude/project-thread-1r9hnc]
+    paths: [.github/workflows/probe.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Economic calendar with the new code
+        run: |
+          python - <<'PY'
+          from kcdt.fetch import economic_calendar
+          rows = economic_calendar(days_file="/tmp/econ_days.json")
+          for r in rows:
+              if any(k in r["e"] for k in ("CPI", "Jobless", "PPI", "Crude Oil Inventories", "Wholesale Inv", "NFIB", "MBA Mortgage App")):
+                  print(r["d"], r["u"], r["e"], "a", r["a"], "c", r["c"], "p", r["p"], r.get("per"))
+          PY
