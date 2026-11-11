@@ -146,6 +146,44 @@ def earnings(today, stocks):
     return sorted(out_today, key=key), sorted(done, key=key), sorted(out_next, key=key)
 
 
+def live_results(data, now, prev=None):
+    """Same-day results for today's large reporters (Nasdaq-100 or 100 億美元+), so the 盤前需知 page can show
+    actual EPS and the extended-hours move that evening instead of the next morning. Pre-market reporters are
+    looked up from 07:00 New York, after-close ones from 16:00; results found earlier the same day are kept.
+    Returns {d, t, rows}, or None on a weekend or before 07:00."""
+    today = now.strftime("%Y-%m-%d")
+    m = now.hour * 60 + now.minute
+    if now.weekday() >= 5 or m < 420:
+        return None
+    by = {s["s"]: s for s in data.get("stocks") or []}
+    big = lambda s: s.get("ndx") or (s.get("mcap") or 0) >= 10
+    old = {r["s"]: r for r in (prev or {}).get("rows", [])} if (prev or {}).get("d") == today else {}
+    rows = []
+    for r in _earn_day(today):
+        t = (r.get("symbol") or "").strip().replace(".", "-")
+        if t not in by or not big(by[t]):
+            continue
+        tm = EARN_TIME.get(r.get("time"))
+        row = dict(s=t, tm=tm, est=_money(r.get("epsForecast")))
+        if old.get(t, {}).get("rep") is not None:
+            row.update({k: old[t][k] for k in ("est", "rep", "sur") if old[t].get(k) is not None})
+        elif m >= (420 if tm == "bmo" else 960):
+            eps = reported_eps(t, today)
+            if eps:
+                row.update({k: v for k, v in eps.items() if v is not None})
+            time.sleep(0.3)
+        rows.append(row)
+    if not rows:
+        return dict(d=today, t=now_utc(), rows=[])
+    mv = movers(_yf_bars(sorted(r["s"] for r in rows), "5d", "5m", True), now)
+    for r in rows:
+        x = mv.get(r["s"])
+        if x and x["t"][:10] >= today:
+            r["mv"] = dict(pct=x["pct"], when=x["when"], t=x["t"])
+    print(f"live results {today}: {sum(r.get('rep') is not None for r in rows)} of {len(rows)} reported")
+    return dict(d=today, t=now_utc(), rows=rows)
+
+
 def movers(bars, now):
     """Extended-hours move against the last regular-session close, per ticker. bars: {ticker: 5-minute frame}.
     "pre" when the latest quote is from a later day than that close (this morning), else "post" (after the close)."""
