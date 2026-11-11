@@ -2142,13 +2142,23 @@ const pmDaily = (x, b) => { const live=pmLive(x,b);
     live?`${x.d} 最新（未收市，報告時嘅價）· ${x.src||'Yahoo'}`:`${x.d} 收市 · ${x.src||'Yahoo'} 日線`, x.link, x.src?`${x.src} 每日息率`:`Yahoo ${x.sym}`) };
 const pmEtf = x => pmCard(`${x.k} ${x.n}`, x.when==='pre'?'盤前':'盤後', `${f(x.v)} <span class="small ${cls(x.pct)}">${sgn(x.pct,2)}%</span>`, `較昨日收市 ${f(x.c)} · ${hkFmt(x.t)} 香港時間<br>盤前成交少，價格只供參考 · Yahoo`, x.link, `Yahoo ${x.k}`);
 let pmScope='ndx';
-// once the report times in this brief have passed (New York clock), the 今日 table is only the plan: say where the results show up
-function pmEarnPast(b, rows){
+// 今日出業績: the brief's morning list, plus the results the econ refresh found since (D.earn_live, same day only).
+// Once a row's report time has passed and no result is in yet, a note says when it will show up.
+function pmToday(b, rows, nm){
+  const L=(D.earn_live&&D.earn_live.d===b.d)?D.earn_live:null, R=Object.fromEntries(((L&&L.rows)||[]).map(r=>[r.s,r]));
   const n=nyNow(), day=ymd(n), m=n.getHours()*60+n.getMinutes();
   const past=e=>day>b.d || (day===b.d && m>=(e.tm==='bmo'?570:e.tm==='amc'?990:1440));
-  const gone=rows.filter(past);
-  if(!gone.length) return '';
-  return `<p class="muted small" style="margin-top:8px">${gone.length===rows.length?'上面全部':`${gone.slice(0,4).map(e=>e.s).join('、')}${gone.length>4?` 等 ${gone.length} 隻`:''}`}嘅公布時間已經過咗，呢張表只係報告整理時（${hkFmt(b.t)} 香港時間）嘅預告，唔會自己更新。實際 EPS 同盤後變動會喺下一份盤前報告（美東 ${b.nd?b.nd.slice(5):'下個交易日'} 早上約 6 點出）嘅「已出業績」顯示。</p>`;
+  const got=rows.filter(e=>R[e.s]&&R[e.s].rep!=null), res=!!got.length;
+  const mv=r=>r&&r.mv?`<span class="${cls(r.mv.pct)}">${sgn(r.mv.pct,1)}%</span> <span class="muted small">${r.mv.when==='pre'?'盤前':'盤後'}</span>`:'<span class="muted">—</span>';
+  const tr=e=>{const r=R[e.s], est=r&&r.est!=null?r.est:e.est;
+    return `<tr><td>${nm(e.s)}</td><td class="small">${ETIME[e.tm]||'未公佈'}</td><td class="small">${esc(e.n||'')}</td><td class="r num">${est==null?'—':f(est)}</td>${res?`<td class="r num"><b>${r&&r.rep!=null?f(r.rep):'—'}</b></td><td class="r num ${cls(r&&r.sur)}">${r&&r.sur!=null?sgn(r.sur,1)+'%':'—'}</td><td class="r num">${mv(r)}</td>`:''}</tr>`};
+  const table=`<table class="cen"><thead><tr><th>代號</th><th>時間</th><th>公司</th><th class="r">EPS 預期</th>${res?'<th class="r">EPS 實際</th><th class="r">差距</th><th class="r">延長時段</th>':''}</tr></thead><tbody>${rows.sort((a,c)=>((ETORD[a.tm]??2)-(ETORD[c.tm]??2))).map(tr).join('')||`<tr><td colspan="${res?7:4}" class="muted">冇</td></tr>`}</tbody></table>`;
+  const wait=rows.filter(e=>past(e)&&!(R[e.s]&&R[e.s].rep!=null));
+  const who=wait.length===rows.length?'上面全部':`${wait.slice(0,4).map(e=>e.s).join('、')}${wait.length>4?` 等 ${wait.length} 隻`:''}`;
+  const notes=[];
+  if(res) notes.push(`實際 EPS 同延長時段變動喺報告之後自動補上（最後檢查：${hkFmt(L.t)} 香港時間，Yahoo 數據）。只計 Nasdaq-100 同市值 100 億美元以上。`);
+  if(wait.length) notes.push(`${who}嘅公布時間已經過咗，但仲未有實際 EPS。收市後網站會喺美東約 17:00 同 19:00 自動再查（Yahoo 通常公布後一兩個鐘先有數）；最遲下一份盤前報告（美東 ${b.nd?b.nd.slice(5):'下個交易日'} 早上約 6 點）嘅「已出業績」會有。`);
+  return table+(notes.length?`<p class="muted small" style="margin-top:8px">${notes.join('<br>')}</p>`:'');
 }
 function pmEarn(b){
   const M=b.movers||{}, pick=e=>pmScope==='all'||(pmScope==='ndx'?e.ndx:WL.has(e.s));
@@ -2158,7 +2168,7 @@ function pmEarn(b){
   return `<div class="controls" id="pm-scope">${[['ndx','Nasdaq-100'],['wl','自選'],['all','全部（市值 100 億美元以上先有 EPS）']].map(([k,l])=>`<button class="tog" data-k="${k}" aria-pressed="${k===pmScope}">${l}</button>`).join('')}</div>
   <div class="cols2" style="align-items:start">
     <div class="panel tablewrap"><h3>已出業績 <span class="muted small">隔晚盤後同今早盤前</span></h3><table class="cen"><thead><tr><th>代號</th><th>時間</th><th class="r">EPS 實際</th><th class="r">預期</th><th class="r">差距</th><th class="r">延長時段</th></tr></thead><tbody>${done.map(e=>`<tr><td>${nm(e.s)}</td><td class="small">${e.d.slice(5)} ${ETIME[e.tm]||''}</td><td class="r num">${f(e.rep)}</td><td class="r num">${f(e.est)}</td><td class="r num ${cls(e.sur)}">${e.sur==null?'—':sgn(e.sur,1)+'%'}</td><td class="r num">${mv(e.s)}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">冇（或者數據源未更新）</td></tr>'}</tbody></table></div>
-    <div class="panel tablewrap"><h3>今日 · 美東 ${b.d.slice(5)}${wdZh(b.d)}出業績 <span class="muted small">${today.length} 隻</span></h3><table class="cen"><thead><tr><th>代號</th><th>時間</th><th>公司</th><th class="r">EPS 預期</th></tr></thead><tbody>${today.sort((a,b)=>((ETORD[a.tm]??2)-(ETORD[b.tm]??2))).map(e=>`<tr><td>${nm(e.s)}</td><td class="small">${ETIME[e.tm]||'未公佈'}</td><td class="small">${esc(e.n||'')}</td><td class="r num">${e.est==null?'—':f(e.est)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">冇</td></tr>'}</tbody></table>${pmEarnPast(b,today)}</div>
+    <div class="panel tablewrap"><h3>今日 · 美東 ${b.d.slice(5)}${wdZh(b.d)}出業績 <span class="muted small">${today.length} 隻</span></h3>${pmToday(b,today,nm)}</div>
     ${b.earn_next?`<div class="panel tablewrap"><h3>${b.nd?pmNextLbl(b):'下個交易日'}出業績 <span class="muted small">${next.length} 隻</span></h3><table class="cen"><thead><tr><th>代號</th><th>時間</th><th>公司</th><th class="r">EPS 預期</th></tr></thead><tbody>${next.sort((a,b)=>((ETORD[a.tm]??2)-(ETORD[b.tm]??2))).map(e=>`<tr><td>${nm(e.s)}</td><td class="small">${ETIME[e.tm]||'未公佈'}</td><td class="small">${esc(e.n||'')}</td><td class="r num">${e.est==null?'—':f(e.est)}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">冇</td></tr>'}</tbody></table></div>`:''}
   </div>`;
 }

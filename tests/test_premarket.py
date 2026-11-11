@@ -36,6 +36,32 @@ def test_daily_last_and_prev_bday():
     assert pm.prev_bday("2026-11-02") == "2026-10-30"
 
 
+def test_live_results(monkeypatch):
+    data = {"stocks": [{"s": "CRWV", "ndx": True}, {"s": "BIG", "mcap": 50}, {"s": "TINY", "mcap": 2}, {"s": "AM", "mcap": 20}]}
+    cal = [{"symbol": "CRWV", "time": "time-after-hours", "epsForecast": "($1.45)"},
+           {"symbol": "BIG", "time": "time-pre-market", "epsForecast": "$0.50"},
+           {"symbol": "TINY", "time": "time-after-hours", "epsForecast": "$0.10"},
+           {"symbol": "AM", "time": "time-after-hours", "epsForecast": "$1.00"}]
+    monkeypatch.setattr(pm, "_earn_day", lambda d: cal)
+    asked = []
+    eps = {"CRWV": dict(est=-1.45, rep=-1.27, sur=12.4), "BIG": dict(est=0.5, rep=0.6, sur=20.0)}
+    monkeypatch.setattr(pm, "reported_eps", lambda t, d: asked.append(t) or eps.get(t))
+    monkeypatch.setattr(pm, "_yf_bars", lambda *a: {})
+    monkeypatch.setattr(pm.time, "sleep", lambda s: None)
+    # 10:00 New York: only the pre-market reporter is looked up; the small cap is left out
+    out = pm.live_results(data, pd.Timestamp("2026-11-10 10:00", tz=NY))
+    assert asked == ["BIG"] and [r["s"] for r in out["rows"]] == ["CRWV", "BIG", "AM"]
+    # 17:00: after-close ones too, and BIG's earlier result is kept without asking again
+    asked.clear()
+    out = pm.live_results(data, pd.Timestamp("2026-11-10 17:00", tz=NY), out)
+    assert asked == ["CRWV", "AM"]
+    r = {x["s"]: x for x in out["rows"]}
+    assert r["CRWV"]["rep"] == -1.27 and r["BIG"]["rep"] == 0.6 and "rep" not in r["AM"]
+    # a weekend or before 07:00 does nothing
+    assert pm.live_results(data, pd.Timestamp("2026-11-14 17:00", tz=NY)) is None
+    assert pm.live_results(data, pd.Timestamp("2026-11-10 06:00", tz=NY)) is None
+
+
 if __name__ == "__main__":
     test_movers()
     test_daily_last_and_prev_bday()

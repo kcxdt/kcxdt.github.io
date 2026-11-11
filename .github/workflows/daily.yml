@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: write  # push the day's snapshot to the history branch
+  actions: write   # start econ.yml after the close, which looks up the evening's earnings results
   pages: write
   id-token: write
   issues: write
@@ -117,3 +118,12 @@ jobs:
           for n in $(gh issue list --label update-failed --state open --json number -q '.[].number'); do
             gh issue close "$n" --comment "Fixed: $RUN_URL"
           done
+      # Earnings released after the close: econ.yml (kcdt.refresh) looks up today's results and publishes them.
+      # Every evening call of this workflow starts one, including the backup calls that stop in seconds because
+      # the close is already built (Worker 16:40 / 18:40 New York, GitHub's later slots), so results that Yahoo
+      # posts an hour or two after the release still reach the page that evening.
+      - name: Look up tonight's earnings results
+        if: needs.build.result == 'success' && needs.deploy.result != 'failure'
+        run: |
+          h=$(TZ=America/New_York date +%H); d=$(TZ=America/New_York date +%u)
+          if [ "$d" -le 5 ] && [ "$((10#$h))" -ge 16 ]; then gh workflow run econ.yml --ref main; else echo "not a weekday evening in New York"; fi
