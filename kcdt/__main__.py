@@ -9,7 +9,7 @@ import pandas as pd
 from datetime import datetime, timezone
 
 from .checks import run as run_checks
-from .compute import build, stock_pages, wants_fundamentals
+from .compute import build, kc_technical, stock_pages, wants_fundamentals
 from .mkt import HOLIDAYS, NY, close_due
 from .fetch import (earnings_calendar, earnings_dates, economic_calendar, fear_greed, fetch_prices, fundamentals,
                     headlines, nasdaq_quarters, profiles, reported_after_fetch, report_times, retry_due, universe)
@@ -232,7 +232,7 @@ def main():
     print(f"fundamentals: {len(extra)} stocks outside the screener pool reported since their last fetch")
     pool, want = set(want), sorted(set(want) | extra)
     del cached
-    fund = fundamentals(want, fpath, max_calls=budget["fund"], reports=reports, first=pool)
+    fund = fundamentals(want, fpath, max_calls=budget["fund"], reports=reports, first=pool, hot=kc_technical(px, meta))
     say("fundamentals")
     nq_rep = {t: r["erep"] for t, r in fund.items() if r.get("erep")}
     for t, ts in reports.items():

@@ -289,9 +289,10 @@ def retry_due(rec, report, now):
             and now - rec.get("_ts", 0) >= RETRY_AFTER)
 
 
-def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, reports=None, first=None):
-    """Refresh stale entries for `tickers`: companies that just reported first, then the ones whose last fetch was
-    still the quarter before (retried), then old schema, then oldest.
+def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, reports=None, first=None, hot=None):
+    """Refresh stale entries for `tickers`: companies that just reported first, then stocks passing KC's technical
+    conditions (`hot`) whose record is due, then the ones whose last fetch was still the quarter before (retried),
+    then old schema, then oldest.
 
     reports: {ticker: unix time} from report_times(): Nasdaq's calendar confirms reports that Yahoo's cached
     earnings date missed (it had already moved on, or had none), so those count as just reported too.
@@ -309,7 +310,8 @@ def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, 
     retry = {t for t in tickers if t in cache and t not in just and retry_due(cache[t], reports.get(t), now)}
     stale = sorted((t for t in tickers if t in just or t in retry or age(t)[0] is False
                     or now - age(t)[1] > max_age_days * 86400),
-                   key=lambda t: (0 if t in just else 1 if t in retry else 2, first is not None and t not in first, age(t)))
+                   key=lambda t: (0 if t in just else 1 if hot and t in hot else 2 if t in retry else 3,
+                                  first is not None and t not in first, age(t)))
     print(f"fundamentals: {len(just)} reported since last fetch, refreshing those first; "
           f"{len(retry)} still on the quarter before their report, trying again")
     done = fails = 0
