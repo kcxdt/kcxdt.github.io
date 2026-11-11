@@ -1085,16 +1085,23 @@ const LIVE_URL='https://kcdt-timer.chovy723.workers.dev';  // the Worker's addre
 if(!LIVE_URL) document.documentElement.classList.add('nolive');  // hides the 延遲價 column until the address is set
 const LQ={}, LSESS={pre:'盤前',reg:'',post:'盤後'};
 const lHM=t=>new Date(t*1000).toLocaleTimeString('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit'});
-const lChg=q=>q&&q.prev?(q.p/q.prev-1)*100:null;
-function liveCell(t, journal){ const q=LQ[String(t).toUpperCase()]; if(!q) return '—';
+// % change is measured from the site's own official close when it is the right day (Yahoo's last 5-minute bar is not
+// the closing-auction price, so the Worker's "prev" can be a few cents off); the Worker's "prev" is the fallback.
+const lDay=t=>new Date(t*1000).toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+function lBase(q, t){ const s=typeof BY!=='undefined'&&BY[t], d=lDay(q.at), asof=typeof D!=='undefined'&&D.asof;
+  if(s&&s.c&&asof){ if(q.sess==='post'&&asof===d) return s.c;
+    if(q.sess!=='post'&&asof<d&&(new Date(d)-new Date(asof))/864e5<=4) return s.c }
+  return q.prev }
+const lChg=(q,t)=>{ const b=q&&lBase(q,t); return b?(q.p/b-1)*100:null };
+function liveCell(t, journal){ const T=String(t).toUpperCase(), q=LQ[T]; if(!q) return '—';
   const when=`${LSESS[q.sess]?LSESS[q.sess]+' ':''}${lHM(q.at)}`;
   return journal ? `<span class="muted small" title="未平倉，呢個係延遲 15 分鐘嘅現價，唔計入盈虧">現價 ${f(q.p)} · ${when}</span>`
-    : `${f(q.p)} <span class="${cls(lChg(q))} small">${sgn(lChg(q),2)}%</span><div class="muted small" style="line-height:1.2">${when}</div>` }
+    : `${f(q.p)} <span class="${cls(lChg(q,T))} small">${sgn(lChg(q,T),2)}%</span><div class="muted small" style="line-height:1.2">${when}</div>` }
 function livePaint(){
   document.querySelectorAll('[data-live]').forEach(e=>{ if(LQ[e.dataset.live.toUpperCase()]) e.innerHTML=liveCell(e.dataset.live, e.dataset.jl) });
   const e=$('s-live'), t=location.hash.startsWith('#s/')?decodeURIComponent(location.hash.slice(3)):null, q=t&&LQ[t];
   if(!e) return; e.hidden=!q; if(!q) return;
-  const c=lChg(q), base=q.sess==='post'?'今日收市':'上日收市';
+  const c=lChg(q,t), base=q.sess==='post'?'今日收市':'上日收市';
   e.innerHTML=`延遲價 <b class="num" style="color:var(--ink)">${f(q.p)}</b>${c==null?'':` <span class="${cls(c)}">${sgn(c,2)}%</span> 對${base}`}<br>${LSESS[q.sess]||'交易時段'} · 美東 ${lHM(q.at)} · 延遲最少 15 分鐘`;
 }
 // Ask for whatever is on screen now: watchlist rows, open journal rows, the stock page. Groups of 25 (the Worker's limit).
