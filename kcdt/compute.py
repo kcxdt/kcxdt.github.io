@@ -23,7 +23,7 @@ INDICES = [("^GSPC", "S&P 500"), ("^IXIC", "Nasdaq 綜合"), ("^DJI", "道指"),
            ("IWM", "羅素 2000 (IWM)"), ("RSP", "等權 S&P (RSP)"), ("^VIX", "VIX")]
 
 # (ticker, name, what the number is): Russell 2000 is shown through the IWM ETF, so its price is in dollars
-MINIS = [("^GSPC", "S&P 500", "指數 · 點"), ("^IXIC", "Nasdaq 綜合", "指數 · 點"), ("^DJI", "道瓊斯工業", "指數 · 點"),
+MINIS = [("^NDX", "Nasdaq-100", "指數 · 點"), ("^GSPC", "S&P 500", "指數 · 點"), ("^IXIC", "Nasdaq 綜合", "指數 · 點"), ("^DJI", "道瓊斯工業", "指數 · 點"),
          ("IWM", "羅素 2000", "IWM ETF · 美元")]
 
 # GICS (Wikipedia) -> Yahoo/finviz sector names, and Chinese labels
@@ -388,16 +388,20 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
                          b50=_f(above50[d], 1), b200=_f(above200[d], 1),
                          n50=_f(nd50[d], 1), n200=_f(nd200[d], 1)))
 
-    def pct(t, k):
+    def pct(t, k, back=0):
         s = close[t].dropna()
-        return _f((s.iloc[-1] / s.iloc[-1 - k] - 1) * 100)
+        if len(s) < k + back + 1:
+            return None
+        return _f((s.iloc[-1 - back] / s.iloc[-1 - k - back] - 1) * 100)
 
     def ytd(t):
         s = close[t].dropna()
         base = s[s.index.year < s.index[-1].year]
         return _f((s.iloc[-1] / base.iloc[-1] - 1) * 100) if len(base) else None
 
-    sectors = [dict(t=t, n=n, d1=pct(t, 1), d5=pct(t, 5), d10=pct(t, 10), h6=pct(t, 126), ytd=ytd(t))
+    # m1 = one month (21 sessions); pv = the same periods ending the session before, for 較昨日排名
+    sectors = [dict(t=t, n=n, d1=pct(t, 1), d5=pct(t, 5), d10=pct(t, 10), m1=pct(t, 21), h6=pct(t, 126), ytd=ytd(t),
+                    pv=dict(d1=pct(t, 1, 1), d5=pct(t, 5, 1), m1=pct(t, 21, 1)))
                for t, n in SECTORS if t in close]
     idx = [dict(n=n, l=_f(close[t].dropna().iloc[-1]), p=_f(close[t].dropna().iloc[-2]))
            for t, n in INDICES if t in close]
@@ -465,6 +469,20 @@ def wants_fundamentals(px, meta):
     ok = (last > 20) & (last > ma50 * 0.97) & (ma50 > ma200 * 0.97) & (v.rolling(50).mean().iloc[-1] > 50_000)
     picked = set(ok[ok].index) | {t for t in tick if meta.at[t, "ndx"]}
     return sorted(picked)
+
+
+def kc_technical(px, meta):
+    """Tickers passing the technical half of KC's default screener on the last close (above the 50-day line, 50 above
+    200, volume over 50k, price over 20): if their fundamentals are due, they are fetched ahead of the rest, so a
+    stock that newly qualifies is judged on current numbers."""
+    days = px["Close"]["^GSPC"].dropna().index
+    c = px["Close"].loc[days]
+    tick = [t for t in meta.index if t in c]
+    c, v = c[tick], px["Volume"].loc[days][tick]
+    last = c.iloc[-1]
+    ma50, ma200 = c.rolling(50).mean().iloc[-1], c.rolling(200).mean().iloc[-1]
+    ok = (last > 20) & (last > ma50) & (ma50 > ma200) & (v.iloc[-1] > 50_000)
+    return set(ok[ok].index)
 
 
 def _clean(px):

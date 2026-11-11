@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 
-from kcdt.compute import DOW30, INDICES, SECTORS, build, stock_pages, wants_fundamentals
+from kcdt.compute import DOW30, INDICES, SECTORS, build, kc_technical, stock_pages, wants_fundamentals
 
 GICS = ["Information Technology", "Communication Services", "Consumer Discretionary",
         "Financials", "Health Care", "Industrials", "Energy"]
@@ -86,6 +86,8 @@ def test_build():
     meta = fake_meta(universe)
     want = wants_fundamentals(px, meta)
     assert len(want) >= 100
+    hot = kc_technical(px, meta)
+    assert hot and hot <= set(want)  # the strict technical pass is inside the looser fundamentals pool
     fng = dict(score=42.0, rating="fear", prev=40.1, w1=35.0, m1=55.2, y1=60.0, ts="2026-10-27",
                hist=[["2026-%02d-%02d" % (1 + i // 28, 1 + i % 28), 30 + (i * 7) % 50] for i in range(250)], live=True)
     fund = fake_fund(want)
@@ -115,7 +117,7 @@ def test_build():
     assert all(0 <= h["score"] <= 16 for h in d["hist"])
     assert d["breadth"]["ndx"]["n"] == 100 and d["nfund"] == len(want)
     assert d["breadth"]["usa"]["n"] == 1105 and d["breadth"]["all"]["n"] == 1000
-    assert len(d["minis"]) == 4 and len(d["minis"][0]["c"]) == 60
+    assert len(d["minis"]) == 5 and d["minis"][0]["n"] == "Nasdaq-100" and len(d["minis"][0]["c"]) == 60
     ranks = [s["rsr"] for s in d["stocks"]]
     assert min(ranks) == 1 and max(ranks) == 99
     f0 = next(s for s in d["stocks"] if s["s"] == want[0])

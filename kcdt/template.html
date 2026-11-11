@@ -92,7 +92,7 @@ nav.tabs .side-brand,nav.tabs .side-foot,nav.tabs .navmore,.navsheet{display:non
   .top .brand{display:none}
 }
 nav.tabs a.stk{font-family:var(--f-data)}
-.stamps span.m{display:none}
+.stamps .m{display:none}
 @media (max-width:640px){
   nav.tabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-behavior:smooth;margin-inline:-16px;padding-inline:8px;
     mask-image:linear-gradient(90deg,transparent 0,#000 12px,#000 calc(100% - 24px),transparent)}
@@ -103,9 +103,8 @@ nav.tabs a.stk{font-family:var(--f-data)}
   .navsheet:not([hidden]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;margin-top:-10px;padding:14px 16px}
   .navsheet div{display:grid;gap:2px;align-content:start}
   .navsheet a{text-decoration:none;color:var(--ink);padding:7px 0;font-size:15px}
-  .top .badge{display:none}
-  .stamps span{display:none}
-  .stamps span.m{display:inline}
+  .stamps .d{display:none}
+  .stamps .m{display:inline}
 }
 .view{display:grid;gap:22px}.view>*,#hx{min-width:0}
 
@@ -176,7 +175,17 @@ button.csort:hover{color:var(--ink)}
 .brief{display:grid;gap:6px;padding:14px 16px}
 .brief ul{margin:0;padding-left:1.2em;display:grid;gap:4px;font-size:14px}
 .brief details summary{cursor:pointer;color:var(--accent);width:max-content}.brief details ul{margin-top:6px;font-size:13.5px}
-.stamps{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;color:var(--muted);margin-top:-12px}
+.stamps{font-size:13px;color:var(--muted);margin-top:-12px}
+.stamps summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 8px}
+.stamps summary::-webkit-details-marker{display:none}
+.stamps summary b{font-weight:500;color:var(--ink)}
+.stamps summary i{font-style:normal;color:var(--line)}
+.stamps summary u{text-decoration:none;color:var(--link)}
+.stamps[open] summary u::after{content:" ▴"}.stamps:not([open]) summary u::after{content:" ▾"}
+.stamps .dot{width:8px;height:8px;border-radius:50%;background:var(--up);align-self:center;flex:none}
+.stamps .dot.w{background:var(--warm)}.stamps .dot.b{background:var(--down)}
+.stamps ul{margin:8px 0 0;padding:10px 14px 10px 28px;background:var(--panel);border:1px solid var(--line);border-radius:8px;display:grid;gap:3px}
+.nw{white-space:nowrap}
 .chg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;align-items:start}
 .chg-grid ul{list-style:none;margin:0;padding:0;font-size:13.5px}
 .chg-grid li{padding:5px 0;border-bottom:1px solid var(--soft);display:flex;gap:8px;align-items:baseline}
@@ -481,12 +490,22 @@ nav.tabs a em{font-style:normal}
 .ov-date{border-bottom:1px solid var(--line);padding-bottom:14px;font-size:13px;color:var(--muted)}
 .ov-date b{color:var(--accent);font-weight:500}
 .intra .stats small{display:block;font-size:12px;margin-top:2px}
-.ov-delta{margin-bottom:16px}
+.ov-top{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);gap:16px;align-items:start}
+.ov-res ol{margin:0;padding:0;list-style:none;display:grid;gap:10px;counter-reset:r}
+.ov-res li{display:grid;grid-template-columns:22px auto 1fr;gap:2px 8px;align-items:baseline;font-size:14px;counter-increment:r}
+.ov-res li::before{content:counter(r);color:var(--muted);font-size:12px;grid-row:span 2}
+.ov-res li .ov-co{grid-column:2/-1;white-space:normal}
+.ov-tag{font-size:11.5px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;justify-self:start}
+.ov-note{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.6}
+.ov-rest{margin-top:8px!important}
+.ov-sec>div>em{font-style:normal;font-size:12px;text-align:right}
 .ov-delta ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
 .ov-delta li{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;font-size:14px;line-height:1.5}
 .ov-delta li>span{color:var(--muted);font-size:13px}
+@media (max-width:640px){.ov-delta li .d{display:none}}
 .ov-more{margin-top:12px}.ov-more summary{cursor:pointer;font-size:13px;color:var(--muted)}
-.ov-more ul{display:block}.ov-more li{display:list-item;margin-left:18px;grid-template-columns:none}
+.ov-more ul:not(.ov-rest){display:block}.ov-more ul:not(.ov-rest) li{display:list-item;margin-left:18px;grid-template-columns:none}
+.ov-more+.ov-more{margin-top:6px}
 .ov-3{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:16px}
 .ov-2{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(300px,1fr);gap:16px}
 .ov-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:22px;min-width:0;display:flex;flex-direction:column}
@@ -512,14 +531,14 @@ nav.tabs a em{font-style:normal}
 .ov-chart svg{display:block;width:100%;height:auto;margin-top:8px}
 .ov-chart text{fill:var(--muted);font-size:12px}
 .ov-sec{margin-top:6px}
-.ov-sec>div{display:grid;grid-template-columns:104px 1fr 56px;gap:10px;align-items:center;min-height:42px;font-size:14px}
+.ov-sec>div{display:grid;grid-template-columns:104px 1fr 56px 30px;gap:10px;align-items:center;min-height:42px;font-size:14px}
 .ov-sec small{font-size:12px;color:var(--muted)}
 .ov-sec strong{text-align:right;font-weight:500}
 .ov-sec .ov-track{height:7px}
 .ov-empty{padding:28px 10px;color:var(--muted);font-size:14px;line-height:2;text-align:center}
 .ov-co{display:block;color:var(--muted);font-size:12px}
-@media (max-width:1000px){.ov-3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.ov-3>:first-child{grid-column:1/-1}.ov-2{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:640px){.ov-3{grid-template-columns:minmax(0,1fr)}.ov-card{padding:16px}.ov-num{font-size:32px}.ov-risk{grid-template-columns:48px 78px 1fr auto}.ov-go{padding:8px 12px}}
+@media (max-width:1000px){.ov-top{grid-template-columns:minmax(0,1fr)}.ov-3{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.ov-3>:first-child{grid-column:1/-1}.ov-2{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.ov-top{display:contents}.ov-res,.ov-2,.ov-wl{order:1}.ov-delta li{grid-template-columns:56px minmax(0,1fr);gap:8px}.ov-3{grid-template-columns:minmax(0,1fr)}.ov-card{padding:16px}.ov-num{font-size:32px}.ov-risk{grid-template-columns:48px 78px 1fr auto}.ov-go{padding:8px 12px}}
 
 /* ===== step 3 (KC, 2026-11-11): every page in the 今日總覽 card look; data and controls unchanged ===== */
 .view{gap:24px}
@@ -549,11 +568,10 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
       <input id="q" list="tickers" placeholder="搵股票：代號或公司名，例如 NVDA" aria-label="搵股票">
       <datalist id="tickers"></datalist>
     </form>
-    <span class="badge">價格截至 <b class="num" id="asof"></b> 美股收市</span>
     <span class="themesw" role="group" aria-label="背景顏色"><button type="button" data-theme="dark">深色</button><button type="button" data-theme="light">白色</button></span>
     <button class="tog" id="login" hidden>用 Gmail 登入</button>
   </header>
-  <div class="stamps" id="stamps"></div>
+  <details class="stamps" id="stamps"></details>
   <div class="stale" id="stale" role="alert" hidden></div>
 
   <nav class="tabs" aria-label="頁面"><div>
@@ -939,6 +957,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
       <div class="sechead"><h2 id="h-st">數據狀態</h2></div>
       <div class="panel tablewrap"><table class="dst"><thead><tr><th>數據</th><th>來源</th><th>最後更新（香港時間）</th><th>覆蓋</th><th>狀態</th></tr></thead><tbody id="dstbody"></tbody></table></div>
       <div class="panel dchk" id="dchecks" hidden></div>
+      <div class="panel" id="ab-late" hidden></div>
     </section>
     <section aria-labelledby="h-risk">
       <div class="sechead"><h2 id="h-risk">風險分點計</h2></div>
@@ -1045,7 +1064,6 @@ const shortN = n => String(n||'').replace(/\s*\([A-Z]{2}\)$/,'').replace(/\s*-\s
 // Sector (板塊) and industry (細分行業) from one source (Yahoo; index lists fill in sectors); missing = 未知
 const secZh = s => s.sec?(ZH[s.sec]||s.sec):'未知';
 const indTxt = s => s.ind||'未知';
-$('asof').textContent = D.asof;
 // The stock rows (most of the page's weight) come in stocks.js, loaded alongside the page: 大市 draws straight away
 // from D, and everything that reads S waits for stocksReady() further down.
 const S = [], BY = {};
@@ -1204,12 +1222,21 @@ const pastDue = s => { const d=s.eold || (s.edate===D.asof && !s.econf ? s.edate
 let FCOV = D.fcov || [0,0];
 const nfmt = n => n.toLocaleString('en-US');
 let fcovTxt = '';
-const drawStamps = () => { $('stamps').innerHTML = [`價格：${D.asof} 美股收市`,
-  `基本面：每隻股票約 7 日輪流更新一次${fNew?`，最新 ${fNew.slice(5)}`:''}`,
-  `經濟數據擷取：${hkFmt(D.econ_t||D.news_t)}`, `新聞擷取：${hkFmt(D.news_t)}（香港時間）`].map(t=>`<span>${t}</span>`).join('')
-  // phones: one short line; the full list is in 說明及數據狀態
-  + `<span class="m">價格 ${D.asof.slice(5)} 收市 · 新聞 ${hkFmt(D.news_t)} · <a href="#about">數據狀態</a></span>`; };
-drawStamps();
+// One status row for every page: 價格截至／新聞更新／待更新, the exact times one tap away
+const drawStamps = () => { const box=$('stamps'), open=box.open, ck=k=>(D.checks||[]).find(c=>c.k===k), late=ck('late'), fill=ck('fill');
+  const todo=[late&&late.n&&`基本面 <span class="nw">${nfmt(late.n)} 隻</span>`, fill&&fill.n&&`補價 <span class="nw">${fill.n} 隻</span>`].filter(Boolean);
+  const dot=$('side-dot')?$('side-dot').className:'';
+  box.innerHTML = `<summary><span class="dot ${dot}"></span>`
+    + `<span class="nw">價格截至 <b>${D.asof.slice(5)}（${'日一二三四五六'[new Date(D.asof+'T12:00:00Z').getUTCDay()]}）收市</b></span><i>｜</i>`
+    + `<span class="nw">新聞更新 <b>${hkFmt(D.news_t)}</b></span><i>｜</i>`
+    + `<span class="d">待更新：${todo.length?todo.join('、'):'冇'}</span><span class="m nw">待更新 ${todo.length?`${todo.length} 項`:'冇'}</span>`
+    + `<u>詳情</u></summary><ul>`
+    + `<li>價格：美東 ${D.asof} 美股收市 · 網站更新 ${hkFmt(D.built)}（香港時間）</li>`
+    + `<li>新聞擷取 ${hkFmt(D.news_t)} · 經濟數據擷取 ${hkFmt(D.econ_t||D.news_t)}（香港時間）</li>`
+    + `<li>基本面：每隻股票約 7 日輪流更新${fNew?`，最新 ${fNew}`:''}${late?` · 出咗業績未更新 ${nfmt(late.n)} 隻`:''}</li>`
+    + (fill&&fill.n?`<li>補價：${fill.n} 隻冇 ${D.asof} 報價，用之前收市價補</li>`:'')
+    + `<li><a href="#about">數據狀態：每項來源、更新時間同待更新名單 →</a></li></ul>`;
+  box.open=open; };
 // The close update starts 16:50 New York (backups until ~23:00, plus a Claude check at 17:47) and takes ~10 minutes.
 // From 16:30 on a trading day until 19:00 New York a missing close shows as 「更新緊」; after that it is a warning.
 // Market holidays come from the build (kcdt/mkt.py), so a holiday never counts as a missed day.
@@ -1236,6 +1263,7 @@ drawStamps();
   const ck=k=>(D.checks||[]).find(c=>c.k===k), late=ck('late'), fill=ck('fill');
   const sub=[late&&(late.n?`基本面 ${nfmt(late.n)} 隻待更新`:'基本面已更新'), fill&&fill.n?`${fill.n} 隻補價`:''].filter(Boolean).join(' · ');
   $('side-st').innerHTML = (box.hidden?`價格正常 · ${D.asof.slice(5)} 收市`:soft?'今日收市更新緊':'價格未更新')+(sub?`<small>${sub}</small>`:'');
+  drawStamps();
 })();
 
 // ---------- search ----------
@@ -1335,45 +1363,99 @@ function ovChart(m, cw){
     +`<polygon points="${x(0)},${H-B} ${pts} ${x(n-1)},${H-B}" fill="url(#ov-fill)"/><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/><circle cx="${x(n-1)}" cy="${y(C[n-1]).toFixed(1)}" r="3.5" fill="var(--accent)"/>`
     +`<text x="${L}" y="${H-5}">${m.d[0]}</text><text x="${W-R}" y="${H-5}" text-anchor="end">${m.d[n-1]}</text></svg>`;
 }
-// 較昨日有咩變化: only what moved since the session before, one short line each; the thresholds behind a light
-// change and the full lists are one tap away (收起嘅說明), so the cards below keep their numbers without long text
-function ovDelta(Z, n50, dp){
-  const L=[], up=d=>d>0?'up':d<0?'down':'', pts=(d,u='分')=>d===0?'不變':`${d>0?'升':'跌'} ${Math.abs(d)} ${u}`;
-  L.push(['風險分', Z.map(z=>`${z.n} <b class="num">${z.p}</b>（${z.d===0?'不變':`<span class="${z.d>0?'down':'up'}">${pts(z.d)}</span>`}）`).join(' · ')]);
-  const T=[{n:'大市',hist:D.hist,rules:D.rules}].concat(D.tech?[{n:'科技股',hist:D.tech.hist,rules:D.tech.rules}]:[]), lc=T.flatMap(lightChanges);
-  L.push(['轉燈', lc.length?lc.map(c=>`${c.t.n}「${c.r.n}」${LIGHT[c.from]} → <b class="${c.to>c.from?'down':'up'}">${LIGHT[c.to]}</b>`).join('；'):'<span class="muted">8 個指標燈號同前一日一樣</span>']);
-  const H=D.hist, a=H[H.length-2], b=H[H.length-1], pp=(x,y)=>x==null||y==null?null:Math.round((y-x)*10)/10;
-  const db=pp(a&&a.b50,b.b50);
-  L.push(['參與度', `Nasdaq-100 企 50 日線上 <b class="num">${n50.toFixed(1)}%</b>${dp==null?'':`（<span class="${up(dp)}">${dp===0?'不變':`${dp>0?'+':'−'}${Math.abs(dp)} 個百分點`}</span>）`}`
-    +(db==null?'':` · 全美股 <b class="num">${f(b.b50,1)}%</b>（<span class="${up(db)}">${db===0?'不變':`${db>0?'+':'−'}${Math.abs(db)} 個百分點`}</span>）`)]);
-  const F=D.fng, vix=(D.idx||[]).find(x=>x.n==='VIX'), sent=[];
-  if(F&&F.prev!=null){const d=Math.round(F.score)-Math.round(F.prev); sent.push(`恐懼與貪婪 ${Math.round(F.prev)} → <b class="num">${Math.round(F.score)}</b>`)}
-  if(vix&&vix.p) sent.push(`VIX ${f(vix.p)} → <b class="num">${f(vix.l)}</b>（${sgn((vix.l/vix.p-1)*100,1)}%）`);
-  if(sent.length) L.push(['情緒', sent.join(' · ')]);
+// Yesterday's KC list as the page showed it (h/ snapshot): a stock in today's list that was not there, without a
+// technical flip, only got in because its fundamentals were filled in or updated, so it is not a new signal
+let YKC=null, ykcAsked=false;
+function loadYKC(){ if(ykcAsked) return; ykcAsked=true;
+  fetch('h/index.json',{cache:'no-cache'}).then(r=>r.json()).then(h=>{ const d=(h||[]).filter(x=>x<D.asof).pop(); if(!d) throw 0;
+    return fetch(`h/${d}.json`).then(r=>r.json()) }).then(x=>{ YKC=new Set((x.kc||[]).map(r=>r[0]));
+    if(drawn.overview) DRAW.overview(); if(drawn.ideas) drawChanges() }).catch(()=>{}) }
+function kcMoves(){
+  const M={cin:[],cout:[],din:[],dout:[]}; if(!READY) return M;
+  S.forEach(s=>{ const k=kcFlip(s), now=passKC(s);
+    if(k) (k.in?M.cin:M.cout).push(s);
+    else if(YKC){ if(now&&!YKC.has(s.s)) M.din.push(s); else if(!now&&YKC.has(s.s)) M.dout.push(s) } });
+  Object.values(M).forEach(l=>l.sort((a,b)=>(b.rsr||0)-(a.rsr||0)));
+  return M;
+}
+// 較昨日有咩變化: only what changed or needs a look, at most 3 lines; the rest (and what stayed the same) behind
+// 查看全部變化. The cards below keep the numbers, so these lines say the change, not the level again.
+const FNGZ=v=>v<25?0:v<45?1:v<=55?2:v<=75?3:4, FNGN=['極度恐懼','恐懼','中性','貪婪','極度貪婪'];
+function ovDelta(dp){
+  const R=[], nw=t=>`<span class="nw">${t}</span>`, pp=d=>d===0?'不變':`${d>0?'+':'−'}${Math.abs(d)} 個百分點`;
+  const T=[{n:'大市',hist:D.hist,rules:D.rules}].concat(D.tech?[{n:'科技股',hist:D.tech.hist,rules:D.tech.rules}]:[]);
+  T.forEach(t=>{ const H=t.hist, d=P100(H[H.length-1].score)-P100(H[H.length-2].score), lc=lightChanges(t);
+    R.push({k:t.n, hot:lc.length>0||d!==0, v: lc.length
+      ? `${d===0?'':`風險分<span class="${d>0?'down':'up'}">${d>0?'升':'跌'} ${nw(Math.abs(d)+' 分')}</span>：`}${lc.map(c=>`「${c.r.n}」${nw(`${LIGHT[c.from]} → <b class="${c.to>c.from?'down':'up'}">${LIGHT[c.to]}</b>`)}`).join('；')}`
+      : `<span class="muted">${nw(t.rules.length+' 項燈號')}同前一日一樣</span>`}) });
   if(READY){
-    const fl=S.map(s=>[s,kcFlip(s)]).filter(x=>x[1]), ins=fl.filter(x=>x[1].in).map(x=>x[0]), outs=fl.filter(x=>!x[1].in).map(x=>x[0]);
-    const tks=l=>l.sort((x,y)=>(y.mcap||0)-(x.mcap||0)).slice(0,6).map(tk).join(' ')+(l.length>6?` 等 ${l.length} 隻`:'');
-    L.push(['KC 條件', ins.length||outs.length?[ins.length&&`新入選 ${ins.length} 隻：${tks(ins)}`,outs.length&&`跌出 ${outs.length} 隻：${tks(outs)}`].filter(Boolean).join('；')+' <a href="#ideas">原因 →</a>':'<span class="muted">冇股票新入選或者跌出</span>']);
+    const M=kcMoves(), tks=l=>l.slice(0,4).map(tk).join(' ')+(l.length>4?` ${nw(`等 ${l.length} 隻`)}`:'');
+    const sig=[M.cin.length&&`新入選 ${nw(M.cin.length+' 隻')}：${tks(M.cin)}`, M.cout.length&&`跌出 ${nw(M.cout.length+' 隻')}：${tks(M.cout)}`].filter(Boolean);
+    R.push({k:'KC 條件', hot:sig.length>0, v: sig.length?sig.join('；')+' <a class="nw" href="#ideas">原因 →</a>':'<span class="muted">冇股票因價格／技術條件新入選或者跌出</span>'});
+    if(M.din.length||M.dout.length) R.push({k:'資料更新', hot:false, v:[M.din.length&&`補齊／更新基本面後先入選 ${nw(M.din.length+' 隻')}：${tks(M.din)}`, M.dout.length&&`更新基本面後唔再符合 ${nw(M.dout.length+' 隻')}：${tks(M.dout)}`].filter(Boolean).join('；')+' <span class="muted">（唔係價格訊號）</span>'});
     const wl=[...WL.keys()].map(t=>BY[t]).filter(Boolean).flatMap(s=>stockChanges(s).filter(c=>c.g!=='in'&&c.g!=='out').map(c=>`${tk(s)} ${c.txt}`));
-    if(WL.size) L.push(['自選', wl.length?wl.slice(0,4).join('；')+(wl.length>4?`；仲有 ${wl.length-4} 項 <a href="#ideas">全部 →</a>`:''):'<span class="muted">自選股冇升穿／跌穿均線，RS 冇大變</span>']);
+    if(WL.size) R.push({k:'自選', hot:wl.length>0, v: wl.length?wl.slice(0,3).join('；')+(wl.length>3?`；${nw(`仲有 ${wl.length-3} 項`)} <a href="#ideas">全部 →</a>`:''):'<span class="muted">自選股冇升穿／跌穿均線，RS 冇大變</span>'});
   }
-  return `<article class="ov-card ov-delta"><div class="ov-lab">較昨日有咩變化 <small>${D.asof} 收市對上一個交易日</small></div>
-    <ul>${L.map(([k,v])=>`<li><span>${k}</span><div>${v}</div></li>`).join('')}</ul>
-    <details class="ov-more"><summary>收起嘅說明</summary><ul class="small muted">
+  const H=D.hist, a=H[H.length-2], b=H[H.length-1], db=a&&a.b50!=null&&b.b50!=null?Math.round((b.b50-a.b50)*10)/10:null;
+  R.push({k:'參與度', hot:Math.abs(dp||0)>=3||Math.abs(db||0)>=3, v:`<span class="d">企 50 日線上：</span>Nasdaq-100 ${dp==null?'—':`<span class="${dp>0?'up':dp<0?'down':''}">${nw(pp(dp))}</span>`}${db==null?'':` · 全美股 <span class="${db>0?'up':db<0?'down':''}">${nw(pp(db))}</span>`}`});
+  const F=D.fng, vix=(D.idx||[]).find(x=>x.n==='VIX'), sent=[]; let sh=false;
+  if(F&&F.prev!=null){ const z0=FNGZ(F.prev), z1=FNGZ(F.score); sh=sh||z0!==z1; sent.push(`恐懼與貪婪 ${nw(`${Math.round(F.prev)} → <b>${Math.round(F.score)}</b>`)}${z0!==z1?`（${FNGN[z0]} → ${FNGN[z1]}）`:''}`) }
+  if(vix&&vix.p){ const c=(vix.l/vix.p-1)*100; sh=sh||Math.abs(c)>=10; sent.push(`VIX ${nw(`${sgn(c,1)}%`)}`) }
+  if(sent.length) R.push({k:'情緒', hot:sh, v:sent.join(' · ')});
+  const hot=R.filter(r=>r.hot), show=hot.slice(0,3), rest=R.filter(r=>!show.includes(r)), li=r=>`<li><span>${r.k}</span><div>${r.v}</div></li>`;
+  const lc=T.flatMap(lightChanges);
+  return `<article class="ov-card ov-delta"><div class="ov-lab">較昨日有咩變化 <small>${D.asof.slice(5)} 收市對上一個交易日</small></div>
+    <ul>${show.length?show.map(li).join(''):`<li><span>今日</span><div class="muted">冇需要留意嘅變化：大市、科技股燈號冇轉，KC 條件冇股票因價格新入選或者跌出</div></li>`}</ul>
+    ${rest.length?`<details class="ov-more"><summary>查看全部變化（仲有 ${rest.length} 項${hot.length>3?`，其中 ${hot.length-3} 項有變`:''}）</summary><ul class="ov-rest">${rest.map(li).join('')}</ul></details>`:''}
+    <details class="ov-more"><summary>計算方法與資料限制</summary><ul class="small muted">
+      <li>每行只寫變化；分數、百分比本身睇下面張卡。預設只顯示最多 3 項有變或者要留意嘅（轉燈、KC 條件、自選、參與度變 3 個百分點以上、情緒換區或 VIX 變 10% 以上）。</li>
       <li>風險分係 8 個指標嘅規則分數（0–100），唔係跌市機率；分數升 = 風險高咗。</li>
       ${lc.map(c=>`<li>${c.t.n}：${lightTxt(c)}</li>`).join('')}
-      <li>參與度 = 收市企喺 50 日線上嘅股票比例；KC 條件 = 選股器嘅預設條件，今日同上一個交易日比較。</li>
+      <li>KC 條件 = 選股器嘅預設條件。「新入選／跌出」只計價格、均線、成交量呢啲技術條件變咗；基本面補齊或者換新一季先入選嘅，另外寫喺「資料更新」，唔係新訊號。</li>
       <li>只係數據整理，唔係買賣建議。</li></ul></details></article>`;
 }
+// 今日研究清單: up to 5 stocks worth opening today: watchlist earnings and changes, new KC entries (price/technical
+// only), KC stocks reporting soon. Each opens the stock page. A list to read, not a list to buy.
+function ovResearch(){
+  if(!READY) return '<article class="ov-card ov-res"><div class="ov-lab">今日研究清單</div><div class="ov-empty">載入緊股票數據…</div></article>';
+  const today=ymd(nyNow()), lim=(()=>{const t=nyNow(); t.setDate(t.getDate()+3); return ymd(t)})();
+  const soon=s=>eNext(s)&&s.edate>=today&&s.edate<=lim, ew=s=>`美東 ${s.edate.slice(5)}${wdZh(s.edate)}${ETIME[s.etime]?' '+ETIME[s.etime]:''}出業績`;
+  const mine=[...WL.keys()].map(t=>BY[t]).filter(Boolean), M=kcMoves(), out=[], seen=new Set();
+  const add=(s,tag,why)=>{ if(out.length<5&&!seen.has(s.s)){ seen.add(s.s); out.push({s,tag,why}) } };
+  mine.filter(soon).sort((a,b)=>a.edate.localeCompare(b.edate)).forEach(s=>add(s,'自選',ew(s)));
+  mine.forEach(s=>{ const c=stockChanges(s).filter(c=>c.g!=='in'&&c.g!=='out'); if(c.length) add(s,'自選',c[0].txt) });
+  M.cin.slice(0,3).forEach(s=>add(s,'新入選',kcFlip(s).why.join('、')));
+  S.filter(s=>passKC(s)&&soon(s)).sort((a,b)=>a.edate.localeCompare(b.edate)||(b.mcap||0)-(a.mcap||0)).forEach(s=>add(s,'KC 條件股',ew(s)));
+  return `<article class="ov-card ov-res"><div class="ov-lab">今日研究清單 <small>撳代號睇個股</small></div>
+    ${out.length?`<ol>${out.map(x=>`<li><a class="tk" href="#s/${encodeURIComponent(x.s.s)}">${x.s.s}</a><span class="ov-tag">${x.tag}</span><span class="ov-co">${esc(shortN(x.s.n))} · ${x.why}</span></li>`).join('')}</ol>`
+      :'<div class="ov-empty">今日冇新入選、自選冇大變化，未來幾日都冇相關業績。</div>'}
+    <div class="ov-foot"><span>自選業績同變化、因價格新入選、KC 條件股業績 · 唔係買賣建議</span><a href="#ideas">全部訊號 →</a></div></article>`;
+}
+// most important first when several key events fall on the same day
+const ECON_TOP=[/FOMC|Fed Interest Rate|Federal Funds/i,/\bCPI\b|Consumer Price/i,/Nonfarm|Non-Farm|Employment Situation/i,/\bPCE\b/i,/\bGDP\b/i,/Powell/i,/Retail Sales/i,/\bPPI\b|Producer Price/i];
+const econRank=e=>{const i=ECON_TOP.findIndex(r=>r.test(e.e||'')); return i<0?99:i};
+let ovSecK='d1';
 DRAW.overview = () => {
+  loadYKC();
   const T=[['大市',D.hist]]; if(D.tech) T.push(['科技股',D.tech.hist]);
   const Z=T.map(([n,H])=>{const b=H[H.length-1], a=H[H.length-2]; return {n, s:b.score, p:P100(b.score), d:P100(b.score)-P100(a.score), z:zoneOf(b.score)}});
   const lvl=z=>z.s<=4?0:z.s<=9?1:2, top=Math.max(...Z.map(lvl)), hot=Z.filter(z=>lvl(z)===top).map(z=>z.n).join('同');
   const head = top===0 ? '大市同科技股都喺低風險' : `${hot}${top===2?'喺高風險區':'喺警戒區'}`;
   const bn=D.breadth.ndx, n50=ndx50(), H=D.hist, h0=H[H.length-2], dp=h0&&h0.n50!=null?Math.round((n50-h0.n50)*10)/10:null;
-  const now=Date.now(), nx=econRows().filter(e=>e.key&&e.t&&e.t>now).sort((a,b)=>a.t-b.t)[0];
-  const SE=[...(D.sectors||[])].filter(x=>x.d1!=null).sort((a,b)=>b.d1-a.d1), pick=SE.length>6?[...SE.slice(0,4),...SE.slice(-2)]:SE, mx=Math.max(...pick.map(x=>Math.abs(x.d1)),0.01);
+  // 下一件大事: today's (Hong Kong date) most important key event, then how many others today; else the next one
+  const now=Date.now(), hkD=t=>new Date(t).toLocaleDateString('en-CA',{timeZone:'Asia/Hong_Kong'}), hkToday=hkD(now);
+  const up=econRows().filter(e=>e.key&&e.t&&e.t>now).sort((a,b)=>a.t-b.t), tday=up.filter(e=>hkD(e.t)===hkToday);
+  const nx=tday.length?[...tday].sort((a,b)=>econRank(a)-econRank(b)||a.t-b.t)[0]:up[0], others=tday.filter(e=>e!==nx);
+  const hm=e=>new Date(e.t).toLocaleTimeString('zh-HK',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false});
+  // sectors: 今日／5 日／1 個月, with the change in rank since the session before (same period, one day earlier)
+  const SK=[['d1','今日'],['d5','5 日'],['m1','1 個月']].filter(([k])=>(D.sectors||[]).some(x=>x[k]!=null)); if(!SK.some(x=>x[0]===ovSecK)) ovSecK='d1';
+  const SE=[...(D.sectors||[])].filter(x=>x[ovSecK]!=null).sort((a,b)=>b[ovSecK]-a[ovSecK]);
+  const PV=[...SE].filter(x=>x.pv&&x.pv[ovSecK]!=null).sort((a,b)=>b.pv[ovSecK]-a.pv[ovSecK]), pr=x=>PV.length===SE.length?PV.indexOf(x):-1;
+  const pick=SE.length>6?[...SE.slice(0,4),...SE.slice(-2)]:SE, mx=Math.max(...pick.map(x=>Math.abs(x[ovSecK])),0.01);
+  const rk=x=>{const a=pr(x), b=SE.indexOf(x); if(a<0) return '<em></em>'; const d=a-b; return `<em class="${d>0?'up':d<0?'down':'muted'}" title="排名較昨日${d===0?'不變':d>0?`升 ${d} 位`:`跌 ${-d} 位`}">${d===0?'–':d>0?`▲${d}`:`▼${-d}`}</em>`};
   const M=D.minis||[], m=M[ovIdx]||M[0], k=m?m.c.length:0, mp=m?(m.c[k-1]/m.c[k-2]-1)*100:null;
+  const mnote = !m ? '' : m.n==='Nasdaq-100' ? '<p class="ov-note">Nasdaq-100 指數（點數）。QQQ 係追蹤佢嘅 ETF（美元價），NQ 係期貨（有到期月同升貼水，差唔多 24 小時交易），三樣價位同升跌時段都唔同，唔好直接對數。</p>'
+    : m.n==='Nasdaq 綜合' ? '<p class="ov-note">Nasdaq 綜合指數包 Nasdaq 全部 3,000 幾隻股，唔係 NQ 跟嘅 Nasdaq-100。</p>' : '';
   const mine=READY?[...WL.values()].filter(r=>BY[r.id]).sort((a,b)=>(a.added||'').localeCompare(b.added||'')||a.id.localeCompare(b.id)).map(r=>BY[r.id]):[];
   const wl = !READY ? '<div class="ov-empty">載入緊股票數據…</div>'
     : !mine.length ? '<div class="ov-empty">未有自選股票。喺選股器、機會頁或者個股頁撳 ☆ 加入，就會喺呢度集中顯示。<br><a href="#screener">去選股器 →</a></div>'
@@ -1382,8 +1464,7 @@ DRAW.overview = () => {
   $('v-overview').innerHTML = `
     <header class="ov-head"><div><h2>睇清市況，<span>再聚焦機會。</span></h2></div><a class="ov-go" href="#screener">開始選股 →</a></header>
     <div class="ov-links">${[['pm','盤前需知'],['close','收市後分析'],['market','大市完整指標'],['news','經濟及新聞'],['earnings','業績日曆'],['ideas','機會及訊號'],['journal','交易日誌']].map(([h,n])=>`<a href="#${h}">${n} →</a>`).join('')}</div>
-    <div class="ov-date"><b>● 收市數據</b>　${D.asof}${wdZh(D.asof)} 美股收市 · 網站更新 ${hkFmt(D.built)}（香港時間）</div>
-    ${ovDelta(Z, n50, dp)}
+    <div class="ov-top">${ovDelta(dp)}${ovResearch()}</div>
     <div class="ov-3">
       <article class="ov-card"><div class="ov-lab">趨勢風險 <small>規則分數，唔係跌市機率</small></div><h3>${head}</h3>
         ${Z.map(z=>`<div class="ov-risk"><span>${z.n}</span><strong class="num">${z.p}<small> /100</small></strong><span class="ov-track"><b style="width:${z.p}%;background:var(${z.z[1]})"></b></span><span class="pill p${lvl(z)}">${z.z[0]}</span></div>`).join('')}
@@ -1391,22 +1472,24 @@ DRAW.overview = () => {
       <article class="ov-card"><div class="ov-lab">市場參與度 <small>Nasdaq-100</small></div><div class="ov-num num">${n50.toFixed(1)}<small>%</small></div><p>企喺 50 日線上嘅股票</p>
         <span class="ov-track big"><b style="width:${n50}%"></b></span>
         <div class="ov-foot"><span class="num">${bn.a50} ／ ${bn.n} 隻${dp==null?'':` · 較前一日${dp===0?'不變':`${dp>0?'+':'−'}${Math.abs(dp)} 個百分點`}`}</span><a href="#market">市場寬度 →</a></div></article>
-      <article class="ov-card"><div class="ov-lab">下一件大事 <small>香港時間</small></div>
-        ${nx?`<div class="ov-num ev num">${hkFmt(nx.u,true)}</div><h3 style="font-size:15px">${esc(econName(nx))}</h3><p>${[nx.c!=null&&`預期 ${esc(nx.c)}`,nx.p!=null&&`前值 ${esc(nx.p)}`].filter(Boolean).join(' · ')||'重要經濟數據／講話'}</p>`
+      <article class="ov-card"><div class="ov-lab">${tday.length?'今日重要事件':'下一個重要事件'} <small>香港時間</small></div>
+        ${nx?`<div class="ov-num ev num">${tday.length?`今日 ${hm(nx)}`:hkFmt(nx.u,true)}</div><h3 style="font-size:15px">${esc(econName(nx))}</h3><p>${[nx.c!=null&&`預期 ${esc(nx.c)}`,nx.p!=null&&`前值 ${esc(nx.p)}`].filter(Boolean).join(' · ')||'重要經濟數據／講話'}</p>
+            ${others.length?`<details class="ov-more"><summary>今日其餘重要事件 ${others.length} 項</summary><ul class="small">${others.map(e=>`<li><span class="num">${hm(e)}</span> ${esc(econName(e))}</li>`).join('')}</ul></details>`:tday.length?'<p class="ov-note">今日冇其他重要事件</p>':''}`
             :'<div class="ov-num ev">暫時未有</div><p>未來兩星期未有重要經濟數據</p>'}
         <div class="ov-foot"><span>日曆擷取 ${hkFmt(D.econ_t||D.news_t)}</span><a href="#news">經濟日曆 →</a></div></article>
     </div>
     <div class="ov-2">
       <article class="ov-card"><div class="ov-lab"><span>市場走勢</span><span class="controls">${M.map((x,i)=>`<button class="tog" data-ovi="${i}" aria-pressed="${i===ovIdx}">${esc(x.n)}</button>`).join('')}</span></div>
-        ${m?`<div class="ov-price num">${f(m.c[k-1])}<small class="${cls(mp)}">${sgn(mp,2)}%</small></div><div class="ov-chart" id="ov-ch"></div>
+        ${m?`<div class="ov-price num">${f(m.c[k-1])}<small class="${cls(mp)}">${sgn(mp,2)}%</small></div><div class="ov-chart" id="ov-ch"></div>${mnote}
         <div class="ov-foot"><span>${esc(m.n)}${m.u?` ${esc(m.u)}`:''} · 最近 ${k} 個交易日收市 · 截至 ${D.asof}</span><a href="#market">K 線同更多圖表 →</a></div>`:'<p>暫時未有走勢資料</p>'}</article>
-      <article class="ov-card"><div class="ov-lab">邊個板塊帶頭？ <small>當日升跌</small></div>
-        <div class="ov-sec">${pick.map(s=>`<div><span>${esc(s.n)} <small>${esc(s.t)}</small></span><span class="ov-track"><b style="width:${Math.abs(s.d1)/mx*100}%;background:var(--${s.d1>=0?'up':'down'})"></b></span><strong class="num ${cls(s.d1)}">${sgn(s.d1,1)}%</strong></div>`).join('')}</div>
-        <div class="ov-foot"><span>用板塊 ETF 代表${SE.length>6?' · 最強 4 個同最弱 2 個':''}</span><a href="#market">全部板塊 →</a></div></article>
+      <article class="ov-card"><div class="ov-lab"><span>邊個板塊帶頭？</span><span class="controls">${SK.map(([k,n])=>`<button class="tog" data-sk="${k}" aria-pressed="${k===ovSecK}">${n}</button>`).join('')}</span></div>
+        <div class="ov-sec">${pick.map(s=>`<div><span>${esc(s.n)} <small>${esc(s.t)}</small></span><span class="ov-track"><b style="width:${Math.abs(s[ovSecK])/mx*100}%;background:var(--${s[ovSecK]>=0?'up':'down'})"></b></span><strong class="num ${cls(s[ovSecK])}">${sgn(s[ovSecK],1)}%</strong>${rk(s)}</div>`).join('')}</div>
+        <div class="ov-foot"><span>用板塊 ETF 代表${SE.length>6?' · 最強 4 個同最弱 2 個':''} · ▲▼ = 排名較昨日</span><a href="#market">全部板塊 →</a></div></article>
     </div>
-    <article class="ov-card"><div class="ov-lab"><span>我嘅自選清單</span><a href="#watch">查看全部 →</a></div>${wl}</article>`;
+    <article class="ov-card ov-wl"><div class="ov-lab"><span>我嘅自選清單</span><a href="#watch">查看全部 →</a></div>${wl}</article>`;
   if(m) $('ov-ch').innerHTML=ovChart(m, $('ov-ch').clientWidth);  // drawn at the card's real width so the labels keep their size
   $('v-overview').querySelectorAll('[data-ovi]').forEach(b=>b.onclick=()=>{ovIdx=+b.dataset.ovi; DRAW.overview()});
+  $('v-overview').querySelectorAll('[data-sk]').forEach(b=>b.onclick=()=>{ovSecK=b.dataset.sk; DRAW.overview()});
 };
 
 // ---------- 收市後分析 ----------
@@ -1745,7 +1828,9 @@ function drawChanges(){
   const T=[['大市',D.hist,D.rules]].concat(D.tech?[['科技',D.tech.hist,D.tech.rules]]:[]).flatMap(([n,hist,rules])=>lightChanges({n,hist,rules}));
   $('chg').innerHTML =
     `<div class="panel"><h3>風險分燈號 <span class="muted small">${T.length} 個轉咗</span></h3><ul>${T.map(c=>`<li><span>${c.t.n}風險分：${lightTxt(c)}</span></li>`).join('')||'<li class="muted">8 個指標（大市同科技）燈號同昨日一樣</li>'}</ul></div>`
-    + box('新入選 KC 條件', G.in, '今日冇新入選') + box('跌出 KC 條件', G.out, '今日冇跌出')
+    + box('新入選 KC 條件 <span class="muted small">價格／技術條件變化</span>', G.in, '今日冇新入選') + box('跌出 KC 條件 <span class="muted small">價格／技術條件變化</span>', G.out, '今日冇跌出')
+    + (()=>{ loadYKC(); const M=kcMoves(), inP=s=>pool.includes(s)||chgScope==='kc', L=[...M.din.filter(inP).map(s=>[s,{txt:'補齊／更新基本面後先符合（價格條件昨日已經符合）'}]),...M.dout.filter(inP).map(s=>[s,{txt:'更新基本面後唔再符合'}])];
+        return L.length?box('資料更新後入選／跌出 <span class="muted small">唔係新訊號</span>', L, ''):'' })()
     + box('升穿均線', G.up, '今日冇') + box('跌穿均線', G.dn, '今日冇')
     + box('RS 排名大變（10 級或以上）', G.rs, '今日冇');
 }
@@ -2464,7 +2549,7 @@ DRAW.about = () => {
   const E=econRows(), unc=E.filter(e=>e.unconf&&e.d<=wkEnd).length, uncNext=E.filter(e=>e.unconf&&e.d>wkEnd).length, late=E.filter(e=>e.state==='late').length;
   const rows=[
     ['價格、指數、市場寬度','Yahoo Finance',hkFmt(D.built),`${n.toLocaleString('en-US')} 隻股票，價格截至 ${D.asof} 收市`, stale?spill(2,'過期'):spill(0,'正常')],
-    ['營收／EPS（基本面）','Nasdaq、Yahoo Finance',fNew?`最新 ${fNew}，最舊 ${FTS[0]}`:'—',`共 ${nfmt(n)} 隻：${fcovTxt}（市值、營收增長、機構持股、Beta）· 每隻約 7 日輪流更新，出咗業績嘅優先`, old?spill(1,`${old} 隻出咗業績未更新`)+' <a class="small" href="#screener" id="ab-stale">喺選股器睇</a>':spill(0,'正常')],
+    ['營收／EPS（基本面）','Nasdaq、Yahoo Finance',fNew?`最新 ${fNew}，最舊 ${FTS[0]}`:'—',`共 ${nfmt(n)} 隻：${fcovTxt}（市值、營收增長、機構持股、Beta）· 每隻約 7 日輪流更新，剛出業績同新符合 KC 條件嘅優先`, old?spill(1,`${old} 隻出咗業績未更新`)+' <a class="small" href="#screener" id="ab-stale">喺選股器睇</a>':spill(0,'正常')],
     ['業績日','Nasdaq 業績日曆、Yahoo Finance（公司已定＝已排期，其餘＝預計）',hkFmt(D.built),`美東日期＋盤前／盤後 · ${nfmt(ed.length)} 隻有下次日期，${nfmt(conf)} 隻已排期`, past?spill(1,`${past} 隻預計日已過，未確認公布（計到 ${D.asof}）`):spill(0,'正常')],
     ['美國經濟數據','Nasdaq、ForexFactory（對照按月／按年）',hkFmt(D.econ_t||D.news_t),`今個星期同下個星期 ${E.length} 項${uncNext?` · 下星期有 ${uncNext} 項要到下星期一先分得出按月定按年（對照來源只出當週）`:''}`, late||unc?spill(1,[late&&`${late} 項等數據源更新`,unc&&`${unc} 項按月／按年未確認`].filter(Boolean).join('，')):spill(0,'正常')],
     ['市場新聞','Nasdaq',hkFmt(D.news_t),`${(D.news||[]).length} 條`, (D.news||[]).length?spill(0,'正常'):spill(2,'拎唔到')],
@@ -2479,6 +2564,20 @@ DRAW.about = () => {
     <ul>${C.map(c=>`<li class="small">${spill(c.lv,['正常','留意','有問題'][c.lv])} ${c.page?'<span class="muted">［頁面對照］</span> ':''}${esc(c.t)}</li>`).join('')}</ul>`;
   };
   drawChecks(null);
+  // 基本面待更新名單: your watchlist first, then stocks passing KC's conditions, then the most recent reports;
+  // how long each has waited since its report and when its fundamentals last came in
+  const LT=S.filter(fStale), dd=d=>d?Math.max(0,Math.round((Date.parse(D.asof)-Date.parse(d))/864e5)):null;
+  const grp=s=>WL.has(s.s)?0:passKC(s)?1:2, GN=['自選','符合 KC 條件',''];
+  LT.sort((a,b)=>grp(a)-grp(b)||(b.erep||'').localeCompare(a.erep||'')||a.s.localeCompare(b.s));
+  $('ab-late').hidden=!LT.length;
+  if(LT.length){ const nm=LT.filter(s=>grp(s)===0).length, row=s=>`<tr><td>${tk(s)}${GN[grp(s)]?` <span class="ov-tag">${GN[grp(s)]}</span>`:''}</td><td class="num">${s.erep||'—'}</td><td class="r num">${dd(s.erep)==null?'—':dd(s.erep)+' 日'}</td><td class="num">${s.fts||'未有'}</td><td class="num">${s.qend||'—'}</td></tr>`;
+    $('ab-late').innerHTML=`<div class="sechead"><h3>基本面待更新名單 <span class="muted small">${LT.length} 隻出咗業績，數據仲係上一季${WL.size?` · 你嘅自選股 ${nm} 隻`:''}</span></h3></div>
+      <p class="muted small">排序：自選股 → 符合 KC 條件 → 最近出業績。系統每 12 小時自動再試，剛出業績同新符合條件嘅股票優先更新。已等 = 由出業績日計到 ${D.asof}。</p>
+      <div class="tablewrap"><table><thead><tr><th>代號</th><th>出業績（美東）</th><th class="r">已等</th><th>上次成功更新</th><th>數據截至季度</th></tr></thead><tbody>${LT.slice(0,15).map(row).join('')}</tbody>
+      ${LT.length>15?`<tbody id="ab-late-more" hidden>${LT.slice(15).map(row).join('')}</tbody>`:''}</table></div>
+      ${LT.length>15?`<button class="tog" id="ab-late-all" style="margin-top:8px">顯示全部 ${LT.length} 隻</button>`:''}`;
+    if($('ab-late-all')) $('ab-late-all').onclick=e=>{ $('ab-late-more').hidden=false; e.target.remove() };
+  }
   $('dstbody').innerHTML=rows.map(r=>`<tr><td><b>${r[0]}</b></td><td class="small" data-l="來源">${r[1]}</td><td class="num small" data-l="最後更新">${r[2]}</td><td class="small" data-l="覆蓋">${r[3]}</td><td>${r[4]}</td></tr>`).join('');
   if($('ab-stale')) $('ab-stale').onclick=()=>{ FRESH='stale' };
   fetch('pm/index.json',{cache:'no-cache'}).then(r=>r.json()).catch(()=>[]).then(p=>{ PM=p||[];
