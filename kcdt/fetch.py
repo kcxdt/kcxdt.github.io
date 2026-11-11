@@ -617,7 +617,7 @@ def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, n
             kept = {}
     shown = {}  # the rows the site shows now
     for r in prev or []:
-        if r.get("d"):
+        if r.get("d") and not r.get("hol"):  # holiday rows are added again below, from the rules
             shown.setdefault(r["d"], []).append({k: r.get(k) for k in ("d", "u", "e", "a", "c", "p")})
     kept = {**kept, **shown}  # the site is never older than the file
     days = [d.strftime("%Y-%m-%d") for d in pd.bdate_range(monday, periods=10)]
@@ -652,10 +652,16 @@ def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, n
             memory = json.loads(path.read_text())
         except Exception:
             memory = {}
-    label(out, forexfactory(), memory, bls_changes)
+    ff = forexfactory()
+    label(out, ff, memory, bls_changes)
     if path:
         path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps(memory, ensure_ascii=False, indent=1, sort_keys=True))
+    if out:  # bank holidays and early closes (★); an empty answer stays empty so the caller keeps its last good copy
+        from .holidays import calendar_rows
+        hol = calendar_rows(days, ff)
+        print(f"economic calendar: {len(hol)} holiday / early-close rows ({', '.join(r['d'] for r in hol) or 'none'})")
+        out += hol
     print(f"economic calendar: {len(out)} US releases, {sum(1 for r in out if r.get('ref'))} with a period, "
           f"{sum(1 for r in out if r.get('per'))} with m/m-y/y known, {sum(1 for r in out if r.get('unconf'))} unconfirmed")
     return out

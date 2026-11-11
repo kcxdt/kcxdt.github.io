@@ -176,7 +176,8 @@ def forexfactory():
             t = pd.Timestamp(x["date"]).tz_convert("UTC").strftime("%Y-%m-%dT%H:%MZ")
         except Exception:
             continue
-        out.append(dict(t=t, title=x.get("title") or "", impact=x.get("impact"), f=x.get("forecast"), p=x.get("previous")))
+        d = pd.Timestamp(x["date"]).tz_convert("America/New_York").strftime("%Y-%m-%d")
+        out.append(dict(t=t, d=d, title=x.get("title") or "", impact=x.get("impact"), f=x.get("forecast"), p=x.get("previous")))
     print(f"forexfactory: {len(out)} US rows this week")
     return out
 

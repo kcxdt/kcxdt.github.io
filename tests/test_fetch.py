@@ -64,7 +64,13 @@ def test_economic_calendar_keeps_a_day_nasdaq_mixes_up(tmp_path=None):
     bad = dict(good, **{"2026-11-11": wed})
     rows, _ = _econ("2026-11-10", bad, now="2026-11-10T23:28Z", days_file=days)
     assert [r["e"] for r in rows if r["d"] == "2026-11-10"] == ["CPI"]
-    assert [r["e"] for r in rows if r["d"] == "2026-11-11"] == ["MBA Mortgage Applications", "OPEC Monthly Report"]
+    assert [r["e"] for r in rows if r["d"] == "2026-11-11" and not r.get("hol")] == ["MBA Mortgage Applications", "OPEC Monthly Report"]
+    vet = [r for r in rows if r.get("hol")]
+    assert [(r["d"], r["hol"]["zh"], r["imp"]) for r in vet] == [("2026-11-11", "退伍軍人節", 3)], vet
+    assert vet[0]["u"] == "2026-11-11T05:00Z" and vet[0]["note"] == "債市、銀行休市；股市照常交易"
+    # a holiday row on the site is not kept as a Nasdaq row: one copy only after the next refresh
+    rows, _ = _econ("2026-11-10", bad, now="2026-11-10T23:28Z", prev=rows)
+    assert sum(1 for r in rows if r.get("hol")) == 1
     # without the file, the rows the site shows now are the fallback
     shown = [dict(d="2026-11-10", u="2026-11-10T13:30Z", e="CPI", a="0.4%", c=None, p="0.6%", note="x")]
     rows, _ = _econ("2026-11-10", bad, now="2026-11-10T23:28Z", prev=shown)

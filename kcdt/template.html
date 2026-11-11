@@ -1442,7 +1442,7 @@ function ovResearch(){
 }
 // most important first when several key events fall on the same day
 const ECON_TOP=[/FOMC|Fed Interest Rate|Federal Funds/i,/\bCPI\b|Consumer Price/i,/Nonfarm|Non-Farm|Employment Situation/i,/\bPCE\b/i,/\bGDP\b/i,/Powell/i,/Retail Sales/i,/\bPPI\b|Producer Price/i];
-const econRank=e=>{const i=ECON_TOP.findIndex(r=>r.test(e.e||'')); return i<0?99:i};
+const econRank=e=>{ if(e.hol) return e.hol.stock==='closed'?-1:50; const i=ECON_TOP.findIndex(r=>r.test(e.e||'')); return i<0?99:i};
 let ovSecK='d1';
 DRAW.overview = () => {
   loadYKC();
@@ -1453,9 +1453,10 @@ DRAW.overview = () => {
   const bn=D.breadth.ndx, n50=ndx50(), H=D.hist, h0=H[H.length-2], dp=h0&&h0.n50!=null?Math.round((n50-h0.n50)*10)/10:null;
   // 下一件大事: today's (Hong Kong date) most important key event, then how many others today; else the next one
   const now=Date.now(), hkD=t=>new Date(t).toLocaleDateString('en-CA',{timeZone:'Asia/Hong_Kong'}), hkToday=hkD(now);
-  const up=econRows().filter(e=>e.key&&e.t&&e.t>now).sort((a,b)=>a.t-b.t), tday=up.filter(e=>hkD(e.t)===hkToday);
+  // a holiday counts all day long (its New York date), a release until its time
+  const up=econRows().filter(e=>e.key&&e.t&&(e.hol?e.d>=hkToday:e.t>now)).sort((a,b)=>a.t-b.t), tday=up.filter(e=>(e.hol?e.d:hkD(e.t))===hkToday);
   const nx=tday.length?[...tday].sort((a,b)=>econRank(a)-econRank(b)||a.t-b.t)[0]:up[0], others=tday.filter(e=>e!==nx);
-  const hm=e=>new Date(e.t).toLocaleTimeString('zh-HK',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false});
+  const hm=e=>e.hol?'全日':new Date(e.t).toLocaleTimeString('zh-HK',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false});
   // sectors: 今日／5 日／1 個月, with the change in rank since the session before (same period, one day earlier)
   const SK=[['d1','今日'],['d5','5 日'],['m1','1 個月']].filter(([k])=>(D.sectors||[]).some(x=>x[k]!=null)); if(!SK.some(x=>x[0]===ovSecK)) ovSecK='d1';
   const SE=[...(D.sectors||[])].filter(x=>x[ovSecK]!=null).sort((a,b)=>b[ovSecK]-a[ovSecK]);
@@ -1482,8 +1483,8 @@ DRAW.overview = () => {
         <span class="ov-track big"><b style="width:${n50}%"></b></span>
         <div class="ov-foot"><span class="num">${bn.a50} ／ ${bn.n} 隻${dp==null?'':` · 較前一日${dp===0?'不變':`${dp>0?'+':'−'}${Math.abs(dp)} 個百分點`}`}</span><a href="#market">市場寬度 →</a></div></article>
       <article class="ov-card"><div class="ov-lab">${tday.length?'今日重要事件':'下一個重要事件'} <small>香港時間</small></div>
-        ${nx?`<div class="ov-num ev num">${tday.length?`今日 ${hm(nx)}`:hkFmt(nx.u,true)}</div><h3 style="font-size:15px">${esc(econName(nx))}</h3><p>${[nx.c!=null&&`預期 ${esc(nx.c)}`,nx.p!=null&&`前值 ${esc(nx.p)}`].filter(Boolean).join(' · ')||'重要經濟數據／講話'}</p>
-            ${others.length?`<details class="ov-more"><summary>今日其餘重要事件 ${others.length} 項</summary><ul class="small">${others.map(e=>`<li><span class="num">${hm(e)}</span> ${esc(econName(e))}</li>`).join('')}</ul></details>`:tday.length?'<p class="ov-note">今日冇其他重要事件</p>':''}`
+        ${nx?`<div class="ov-num ev num">${tday.length?`今日 ${hm(nx)}`:nx.hol?holWhen(nx):hkFmt(nx.u,true)}</div><h3 style="font-size:15px">${esc(econName(nx))}</h3><p>${nx.hol?esc(nx.note||''):[nx.c!=null&&`預期 ${esc(nx.c)}`,nx.p!=null&&`前值 ${esc(nx.p)}`].filter(Boolean).join(' · ')||'重要經濟數據／講話'}</p>
+            ${others.length?`<details class="ov-more"><summary>今日其餘重要事件 ${others.length} 項</summary><ul class="small">${others.map(e=>`<li><span class="num">${hm(e)}</span> ${esc(econName(e))}${e.hol&&e.note?` <span class="muted">（${esc(e.note)}）</span>`:''}</li>`).join('')}</ul></details>`:tday.length?'<p class="ov-note">今日冇其他重要事件</p>':''}`
             :'<div class="ov-num ev">暫時未有</div><p>未來兩星期未有重要經濟數據</p>'}
         <div class="ov-foot"><span>日曆擷取 ${hkFmt(D.econ_t||D.news_t)}</span><a href="#news">經濟日曆 →</a></div></article>
     </div>
@@ -1664,7 +1665,10 @@ function drawInd(t){
 function lightChanges(t){ const H=t.hist, a=H[H.length-2], b=H[H.length-1]; if(!a) return [];
   return t.rules.filter(r=>a.p[r.k]!==b.p[r.k]).map(r=>({t, r, from:a.p[r.k], to:b.p[r.k], v0:a.v[r.k], v1:b.v[r.k]})) }
 const lightTxt = c => `<b>${c.r.n}</b> ${LIGHT[c.from]} → <b class="${c.to>c.from?'down':'up'}">${LIGHT[c.to]}</b>（${f(c.v0)}${c.r.u} → ${f(c.v1)}${c.r.u}；警戒 ${ruleCmp(c.r)} ${c.r.y}${c.r.u}，高風險 ${ruleCmp(c.r)} ${c.r.r}${c.r.u}）`;
-const econName = e => (econZh(e.e||'')||e.e||'') + (e.per?`（${e.per}）`:'');
+const econName = e => e.hol ? holName(e) : (econZh(e.e||'')||e.e||'') + (e.per?`（${e.per}）`:'');
+// Bank holidays and early closes (kcdt/holidays.py): whole-day ★ rows, dated by the New York day
+const holName = e => e.hol.full ? `美國假期：${e.hol.zh}` : `${e.hol.zh}：提早收市`;
+const holWhen = e => `${e.d.slice(5)}${wdZh(e.d)}全日`;
 // Three short lines (risk, breadth, next release); the detail goes under 查看全部變化
 function brief(T){ brief.T=T;  // drawn again when the stock rows arrive (the earnings lines need them)
   const L=[], M=[], pp=(a,b)=>{const d=Math.round((b-a)*10)/10; return d===0?'不變':`${d>0?'+':'−'}${Math.abs(d)} 個百分點`};
@@ -1678,7 +1682,7 @@ function brief(T){ brief.T=T;  // drawn again when the stock rows arrive (the ea
   const bn=D.breadth.ndx, n50=ndx50();
   L.push(`<b>市場寬度</b>：Nasdaq-100 企 50 日線上 ${n50.toFixed(1)}%（${bn.a50}／${bn.n} 隻，較上一個交易日${pp(h0.n50,n50)}）`+(SE.length?`；最強板塊 ${SE[0].n} <span class="${cls(SE[0].d1)}">${sgn(SE[0].d1,1)}%</span>`:'')+'。');
   if(SE.length>1) M.push(`今日最弱板塊：${SE[SE.length-1].n} <span class="${cls(SE[SE.length-1].d1)}">${sgn(SE[SE.length-1].d1,1)}%</span>`);
-  const now=Date.now(), nx=econRows().filter(e=>e.key&&e.t&&e.t>now).sort((a,b)=>a.t-b.t)[0];
+  const now=Date.now(), nx=econRows().filter(e=>e.key&&!e.hol&&e.t&&e.t>now).sort((a,b)=>a.t-b.t)[0];
   const ne=S.filter(s=>s.ndx&&eNext(s)).sort((a,b)=>a.edate.localeCompare(b.edate)||(b.mcap||0)-(a.mcap||0));
   L.push(`<b>下一件事</b>：${nx?`${econName(nx)}，香港時間 ${hkFmt(nx.u,true)}`:'未來兩星期未有重要經濟數據'}。<a href="#news">經濟日曆</a>`);
   // today's and the next trading day's batches (so the day before already names tomorrow's reporters), else the next one
@@ -2389,7 +2393,9 @@ const pmNextLbl = b => { const a=new Date(b.d+'T12:00:00Z'), n=new Date(b.nd+'T1
 function pmLines(b){
   const L=[], done=e=>e.a!=null, I=Object.fromEntries((b.idx||[]).concat(b.etf||[]).map(x=>[x.k,x])), pc=x=>`<span class="${cls(x.pct)}">${sgn(x.pct,2)}%</span>`;
   if(I.NDX) L.push(`<b>指數</b>：Nasdaq-100 ${I.NDX.d.slice(5)} 收市 ${f(I.NDX.v)}（${pc(I.NDX)}）${I.SPX?`；標普 500 ${f(I.SPX.v)}（${pc(I.SPX)}）`:''}${I.QQQ?`。QQQ ${I.QQQ.when==='pre'?'盤前':'盤後'} ${pc(I.QQQ)}`:''}${I.SPY?`，SPY ${pc(I.SPY)}`:''}。`);
-  const out=(b.econ||[]).filter(e=>pmKey(e)&&done(e)), due=(b.econ||[]).filter(e=>pmKey(e)&&!done(e)&&e.u&&Date.parse(e.u)>Date.parse(b.t));
+  const hol=(b.econ||[]).filter(e=>e.hol&&e.d===b.d);
+  if(hol.length) L.push(`<b>今日假期</b>：${hol.map(e=>`${esc(holName(e))}，${esc(e.note||'')}`).join('；')}。`);
+  const out=(b.econ||[]).filter(e=>pmKey(e)&&done(e)), due=(b.econ||[]).filter(e=>pmKey(e)&&!e.hol&&!done(e)&&e.u&&Date.parse(e.u)>Date.parse(b.t));
   if(out.length) L.push(`<b>已公布</b>：${out.slice(0,3).map(e=>`${econName(e)} ${esc(e.a)}${e.c?`（預期 ${esc(e.c)}）`:''}`).join('；')}。`);
   if(due.length) L.push(`<b>今日待公布</b>：${due.slice(0,3).map(e=>`${hkHM(e.u)} ${econName(e)}`).join('；')}（香港時間）。`);
   else L.push('<b>今日待公布</b>：今日冇重要經濟數據。');
@@ -2451,7 +2457,7 @@ function pmMovers(b){
 }
 function pmEcon(b){
   const E=(b.econ||[]).filter(e=>pmKey(e)).sort((a,c)=>(Date.parse(a.u)||0)-(Date.parse(c.u)||0));
-  return `<div class="panel tablewrap"><table><thead><tr><th>時間（香港）</th><th>數據</th><th>狀態</th><th class="r">實際</th><th class="r">預期</th><th class="r">前值</th></tr></thead><tbody>${E.map(e=>`<tr><td class="num small">${e.u?hkFmt(e.u):'—'}</td><td>★ ${econName(e)}${e.ref?`<div class="muted small">統計期：${e.ref}</div>`:''}</td><td class="small">${e.a!=null?'<span class="up">已公布</span>':'<span class="muted">待公布</span>'}</td><td class="r num"><b>${e.a!=null?esc(e.a):'—'}</b></td><td class="r num">${e.c!=null?esc(e.c):'—'}</td><td class="r num">${e.p!=null?esc(e.p):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">今日同隔晚冇重要經濟數據。</td></tr>'}</tbody></table></div>
+  return `<div class="panel tablewrap"><table><thead><tr><th>時間（香港）</th><th>數據</th><th>狀態</th><th class="r">實際</th><th class="r">預期</th><th class="r">前值</th></tr></thead><tbody>${E.map(e=>`<tr><td class="num small">${e.hol?`${e.d.slice(5)} 全日`:e.u?hkFmt(e.u):'—'}</td><td>★ ${econName(e)}${e.ref?`<div class="muted small">統計期：${e.ref}</div>`:e.hol&&e.note?`<div class="muted small">${esc(e.note)}</div>`:''}</td><td class="small">${e.hol?`<span class="warntxt">${e.hol.full?'假期':'提早收市'}</span>`:e.a!=null?'<span class="up">已公布</span>':'<span class="muted">待公布</span>'}</td><td class="r num"><b>${e.a!=null?esc(e.a):'—'}</b></td><td class="r num">${e.c!=null?esc(e.c):'—'}</td><td class="r num">${e.p!=null?esc(e.p):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">今日同隔晚冇重要經濟數據。</td></tr>'}</tbody></table></div>
   <p class="muted small">只列重要數據（★）。之後有冇更新數字，睇 <a href="#news">經濟及新聞</a>（數據公布後會再擷取）。</p>`;
 }
 async function pmShow(d){
@@ -2663,6 +2669,7 @@ let econAll=false, newsCat='all';
 function econRows(){
   const now=Date.now(), E=(D.econ||[]).map(e=>({...e, t:e.u?Date.parse(e.u):null, key:e.imp===3||ECON_KEY.test(e.e||'')}));
   E.forEach(e=>{
+    if(e.hol){ e.state = e.hol.full ? 'hol' : 'early'; return }
     e.nn = e.a==null && e.c==null && e.p==null;  // no number at all: statement, press conference, speech
     const talk = /Press Conference|Speaks|Speech|Testimony/i.test(e.e||'');
     if(e.nn) e.state = !e.t ? 'wait' : talk ? (e.t+60*60e3<=now ? 'ended' : e.t<=now ? 'live' : 'soon') : (e.t<=now ? 'out' : 'wait');
@@ -2676,18 +2683,18 @@ function nextFetch(){ const now=new Date();
   for(let i=0;i<8;i++) for(const [h,m] of FETCH_UTC){ const t=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+i,h,m), wd=new Date(t).getUTCDay();
     if(wd>=1&&wd<=5&&t>now) return new Date(t).toISOString() } return null }
 const ESTATE={done:['已公布','up'],late:['已到公布時間，等數據源更新','muted'],wait:['待公布','muted'],bad:['資料異常','down'],
-  out:['已發布','up'],ended:['已結束','up'],live:['進行中','up'],soon:['未開始','muted']};
+  out:['已發布','up'],ended:['已結束','up'],live:['進行中','up'],soon:['未開始','muted'],hol:['假期','warntxt'],early:['提早收市','warntxt']};
 const ELINK=e=>e.link&&['out','ended','live'].includes(e.state)?` · <a href="${e.link}" target="_blank" rel="noopener">${/Press Conference/i.test(e.e)?'睇記者會（聯儲局網站）':/Minutes/i.test(e.e)?'聯儲局議息頁':'睇聲明原文（聯儲局網站）'}</a>`:'';
 const econWkEnd=()=>{const n=nyNow(); n.setDate(n.getDate()+(6-n.getDay())); return ymd(n)};
 function drawEcon(){
   const E=econRows().filter(e=>econAll||e.key), days={};
-  const hkDay=e=>(e.t?new Date(e.t):new Date(e.d+'T12:00:00Z')).toLocaleDateString('en-CA',{timeZone:'Asia/Hong_Kong'});
-  const hkTime=e=>e.t?new Date(e.t).toLocaleTimeString('zh-HK',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false}):'—';
+  const hkDay=e=>e.hol?e.d:(e.t?new Date(e.t):new Date(e.d+'T12:00:00Z')).toLocaleDateString('en-CA',{timeZone:'Asia/Hong_Kong'});
+  const hkTime=e=>e.hol?'全日':e.t?new Date(e.t).toLocaleTimeString('zh-HK',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false}):'—';
   E.forEach(e=>(days[hkDay(e)]=days[hkDay(e)]||[]).push(e));
   const today=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Hong_Kong'}), now=Date.now();
-  const next=E.filter(e=>e.key&&e.t&&e.t>now).sort((a,b)=>a.t-b.t)[0];
+  const next=E.filter(e=>e.key&&!e.hol&&e.t&&e.t>now).sort((a,b)=>a.t-b.t)[0];
   const card=d=>{const dd=new Date(d+'T12:00:00');
-    return `<div class="panel tablewrap" style="padding:10px 12px"${d===today?' id="econ-today"':''}><h3 style="margin-bottom:6px"><span class="num">${d.slice(5)}</span> <span class="muted small">星期${WD[dd.getDay()]}${d===today?' · 今日':''}</span></h3><table><thead><tr><th>時間</th><th>數據</th><th>狀態</th><th class="r">實際</th><th class="r">預期</th><th class="r">前值</th></tr></thead><tbody>${days[d].sort((a,b)=>(a.t||0)-(b.t||0)).map(e=>{const z=econZh(e.e||''), [st,sc]=ESTATE[e.state];
+    return `<div class="panel tablewrap" style="padding:10px 12px"${d===today?' id="econ-today"':''}><h3 style="margin-bottom:6px"><span class="num">${d.slice(5)}</span> <span class="muted small">星期${WD[dd.getDay()]}${d===today?' · 今日':''}</span></h3><table><thead><tr><th>時間</th><th>數據</th><th>狀態</th><th class="r">實際</th><th class="r">預期</th><th class="r">前值</th></tr></thead><tbody>${days[d].sort((a,b)=>(!!b.hol-!!a.hol)||(a.t||0)-(b.t||0)).map(e=>{const z=e.hol?holName(e):econZh(e.e||''), [st,sc]=ESTATE[e.state];
       return `<tr${e===next?' class="nextev"':''}><td class="num small">${hkTime(e)}</td><td class="small">${e.key?'<b>★</b> ':''}${z?`<b>${z}${e.per?`（${e.per}）`:''}</b> <span class="muted">${esc(e.e)}</span>`:`${esc(e.e||'')}${e.per?` <b>（${e.per}）</b>`:''}`}${e.unconf?` <span class="badge" title="${e.d>econWkEnd()?'對照來源（ForexFactory）只出當週，下星期一先確認到':'今個星期 ForexFactory 未有呢項，前值又對唔到之前確認過嘅數字'}">${e.d>econWkEnd()?'按月／按年下星期確認':'按月／按年未確認'}</span>`:''}${e.ref?`<div class="muted small">統計期（按公布時間表推算）：${e.ref}</div>`:e.note?`<div class="muted small">${e.note}${ELINK(e)}</div>`:''}${e.state==='late'?`<div class="muted small">網站下次擷取約 ${hkFmt(nextFetch())}（香港時間）${e.src?` · <a href="${e.src}" target="_blank" rel="noopener">官方發布頁</a>`:''}</div>`:''}${e===next?' <span class="badge">下一項重要</span>':''}</td>
       <td class="small ${sc}" style="white-space:nowrap">${st}</td><td class="r num"><b>${e.a||'—'}</b></td><td class="r num muted">${e.c||'—'}</td><td class="r num muted">${e.p||'—'}</td></tr>`}).join('')}</tbody></table></div>`};
   const ks=Object.keys(days).sort(), past=ks.filter(d=>d<today), rest=ks.filter(d=>d>=today);
