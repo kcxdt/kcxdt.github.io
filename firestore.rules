@@ -1,10 +1,10 @@
 rules_version = '2';
-// Each signed-in person can read and write only their own presets, journal trades and watchlist.
+// Each signed-in person can read and write only their own presets, journal trades, watchlist and NQ Playbook (playbook, pbimg).
 service cloud.firestore {
   match /databases/{database}/documents {
     match /users/{uid}/{col}/{id} {
       allow read, write: if request.auth != null && request.auth.uid == uid
-                         && col in ['trades', 'presets', 'watch'];
+                         && col in ['trades', 'presets', 'watch', 'playbook', 'pbimg'];
     }
   }
 }
