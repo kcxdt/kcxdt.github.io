@@ -200,12 +200,16 @@ if __name__ == "__main__":
     m.OUT = pathlib.Path("site")
     m.OUT.mkdir(exist_ok=True)
     m.write_page(d)
-    (m.OUT / "data.json").write_text(json.dumps(d, ensure_ascii=False), encoding="utf-8")
+    stale = {**d, "checks": [dict(lv=0, t="old rule", k="past", n=99)]}  # checks stored by an older build
+    (m.OUT / "data.json").write_text(json.dumps(stale, ensure_ascii=False), encoding="utf-8")
     # The intraday refresh rebuilds the page from data.json; an empty fetch keeps the last good copy
     from kcdt import refresh
     refresh.economic_calendar, refresh.headlines = (lambda **k: []), (lambda: [])
     refresh.main()
-    assert json.loads((m.OUT / "data.json").read_text())["econ"] == d["econ"]
+    after = json.loads((m.OUT / "data.json").read_text())
+    assert after["econ"] == d["econ"]
+    from kcdt.checks import past_due
+    assert next(c for c in after["checks"] if c.get("k") == "past")["n"] == len(past_due(d["stocks"], d["asof"]))
     m.write_stock_pages(pages)
     # A past day in the history folder plus today's, so the 歷史 view has two dates to pick
     import tempfile
