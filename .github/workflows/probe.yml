@@ -1,0 +1,17 @@
+name: probe
+on:
+  push:
+    branches: [claude/probe]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
+        with:
+          path: cache
+          key: fundamentals-latest
+          restore-keys: fundamentals-
+      - run: pip install -r requirements.txt
+      - run: ls -la cache || true
+      - run: python probe/diag5.py
