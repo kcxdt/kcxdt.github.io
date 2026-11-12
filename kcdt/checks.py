@@ -35,14 +35,9 @@ def fund_late(stocks):
 
 
 def past_due(stocks, asof):
-    """Expected report dates up to `asof` with no confirmed report, as the page counts them at the end of that day:
-    dates that had already passed at the build (eold), plus dates on `asof` itself that nobody confirmed."""
-    out = []
-    for s in stocks:
-        d = s.get("eold") or (s.get("edate") if s.get("edate") == asof and not s.get("econf") else None)
-        if d and not (s.get("erep") and s["erep"] >= d):
-            out.append(s["s"])
-    return out
+    """Expected report dates before `asof` with no confirmed report (eold). A date on `asof` itself is not counted
+    yet: the build runs right after the close, before that evening's reports can be confirmed."""
+    return [s["s"] for s in stocks if s.get("eold") and not (s.get("erep") and s["erep"] >= s["eold"])]
 
 
 def pm_expected(now):
@@ -83,7 +78,7 @@ def run(data, today=None, now=None):
     add(0 if len(fill) <= 30 else 1, f"冇 {data['asof']} 報價、用之前收市補嘅股票：{len(fill)} 隻"
         + (f"（例如 {'、'.join(fill[:6])}；表入面標「補價」，唔計入升跌家數、成交量同新高新低）" if fill else ""), "fill", len(fill))
     old = len(past_due(st, data["asof"]))
-    add(0 if old <= 30 else 1, f"預計業績日已過但未確認公布：{old} 隻（計到 {data['asof']} 為止；下次業績日顯示「未知」）",
+    add(0 if old <= 30 else 1, f"預計業績日已過但未確認公布：{old} 隻（{data['asof']} 之前嘅日子；下次業績日顯示「未知」）",
         "past", old)
     now = pd.Timestamp(now) if now is not None else pd.Timestamp.now(tz="America/New_York")
     want, pm = pm_expected(now), data.get("pm_d")

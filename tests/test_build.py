@@ -263,7 +263,7 @@ def test_checks_helpers():
     assert pm_expected(pd.Timestamp("2026-11-08 20:00", tz=ny)) == "2026-11-06"  # Sunday
     st = [dict(s="A", eold="2026-11-03"), dict(s="B", eold="2026-11-03", erep="2026-11-04"),
           dict(s="C", edate="2026-11-06"), dict(s="D", edate="2026-11-06", econf=True), dict(s="E", edate="2026-11-09")]
-    assert past_due(st, "2026-11-06") == ["A", "C"]
+    assert past_due(st, "2026-11-06") == ["A"]  # C is due on the day itself: not counted until the day after
 
 
 def test_old_yahoo_dates_are_not_past_due():
@@ -275,15 +275,20 @@ def test_old_yahoo_dates_are_not_past_due():
     seen = ts("2026-10-25")
     yd = {"S0001": {"ts": ts("2025-03-07"), "est": False, "_ts": seen},   # closed-end fund: last report long ago
           "S0002": {"ts": ts("2025-09-01"), "est": True, "_ts": seen},    # an old guess
-          "S0003": {"ts": ts("2026-10-22"), "est": True, "_ts": seen},    # a guess from last week: may be late
-          "S0004": {"ts": ts("2026-10-22"), "est": True, "_ts": ts("2026-10-20")}}  # fetched before it: expected, missed
-    d = build(px, fake_meta(universe), {}, None, {}, {}, {}, yd)
+          "S0003": {"ts": ts("2026-10-22"), "est": True, "_ts": seen},    # a guess already past when fetched
+          "S0004": {"ts": ts("2026-10-22"), "est": True, "_ts": ts("2026-10-20")},  # fetched before it: expected, missed
+          "S0005": {"ts": ts("2026-10-22"), "est": False, "_ts": ts("2026-10-20")},  # the company's own date: reported
+          "S0006": {"ts": ts("2026-10-27"), "est": True, "_ts": ts("2026-10-20")},   # a guess for today
+          "S0007": {"ts": ts("2026-11-03"), "est": True, "_ts": ts("2026-10-20")}}   # a guess a week after a report
+    d = build(px, fake_meta(universe), {}, None, {}, {"S0007": "2026-10-26"}, {}, yd)
     s = {x["s"]: x for x in d["stocks"]}
     assert s["S0001"]["erep"] == "2025-03-07" and "eold" not in s["S0001"] and not s["S0001"].get("edate")
     assert "eold" not in s["S0002"] and not s["S0002"].get("erep")
-    assert s["S0003"]["eold"] == "2026-10-22" and s["S0004"]["eold"] == "2026-10-22"
+    assert "eold" not in s["S0003"] and s["S0004"]["eold"] == "2026-10-22"
+    assert s["S0005"]["erep"] == "2026-10-22" and "eold" not in s["S0005"]
+    assert s["S0006"]["edate"] == "2026-10-27" and s["S0007"]["erep"] == "2026-10-26" and not s["S0007"].get("edate")
     from kcdt.checks import past_due
-    assert past_due(d["stocks"], d["asof"]) == ["S0003", "S0004"]
+    assert past_due(d["stocks"], d["asof"]) == ["S0004"]
 
 
 def test_nasdaq_qend_by_eps_when_revenue_differs():
