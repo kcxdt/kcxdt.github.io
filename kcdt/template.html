@@ -456,7 +456,7 @@ nav.tabs a em{font-style:normal}
 @media (min-width:1100px){
   .wrap{grid-template-columns:210px minmax(0,1fr);column-gap:0;padding-right:0}
   .wrap>:not(nav){width:calc(100% - 64px);max-width:1600px;justify-self:center;box-sizing:border-box}
-  nav.tabs{position:fixed;inset:0 auto 0 0;width:210px;box-sizing:border-box;margin:0;padding:22px 12px 16px;overflow-y:auto;scrollbar-width:thin;gap:0;z-index:20}
+  nav.tabs{position:fixed;inset:0 auto 0 0;width:210px;box-sizing:border-box;margin:0;padding:22px 12px 16px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;gap:0;z-index:20}
   nav.tabs>div{position:static;display:flex;flex-direction:column;gap:3px;flex:1 0 auto;min-height:100%}
   nav.tabs .side-brand{display:flex;align-items:center;gap:10px;padding:0 6px 14px;border-radius:0}
   nav.tabs .kmark{font:italic 600 27px system-ui,sans-serif;letter-spacing:-3px;color:var(--accent);padding-right:4px}
@@ -476,7 +476,7 @@ nav.tabs a em{font-style:normal}
   .side-status i{width:7px;height:7px;border-radius:50%;background:var(--cool);flex:none}
   .side-status i.w{background:var(--warm)} .side-status i.b{background:var(--hot)}
   nav.tabs a.side-status svg{margin-left:auto;width:14px;height:14px}
-  #side-st small{display:block;font-size:13px;margin-top:2px}
+  #side-st{min-width:0;white-space:normal} #side-st small{display:block;font-size:13px;margin-top:2px}
   .side-user{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding:14px 6px 0;font-size:13px;min-width:0}
   .side-user>div{min-width:0;line-height:1.4}
   .side-user b,.side-user small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2470,11 +2470,16 @@ function pmMovers(b){
   return `<div class="cols2" style="align-items:start">${list('Nasdaq-100 升得最多',nd.slice(0,8))}${list('Nasdaq-100 跌得最多',nd.slice(-8).reverse())}</div>
     ${WL.size?list(`自選股 <span class="muted small">${wl.length} 隻有延長時段報價</span>`,wl)+(miss.length?`<p class="muted small">${miss.join('、')} 冇延長時段報價（只計 Nasdaq-100、符合 KC 條件、市值 500 億美元以上同今日出業績嘅股票）。</p>`:''):''}`;
 }
+// Same states as 經濟及新聞: a speech or statement has no number, so it is never 待公布 once its time has passed
+function pmEState(e){ const t=Date.parse(e.u)||null, now=Date.now();
+  if(e.a==null&&e.c==null&&e.p==null) return !t?'wait':/Press Conference|Speaks|Speech|Testimony/i.test(e.e||'')?(t+60*60e3<=now?'ended':t<=now?'live':'soon'):(t<=now?'out':'wait');
+  return e.a!=null?'done':(t&&t<=now?'late':'wait') }
 function pmEcon(b){
   const E=(b.econ||[]).filter(e=>pmKey(e)).sort((a,c)=>(Date.parse(a.u)||0)-(Date.parse(c.u)||0));
-  return `<div class="panel tablewrap"><table><thead><tr><th>時間（香港）</th><th>數據</th><th>狀態</th><th class="r">實際</th><th class="r">預期</th><th class="r">前值</th></tr></thead><tbody>${E.map(e=>`<tr><td class="num small">${e.hol?`${e.d.slice(5)} 全日`:e.u?hkFmt(e.u):'—'}</td><td>★ ${econName(e)}${e.ref?`<div class="muted small">統計期：${e.ref}</div>`:e.hol&&e.note?`<div class="muted small">${esc(e.note)}</div>`:''}</td><td class="small">${e.hol?`<span class="warntxt">${e.hol.full?'假期':'提早收市'}</span>`:e.a!=null?'<span class="up">已公布</span>':'<span class="muted">待公布</span>'}</td><td class="r num"><b>${e.a!=null?esc(e.a):'—'}</b></td><td class="r num">${e.c!=null?esc(e.c):'—'}</td><td class="r num">${e.p!=null?esc(e.p):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">今日同隔晚冇重要經濟數據。</td></tr>'}</tbody></table></div>
+  return `<div class="panel tablewrap"><table><thead><tr><th>時間（香港）</th><th>數據</th><th>狀態</th><th class="r">實際</th><th class="r">預期</th><th class="r">前值</th></tr></thead><tbody>${E.map(e=>`<tr><td class="num small">${e.hol?`${e.d.slice(5)} 全日`:e.u?hkFmt(e.u):'—'}</td><td>★ ${econName(e)}${e.ref?`<div class="muted small">統計期：${e.ref}</div>`:e.hol&&e.note?`<div class="muted small">${esc(e.note)}</div>`:''}</td><td class="small">${e.hol?`<span class="warntxt">${e.hol.full?'假期':'提早收市'}</span>`:(([st,sc])=>`<span class="${sc}">${st}</span>`)(ESTATE[pmEState(e)])}</td><td class="r num"><b>${e.a!=null?esc(e.a):'—'}</b></td><td class="r num">${e.c!=null?esc(e.c):'—'}</td><td class="r num">${e.p!=null?esc(e.p):'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="muted">今日同隔晚冇重要經濟數據。</td></tr>'}</tbody></table></div>
   <p class="muted small">只列重要數據（★）。之後有冇更新數字，睇 <a href="#news">經濟及新聞</a>（數據公布後會再擷取）。</p>`;
 }
+const pmClosed=d=>{const n=nyNow(), t=ymd(n); return t>d||(t===d&&n.getHours()>=16)};
 async function pmShow(d){
   const sel=$('pm-day'); sel.value=d; const i=PM.indexOf(d);
   $('pm-prev').disabled=i<=0; $('pm-next').disabled=i>=PM.length-1;
@@ -2484,7 +2489,7 @@ async function pmShow(d){
   const draw=()=>{
     const want=pmWant(), cur=d>=want, latest=pmLatest();
     $('pm').innerHTML = (latest<want?`<div class="stale pmstale" role="status"><b>最新報告：${latest}，未有更新。</b>應該有美東 ${want}${wdZh(want)} 嘅報告，自動整理可能延遲或者失敗。下面係${d===latest?'最近一份':''}歷史報告，數字唔係今日嘅。</div>`:'')
-      + `<div class="panel lead pmhero"><div><span class="tagchip">${cur?(d===ymd(nyNow())?'今日':'最新'):'歷史報告'} · 美東 ${d}${wdZh(d)}</span><h3>${cur?'今日，先留意呢幾件事。':`${d} 嘅報告（歷史）`}</h3>${b.late?`<p class="small warntxt" style="margin:-4px 0 6px">呢份報告喺開市後（香港時間 ${hkFmt(b.t)}）先整理到：「盤前」價已經包埋開市後成交，同正式盤前唔同。</p>`:''}<ul>${L.map(x=>`<li>${x}</li>`).join('')}</ul>
+      + `<div class="panel lead pmhero"><div><span class="tagchip">${cur?(d===ymd(nyNow())?'今日':'最新'):'歷史報告'} · 美東 ${d}${wdZh(d)}</span><h3>${cur?'今日，先留意呢幾件事。':`${d} 嘅報告（歷史）`}</h3>${b.late?`<p class="small warntxt" style="margin:-4px 0 6px">呢份報告喺開市後（香港時間 ${hkFmt(b.t)}）先整理到：「盤前」價已經包埋開市後成交，同正式盤前唔同。</p>`:''}${cur&&pmClosed(d)?`<p class="small muted" style="margin:-4px 0 6px">美東 ${d.slice(5)} 已經收市，呢份係嗰日開市前嘅報告。收市結果睇 <a href="#close">收市後分析</a>；下一份約美東 ${b.nd?b.nd.slice(5):'下個交易日'} 早上 6 點出。</p>`:''}<ul>${L.map(x=>`<li>${x}</li>`).join('')}</ul>
       <p class="muted small" style="margin-top:8px">資料截至 ${hkFmt(b.t)}（香港時間）· 由下面數據自動整理，唔係建議</p></div>
       <div class="pmstat"><div><b>${(b.econ||[]).filter(pmKey).length}</b><span class="muted small">重要經濟數據</span></div><div><b>${got}/${4+(b.mkt||[]).length+(b.world||[]).length}</b><span class="muted small">已取得市場項目</span></div></div></div>
       <section><p class="kicker">Indices</p><h2>指數琴日收市同 ETF 盤前</h2><div class="cards">${(b.idx||[]).map(x=>pmDaily(x,b)).join('')}${(b.etf||[]).map(pmEtf).join('')}</div></section>
@@ -2674,7 +2679,7 @@ const hkt = iso => new Date(iso).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kon
 // Key releases (★) and Chinese names for the common ones
 const ECON_KEY=/FOMC|Fed Interest Rate|CPI|PCE|GDP|Nonfarm|Unemployment Rate|Initial Jobless|Retail Sales|ISM|PPI|JOLTS|CB Consumer Confidence|Michigan Consumer Sentiment|Durable Goods Orders/i;
 const ECON_ZH=[[/^FOMC Statement/,'議息聲明'],[/^Fed Interest Rate Decision/,'聯儲局利率決定'],[/^FOMC Press Conference/,'議息記者會'],[/^FOMC Meeting Minutes/,'議息會議紀錄'],
-  [/^Core PCE Price Index/,'核心 PCE 物價指數'],[/^PCE Price index/i,'PCE 物價指數'],[/^Core CPI/,'核心 CPI'],[/^CPI/,'CPI 消費物價指數'],[/^Core PPI/,'核心 PPI'],[/^PPI/,'PPI 生產物價指數'],
+  [/^Core PCE Price Index/,'核心 PCE 物價指數'],[/^PCE Price index/i,'PCE 物價指數'],[/^Core CPI Index/,'核心 CPI 指數'],[/^Core CPI/,'核心 CPI'],[/^CPI Index, n\.?s\.?a/i,'CPI 指數（未經季節調整）'],[/^CPI Index, s\.?a/i,'CPI 指數（經季節調整）'],[/^CPI, n\.?s\.?a/i,'CPI 按月（未經季節調整）'],[/^CPI/,'CPI 消費物價指數'],[/^Core PPI/,'核心 PPI'],[/^PPI/,'PPI 生產物價指數'],
   [/^GDP$/,'GDP 經濟增長'],[/^Nonfarm Payrolls/,'非農就業'],[/^Unemployment Rate/,'失業率'],[/^Initial Jobless Claims/,'首次申領失業救濟'],[/^Continuing Jobless Claims/,'持續申領失業救濟'],
   [/^Retail Sales/,'零售銷售'],[/^ISM Manufacturing PMI/,'ISM 製造業 PMI'],[/^ISM Non-Manufacturing PMI|^ISM Services PMI/,'ISM 服務業 PMI'],[/^JOLTs? Job Openings/i,'JOLTS 職位空缺'],
   [/^CB Consumer Confidence/,'消費者信心指數'],[/^Michigan Consumer Sentiment/,'密歇根消費者信心'],[/^Durable Goods Orders/,'耐用品訂單'],[/^Core Durable Goods Orders/,'核心耐用品訂單'],
