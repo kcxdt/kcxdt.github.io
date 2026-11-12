@@ -9,6 +9,7 @@ import json
 import pandas as pd
 
 from .__main__ import OUT, now_utc, write_page
+from .checks import run as run_checks
 from .fetch import economic_calendar, headlines
 
 
@@ -29,6 +30,12 @@ def main():
             data["earn_live"] = live
     except Exception as e:  # results are a bonus; never lose the econ / news refresh over them
         print("live results failed:", e)
+    try:
+        # the page is rebuilt from today's template, so the stored checks must follow today's rules too: after a
+        # rule change (12 Nov 2026, past-due dates) the page counted 6 while the checks from the close build said 15
+        data["checks"] = run_checks(data)
+    except Exception as e:
+        print("checks failed, keeping the close build's:", e)
     path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
     write_page(data)
     print(f"refreshed: {len(econ)} econ rows, {len(news)} headlines (empty = kept the last good copy)")
