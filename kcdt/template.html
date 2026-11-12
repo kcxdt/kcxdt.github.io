@@ -1230,8 +1230,8 @@ const staleTag = s => fStale(s) ? `<span class="fstale" title="${s.erep} 出咗�
 // No price for the last session: the close before it is carried forward (up to 3 days), so there is no change, volume or
 // new high/low for the day, and those stocks are left out of the day's counts
 const fillTag = s => s.fill ? `<span class="fstale fill" title="冇 ${D.asof} 報價，用 ${s.pxd||'之前'} 收市價補（補咗 ${s.fill} 日）。今日升跌、成交量同新高新低唔計呢隻">補價</span>` : '';
-// Expected dates up to the last close with no confirmed report (same rule as kcdt/checks.py past_due)
-const pastDue = s => { const d=s.eold || (s.edate===D.asof && !s.econf ? s.edate : null); return !!d && !(s.erep && s.erep>=d) };
+// Expected dates before the last close with no confirmed report (same rule as kcdt/checks.py past_due)
+const pastDue = s => !!s.eold && !(s.erep && s.erep>=s.eold);
 // Fundamentals coverage, one definition everywhere: [any fundamentals, every field the default screener reads]
 let FCOV = D.fcov || [0,0];
 const nfmt = n => n.toLocaleString('en-US');
@@ -2571,7 +2571,7 @@ function pageChecks(late, past, pmc){
 const spill = (p, t) => `<span class="pill p${p}">${t}</span>`;
 DRAW.about = () => {
   const n=S.length, stale=!$('stale').hidden && !$('stale').classList.contains('soft');
-  const old=S.filter(fStale).length;
+  const old=S.filter(fStale).length, wk=new Date(Date.parse(D.asof)-7*864e5).toISOString().slice(0,10), oldNew=S.filter(s=>fStale(s)&&s.erep>=wk).length;
   const ed=S.filter(s=>eNext(s)), conf=ed.filter(s=>s.econf).length, past=S.filter(pastDue).length;
   // 按月／按年 is confirmed from ForexFactory, which only lists the current week: next week's rows can't be confirmed
   // before Monday, so only this week's unconfirmed rows count as something to look at
@@ -2579,8 +2579,8 @@ DRAW.about = () => {
   const E=econRows(), unc=E.filter(e=>e.unconf&&e.d<=wkEnd).length, uncNext=E.filter(e=>e.unconf&&e.d>wkEnd).length, late=E.filter(e=>e.state==='late').length;
   const rows=[
     ['價格、指數、市場寬度','Yahoo Finance',hkFmt(D.built),`${n.toLocaleString('en-US')} 隻股票，價格截至 ${D.asof} 收市`, stale?spill(2,'過期'):spill(0,'正常')],
-    ['營收／EPS（基本面）','Nasdaq、Yahoo Finance',fNew?`最新 ${fNew}，最舊 ${FTS[0]}`:'—',`共 ${nfmt(n)} 隻：${fcovTxt}（市值、營收增長、機構持股、Beta）· 每隻約 7 日輪流更新，剛出業績同新符合 KC 條件嘅優先`, old?spill(1,`${old} 隻出咗業績未更新`)+' <a class="small" href="#screener" id="ab-stale">喺選股器睇</a>':spill(0,'正常')],
-    ['業績日','Nasdaq 業績日曆、Yahoo Finance（公司已定＝已排期，其餘＝預計）',hkFmt(D.built),`美東日期＋盤前／盤後 · ${nfmt(ed.length)} 隻有下次日期，${nfmt(conf)} 隻已排期`, past?spill(1,`${past} 隻預計日已過，未確認公布（計到 ${D.asof}）`):spill(0,'正常')],
+    ['營收／EPS（基本面）','Nasdaq、Yahoo Finance',fNew?`最新 ${fNew}，最舊 ${FTS[0]}`:'—',`共 ${nfmt(n)} 隻：${fcovTxt}（市值、營收增長、機構持股、Beta）· 每隻約 7 日輪流更新，剛出業績同新符合 KC 條件嘅優先`, old?spill(old>50?1:0,old>50?`${old} 隻出咗業績未更新`:`正常 · ${old} 隻等緊來源出新一季`)+' <a class="small" href="#screener" id="ab-stale">喺選股器睇</a>'+`<div class="small muted">${oldNew} 隻係近 7 日先出業績；Yahoo 同 Nasdaq 通常要幾日先有新一季數字，系統每 12 小時再試</div>`:spill(0,'正常')],
+    ['業績日','Nasdaq 業績日曆、Yahoo Finance（公司已定＝已排期，其餘＝預計）',hkFmt(D.built),`美東日期＋盤前／盤後 · ${nfmt(ed.length)} 隻有下次日期，${nfmt(conf)} 隻已排期`, past?spill(past>30?1:0,past>30?`${past} 隻預計日已過，未確認公布`:`正常 · ${past} 隻預計日已過，未確認公布`)+`<div class="small muted">${D.asof} 之前嘅預計日，Nasdaq 日曆未見實際 EPS；確認咗就會消失</div>`:spill(0,'正常')],
     ['美國經濟數據','Nasdaq、ForexFactory（對照按月／按年）',hkFmt(D.econ_t||D.news_t),`今個星期同下個星期 ${E.length} 項${uncNext?` · 下星期有 ${uncNext} 項要到下星期一先分得出按月定按年（對照來源只出當週）`:''}`, late||unc?spill(1,[late&&`${late} 項等數據源更新`,unc&&`${unc} 項按月／按年未確認`].filter(Boolean).join('，')):spill(0,'正常')],
     ['市場新聞','Nasdaq',hkFmt(D.news_t),`${(D.news||[]).length} 條`, (D.news||[]).length?spill(0,'正常'):spill(2,'拎唔到')],
     ['盤前需知','Yahoo Finance（延遲報價）、US Treasury、Nasdaq','<span id="ab-pm-t">讀取中…</span>','美股交易日紐約時間約 05:50 整理一次 · <span id="ab-pm">讀取中…</span>','<span id="ab-pm-st"></span>'],

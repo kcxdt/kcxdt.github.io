@@ -202,6 +202,7 @@ def fundamentals_row(f):
 
 
 NY = "America/New_York"
+AFTER_REPORT_DAYS = 45  # no company reports twice this close together
 
 
 def ny_day(ts):
@@ -314,16 +315,15 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
         if fund.get(t, {}).get("_ts"):
             row["fts"] = pd.Timestamp(fund[t]["_ts"], unit="s").strftime("%Y-%m-%d")
         yd, yt, ysure, yseen = yahoo_next(fund.get(t), (ydates or {}).get(t))
-        # Yahoo keeps showing the last report's date until the company sets the next one. A date that was already
-        # behind us when it was fetched is therefore no expected date: when Yahoo marks it as the company's own it
-        # is the last report (closed-end funds and half-yearly ADRs showed dates from 2020-2025 as 預計日已過);
-        # an estimate that old says nothing, unless it is from the last two weeks and may simply be running late.
-        if yd and yseen and yd < yseen:
-            if ysure:
-                row["erep"] = max(row.get("erep") or "", yd)
-                yd = None
-            elif (pd.Timestamp(asof) - pd.Timestamp(yd)).days > 14:
-                yd = None
+        # A date the company itself set that is now behind us is its last report (IMOS, set for 10 Nov, stayed
+        # 預計日已過 because Nasdaq's calendar never confirmed it; closed-end funds and half-yearly ADRs showed set dates
+        # from 2020-2025). Yahoo also keeps showing the last date until the next one is known, so a guess that was
+        # already past when it was fetched was never an expected report (BEPC, BIPC, SIFY).
+        if yd and ysure and yd < asof:
+            row["erep"] = max(row.get("erep") or "", yd)
+            yd = None
+        elif yd and yseen and yd < yseen:
+            yd = None
         if yd:
             row["edate"], row["etime"] = yd, yt
             if ysure:
@@ -346,6 +346,11 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
                     row.pop("econf", None)  # date only, nobody confirms it: shown as 預計
         if done and t in done and done[t] > (row.get("erep") or ""):  # on Nasdaq's calendar with an actual EPS
             row["erep"] = done[t]
+        if row.get("edate") and not row.get("econf") and row.get("erep") \
+                and 1 <= (pd.Timestamp(row["edate"]) - pd.Timestamp(row["erep"])).days <= AFTER_REPORT_DAYS:
+            # a guessed date a few weeks after a report: the quarter it was guessing is the one already reported
+            # (TECH reported 4 Nov while the calendar still projected 11 Nov)
+            row["edate"], row["etime"] = None, None
         if fund_stale(row):
             row["fst"] = True  # 業績後待更新: the page shows this flag, the checks count the same rule
         if row.get("edate") and row["edate"] < asof:
