@@ -247,6 +247,7 @@ button.csort:hover{color:var(--ink)}
 #pm,#hx{display:grid;gap:22px}
 select{font:inherit;font-size:14px;padding:4px 8px;border-radius:8px;border:1px solid var(--ctlline);background:var(--ctl);color:var(--ink)}
 .pmhero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px}
+.pmsess{font-size:15px;margin:14px 0 8px}.pmsess:first-child{margin-top:0}
 .pmhero h3{font-size:24px;margin:10px 0 8px}
 .pmhero ul{margin:0;padding-left:20px;display:grid;gap:4px}
 .pmstat{border-left:1px solid var(--line);padding-left:20px;display:grid;gap:14px;align-content:center}
@@ -354,7 +355,9 @@ td.frz .why{display:block;font-size:13px;white-space:normal;max-width:340px;colo
 td.frz .why.no{color:var(--muted)}
 .fstale.fill{color:var(--muted);border-color:var(--line)}
 .fstale{display:inline-block;font-size:12px;line-height:1.5;padding:0 6px;margin-left:4px;border-radius:5px;border:1px solid color-mix(in srgb,var(--warm) 60%,var(--line));color:var(--warm);font-weight:600;white-space:nowrap;vertical-align:1px}
-.inddist{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:10px 14px}
+.inddist{padding:8px 14px}.inddist summary{cursor:pointer}.inddist .indrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
+th .qi{font:inherit;font-size:11px;width:16px;height:16px;line-height:14px;padding:0;margin-left:4px;border-radius:50%;border:1px solid var(--line);background:none;color:var(--muted);cursor:pointer;vertical-align:1px}
+th .qi:hover{border-color:var(--selline);color:var(--ink)}
 .inddist button{font:inherit;font-size:13px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
 .inddist button:hover{border-color:var(--selline);background:var(--sel)}
 .inddist .bar{display:inline-block;height:6px;border-radius:3px;background:var(--accent);vertical-align:middle;margin-left:6px;opacity:.75}
@@ -410,6 +413,10 @@ td.frz .why.no{color:var(--muted)}
 #jbody .open td.pl{font-style:italic}
 #jbody tr.plan td{color:var(--muted)} #jbody tr.plan td b{color:var(--ink)}
 .jplan{display:flex;gap:8px;align-items:flex-start;margin:10px 0 4px}
+.jfutinfo:empty{display:none}.jfutinfo{margin:10px 0 2px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);line-height:1.6}
+.jfutinfo.ok{border-color:color-mix(in srgb,var(--up) 40%,var(--line))}.jfutinfo.warn{border-color:var(--hot);color:var(--ink)}
+.jfutinfo label{display:flex;gap:8px;align-items:center;margin-top:6px;font-weight:600}
+.jempty{padding:18px 20px}.jempty h3{margin:0 0 4px}.jempty .cfbar{margin-top:12px}
 #j-img{border:0;border-radius:10px;padding:10px;background:var(--panel);max-width:96vw}
 #j-img img{max-width:92vw;max-height:80vh;display:block;margin-bottom:8px}
 #j-img::backdrop{background:rgb(0 0 0 / .6)}
@@ -496,10 +503,11 @@ nav.tabs a em{font-style:normal}
   .top .themesw{display:none}
 }
 .ov-guide{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:14px 16px;margin:12px 0 4px}
-.ov-guide ol{list-style:none;margin:10px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px 18px}
-.ov-guide li{display:flex;gap:10px;align-items:flex-start}
+.ov-guide{padding:10px 14px!important}.ov-gh{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ov-guide ol{list-style:none;margin:8px 0 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:6px 18px}
+.ov-guide li{display:flex;gap:10px;align-items:flex-start}.ov-guide details{min-width:0}.ov-guide summary{cursor:pointer;font-size:14px;line-height:24px}
+.ov-guide details p{margin:4px 0 0}
 .ov-guide li>span{flex:none;width:24px;height:24px;border-radius:50%;background:var(--sel);color:var(--accent);display:grid;place-items:center;font-weight:600;font-size:13px}
-.ov-guide #guide-x{margin-left:8px}
 .ov-head{display:flex;justify-content:space-between;align-items:center;gap:12px 24px;flex-wrap:wrap}
 .ov-head h2{font-size:clamp(22px,2.4vw,28px);font-weight:700;line-height:1.4}
 .ov-head h2 span{color:var(--muted)}
@@ -797,7 +805,6 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
   <main class="view" id="v-screener" hidden>
     <section aria-labelledby="h-scr" id="scr-sec" class="condclosed">
       <div class="sechead"><h2 id="h-scr">選股器</h2><span class="muted small" id="scrcount"></span></div>
-      <p class="purpose">選股器＝按自己條件搵股票。想睇今日有咩變化去<a href="#ideas">機會及訊號</a>；追蹤已關注嘅股票去<a href="#watch">自選清單</a>。</p>
       <div class="panel scrmini" role="status"><span id="scr-mini-n"></span><span class="scrbtns"><button class="tog" id="scr-mini-b" type="button" aria-expanded="false" aria-controls="scr-sec">修改條件</button><button class="tog" id="scr-all" type="button">查看全部股票</button></span><span class="scrconds" id="scr-conds"></span></div>
       <div class="panel scrsum" role="status">
         <div><b id="scr-n"></b> <span id="scr-list"></span> <button class="tog" id="cb-add" type="button">＋ 新增條件</button></div>
@@ -847,8 +854,8 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
       </div>
       <div class="panel tablewrap cmp" id="cmp" hidden></div>
       <div class="panel resbar" id="resbar" role="group" aria-label="篩選結果分組"></div>
-      <p class="explain" id="scr-exp"></p>
-      <div class="panel inddist small" id="inddist" hidden></div>
+      <details class="panel inddist small" id="inddist" hidden></details>
+      <p class="explain" id="scr-exp" hidden></p>
       <div class="panel tablewrap" style="padding:6px 0">
         <table id="stocktable" class="cen">
           <thead><tr id="stockhead"></tr></thead>
@@ -856,6 +863,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
         </table>
       </div>
       <p class="muted small" id="scr-more"></p>
+      <p class="muted small">選股器＝按自己條件搵股票。想睇今日有咩變化去<a href="#ideas">機會及訊號</a>；追蹤已關注嘅股票去<a href="#watch">自選清單</a>。</p>
       <details class="panel how" id="how">
         <summary style="cursor:pointer"><b>指標計法說明</b> <span class="muted small">RS、MVP、趨勢模板點計、同邊啲股票比、缺數據點處理 · 各項數據幾時更新見<a href="#about">數據狀態</a></span></summary>
         <div class="how" id="howbody"></div>
@@ -897,6 +905,9 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
   <main class="view" id="v-journal" hidden>
     <section aria-labelledby="h-jn">
       <div class="sechead"><h2 id="h-jn">交易日誌</h2><span class="small"><span class="badge" id="j-where">儲存位置：呢部機嘅瀏覽器</span> <span class="badge" id="j-count" hidden></span> <span class="muted" id="loginmsg"></span></span></div>
+      <div class="panel jempty" id="j-empty" hidden><h3>未有交易紀錄</h3>
+        <p class="muted small">由第一單開始記，或者匯入你之前嘅紀錄。有紀錄之後，呢度先會顯示勝率、盈虧、回撤呢啲統計。</p>
+        <div class="cfbar"><button class="tog" type="button" id="j-first" aria-pressed="true">記低第一單 ↓</button><button class="tog" type="button" id="j-old">匯入舊紀錄（Excel／CSV）</button><button class="tog" type="button" id="j-oldbak">匯入備份檔（JSON）</button></div></div>
       <div class="stats" id="j-stats"></div>
     </section>
     <section class="panel jform" aria-labelledby="h-jf">
@@ -908,12 +919,13 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
           <label>方向<select name="side"><option value="L">Long 做多</option><option value="S">Short 做空</option></select></label>
           <label><span class="j-stk">股票代號</span><span class="j-fut">期貨代號</span><input name="sym" required list="tickers" style="text-transform:uppercase"></label>
           <label class="j-fut">合約月份<input name="cm" placeholder="例如 2026-12 或 NQZ6"></label>
-          <label class="j-fut">合約乘數（每點美元）<input name="mult" type="number" step="any" min="0" placeholder="NQ = 20，MNQ = 2"></label>
+          <label class="j-fut">合約乘數（每點美元）<input name="mult" type="number" step="any" min="0" placeholder="揀代號自動帶入"></label>
           <label>開倉日期<input name="open" type="date" required></label>
           <label><span><span class="j-pl">計劃</span><span class="j-stk">股數</span><span class="j-fut">合約數</span></span><input name="qty" type="number" step="any" min="0" required></label>
           <label><span><span class="j-pl">計劃</span>入場價</span><input name="buy" type="number" step="any" min="0" required></label>
           <label>預計止損<input name="sl" type="number" step="any" min="0"></label>
         </div>
+        <div class="j-fut jfutinfo small" id="j-futinfo" role="status"></div>
         <label class="small jplan"><input type="checkbox" name="plan"> 只係交易計劃（未成交）：入場價同數量係計劃嘅，成交之後喺交易紀錄撳「確認成交」填實際成交價、數量同時間。計劃唔計入任何統計。</label>
         <p class="jstep">2. 平倉 <span class="muted small">（未平倉就留空，之後喺交易紀錄撳「平倉」都得）</span></p>
         <div class="jgrid">
@@ -949,7 +961,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
       <datalist id="j-strats"><option>趨勢跟隨</option><option>突破</option><option>回調買入</option><option>反彈</option><option>業績</option><option>開市突破</option><option>即日反轉</option></datalist>
       <datalist id="j-moods"><option>冷靜理性</option><option>恐懼割肉</option><option>FOMO 追高</option><option>貪心</option><option>報復性交易</option></datalist>
     </section>
-    <section aria-labelledby="h-js">
+    <section aria-labelledby="h-js" id="js-sec">
       <div class="sechead"><h2 id="h-js">復盤統計</h2><div class="controls" id="js-by"></div></div>
       <div class="panel tablewrap"><table>
         <thead><tr><th id="js-h">策略</th><th class="r">樣本（已平倉）</th><th class="r">勝率</th><th class="r">平均盈虧</th><th class="r">平均 R</th><th class="r">總盈虧</th><th class="r">最大回撤</th></tr></thead>
@@ -1305,17 +1317,18 @@ const nfmt = n => n.toLocaleString('en-US');
 let fcovTxt = '';
 // One status row for every page: 價格截至／新聞更新／待更新, the exact times one tap away
 const drawStamps = () => { const box=$('stamps'), open=box.open, ck=k=>(D.checks||[]).find(c=>c.k===k), late=ck('late'), fill=ck('fill');
-  const todo=[late&&late.n&&`基本面 <span class="nw">${nfmt(late.n)} 隻</span>`, fill&&fill.n&&`補價 <span class="nw">${fill.n} 隻</span>`].filter(Boolean);
+  const todo=[late&&late.n&&`基本面 <span class="nw">${nfmt(late.n)} 隻</span>`, fill&&fill.n&&`收市價 <span class="nw">${fill.n} 隻待補齊</span>`].filter(Boolean);
+  const fl=READY?S.filter(s=>s.fill):[], fw=fl.filter(s=>WL.has(s.s));
   const dot=$('side-dot')?$('side-dot').className:'';
   box.innerHTML = `<summary><span class="dot ${dot}"></span>`
-    + `<span class="nw">價格截至 <b>${D.asof.slice(5)}（${'日一二三四五六'[new Date(D.asof+'T12:00:00Z').getUTCDay()]}）收市</b></span><i>｜</i>`
+    + `<span class="nw">${fill&&fill.n&&$('stale').hidden?'大部分收市價已更新：':'價格截至 '}<b>${D.asof.slice(5)}（${'日一二三四五六'[new Date(D.asof+'T12:00:00Z').getUTCDay()]}）收市</b></span><i>｜</i>`
     + `<span class="nw">新聞更新 <b>${hkFmt(D.news_t)}</b></span><i>｜</i>`
     + `<span class="d">待更新：${todo.length?todo.join('、'):'冇'}</span><span class="m nw">待更新 ${todo.length?`${todo.length} 項`:'冇'}</span>`
     + `<u>詳情</u></summary><ul>`
     + `<li>價格：美東 ${D.asof} 美股收市 · 網站更新 ${hkFmt(D.built)}（香港時間）</li>`
     + `<li>新聞擷取 ${hkFmt(D.news_t)} · 經濟數據擷取 ${hkFmt(D.econ_t||D.news_t)}（香港時間）</li>`
     + `<li>基本面：每隻股票約 7 日輪流更新${fNew?`，最新 ${fNew}`:''}${late?` · 出咗業績未更新 ${nfmt(late.n)} 隻`:''}</li>`
-    + (fill&&fill.n?`<li>補價：${fill.n} 隻冇 ${D.asof} 報價，用之前收市價補</li>`:'')
+    + (fill&&fill.n?`<li>收市價待補齊：${fill.n} 隻今日冇 ${D.asof} 報價，暫時用之前收市價（表入面標「補價」，唔計入升跌家數）。${fl.length?`受影響：${fl.slice(0,12).map(s=>tk(s)).join('、')}${fl.length>12?` 等 ${fl.length} 隻`:''}。`:''}${READY?(fw.length?` <b class="warntxt">你嘅自選有 ${fw.length} 隻：${fw.map(s=>s.s).join('、')}</b>`:' 你嘅自選股唔受影響。'):''}</li>`:'')
     + `<li><a href="#about">數據狀態：每項來源、更新時間同待更新名單 →</a></li></ul>`;
   box.open=open; };
 // The close update starts 16:50 New York (backups until ~23:00, plus a Claude check at 17:47) and takes ~10 minutes.
@@ -1342,8 +1355,8 @@ const drawStamps = () => { const box=$('stamps'), open=box.open, ck=k=>(D.checks
   $('side-dot').className = box.hidden?'':soft?'w':'b';
   // prices and fundamentals said separately, so a green light never reads as "every number is complete"
   const ck=k=>(D.checks||[]).find(c=>c.k===k), late=ck('late'), fill=ck('fill');
-  const sub=[late&&(late.n?`基本面 ${nfmt(late.n)} 隻待更新`:'基本面已更新'), fill&&fill.n?`${fill.n} 隻補價`:''].filter(Boolean).join(' · ');
-  $('side-st').innerHTML = (box.hidden?`價格正常 · ${D.asof.slice(5)} 收市`:soft?'今日收市更新緊':'價格未更新')+(sub?`<small>${sub}</small>`:'');
+  const sub=[late&&(late.n?`基本面 ${nfmt(late.n)} 隻待更新`:'基本面已更新'), fill&&fill.n?`${fill.n} 隻收市價待補齊`:''].filter(Boolean).join(' · ');
+  $('side-st').innerHTML = (box.hidden?`${fill&&fill.n?'大部分收市價已更新':'收市價已更新'} · ${D.asof.slice(5)}`:soft?'今日收市更新緊':'價格未更新')+(sub?`<small>${sub}</small>`:'');
   drawStamps();
 })();
 
@@ -1604,11 +1617,11 @@ DRAW.overview = () => {
         `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${sgn(s.chg,2)}%</td><td class="r num">${s.rsr??'—'}</td><td class="r num ${cls(s.d50)}">${sgn(s.d50,1)}</td><td class="num">${eNext(s)?`${s.edate.slice(5)}${ETIME[s.etime]?' '+ETIME[s.etime]:''}`:'<span class="muted">未知</span>'}</td></tr>`).join('')}</tbody></table></div><p class="explain" style="margin-top:8px">${EXP_RS()}</p>${mine.length>8?`<p style="margin-top:10px">顯示頭 8 隻，共 ${mine.length} 隻。</p>`:''}`;
   $('v-overview').innerHTML = `
     <header class="ov-head"><div><h2>睇清市況，<span>再聚焦機會。</span></h2></div><a class="ov-go" href="#screener">開始選股 →</a></header>
-    ${Store.get('guide1',0)?'':`<div class="ov-guide" role="note"><b>第一次用？跟住呢 3 步睇：</b><ol>
-      <li><span>1</span><div><b>今日市況點</b><br><span class="muted small">先睇下面「較昨日有咩變化」同「趨勢風險」，知道大市同科技股係低風險定警戒。想知開市前要留意咩，睇 <a href="#pm">盤前需知</a>。</span></div></li>
-      <li><span>2</span><div><b>邊幾隻值得研究</b><br><span class="muted small">「今日研究清單」列出今日新符合 KC 條件嘅股票；想自己揀條件就去 <a href="#screener">選股器</a>。撳代號會開個股頁。</span></div></li>
-      <li><span>3</span><div><b>跟進同記錄</b><br><span class="muted small">撳代號旁邊嘅 ☆ 加入 <a href="#watch">自選清單</a>；決定咗就喺 <a href="#journal">交易日誌</a> 記低計劃或者交易，之後覆盤。</span></div></li>
-    </ol><p class="muted small" style="margin:6px 0 0">全部只係數據參考，唔係買賣建議。<button class="tog" type="button" id="guide-x">知道喇，唔再顯示</button></p></div>`}
+    ${Store.get('guide1',0)?'':`<div class="ov-guide" role="note"><div class="ov-gh"><b>第一次用？3 步：</b><button class="tog" type="button" id="guide-x">知道喇，唔再顯示</button></div><ol>
+      <li><span>1</span><details><summary>睇市況：大市係低風險定警戒</summary><p class="muted small">先睇下面「較昨日有咩變化」同「趨勢風險」。想知開市前要留意咩，睇 <a href="#pm">盤前需知</a>。</p></details></li>
+      <li><span>2</span><details><summary>揀股：睇今日研究清單或者用選股器</summary><p class="muted small">「今日研究清單」列出今日新符合 KC 條件嘅股票；想自己揀條件就去 <a href="#screener">選股器</a>。撳代號會開個股頁。</p></details></li>
+      <li><span>3</span><details><summary>跟進：加自選，記低交易</summary><p class="muted small">撳代號旁邊嘅 ☆ 加入 <a href="#watch">自選清單</a>；決定咗就喺 <a href="#journal">交易日誌</a> 記低計劃或者交易，之後覆盤。全部只係數據參考，唔係買賣建議。</p></details></li>
+    </ol></div>`}
     <div class="ov-links">${[['pm','盤前需知'],['close','收市後分析'],['market','大市完整指標'],['news','經濟及新聞'],['earnings','業績日曆'],['ideas','機會及訊號'],['journal','交易日誌']].map(([h,n])=>`<a href="#${h}">${n} →</a>`).join('')}</div>
     <div class="ov-top">${ovDelta(dp)}${ovResearch()}</div>
     <div class="ov-3">
@@ -1616,7 +1629,7 @@ DRAW.overview = () => {
         ${Z.map(z=>`<div class="ov-risk"><span>${z.n}</span><strong class="num">${z.p}<small> /100</small></strong><span class="ov-track"><b style="width:${z.p}%;background:var(${z.z[1]})"></b></span><span class="pill p${lvl(z)}">${z.z[0]}</span></div>`).join('')}
         <p class="explain">${EXP_RISK}</p>
         <div class="ov-foot"><span>${Z.map(z=>`${z.n}${z.d===0?'同前一日一樣':`較前一日${z.d>0?'升':'跌'} ${Math.abs(z.d)} 分`}`).join(' · ')}</span><a href="#market">點樣計 →</a></div></article>
-      <article class="ov-card"><div class="ov-lab">市場參與度 <small>Nasdaq-100</small></div><div class="ov-num num">${n50.toFixed(1)}<small>%</small></div><p>企喺 50 日線上嘅股票</p><p class="explain">${EXP_B50}</p>
+      <article class="ov-card"><div class="ov-lab">市場參與度 <small>Nasdaq-100</small></div><div class="ov-num num">${n50.toFixed(1)}<small>%</small></div><p>企喺 50 日線上嘅股票</p><p class="explain">${EXP_B50(bn)}</p>
         <span class="ov-track big"><b style="width:${n50}%"></b></span>
         <div class="ov-foot"><span class="num">${bn.a50} ／ ${bn.n} 隻${dp==null?'':` · ${dp===0?'同昨日一樣':`較昨日${dp>0?'多':'少'} ${Math.abs(dp)} 個百分點`}`}</span><a href="#market">市場寬度 →</a></div></article>
       <article class="ov-card"><div class="ov-lab">${tday.length?'今日重要事件':'下一個重要事件'} <small>香港時間</small></div>
@@ -2127,8 +2140,9 @@ const colSave = () => { Store.set('cols',[...SHOW]); Store.set('colind2',SHOWIND
 const CMP=new Set();
 let SCR_ROWS=[];
 function drawHead(){
-  $('stockhead').innerHTML=`<th class="frz"><button data-k="s">代號</button></th>`+visCols().map(c=>`<th class="${['mvp','tt','edate','sec','ind'].includes(c[0])?'':'r'}"><button data-k="${c[0]}"${c[5]?` title="${c[5]}"`:''}>${c[1]}</button></th>`).join('');
-  document.querySelectorAll('#stocktable th button').forEach(b=>{
+  $('stockhead').innerHTML=`<th class="frz"><button data-k="s">代號</button></th>`+visCols().map(c=>`<th class="${['mvp','tt','edate','sec','ind'].includes(c[0])?'':'r'}"><button data-k="${c[0]}"${c[5]?` title="${c[5]}"`:''}>${c[1]}</button>${c[0]==='rsr'||c[0]==='tt'?`<button type="button" class="qi" data-qi="1" aria-controls="scr-exp" aria-label="${c[1]} 點計" title="${c[1]} 點計">?</button>`:''}</th>`).join('');
+  $('stockhead').querySelectorAll('[data-qi]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const x=$('scr-exp'); x.hidden=!x.hidden; if(!x.hidden) x.scrollIntoView({block:'nearest'}) });
+  document.querySelectorAll('#stocktable th button[data-k]').forEach(b=>{
     if(b.dataset.k===sortK){b.dataset.active='true'; b.textContent+=sortDir<0?' ▾':' ▴'}
     b.onclick=()=>{const k=b.dataset.k; if(sortK===k)sortDir*=-1; else {sortK=k;sortDir=(k==='s'||k==='edate')?1:-1} drawHead(); renderStocks()}});
 }
@@ -2152,11 +2166,11 @@ function drawIndDist(rows){ const e=$('inddist'); if(!e) return;
   const c={}; rows.forEach(s=>{const k=s.ind||'?'; c[k]=(c[k]||0)+1});
   const L=Object.entries(c).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])), top=L.slice(0,6), rest=L.slice(6).reduce((a,x)=>a+x[1],0), mx=top[0][1];
   const cur=(CFS.ind||'').startsWith('=')?CFS.ind.slice(1):null;
-  e.hidden=false;
-  e.innerHTML=`<b>${nfmt(rows.length)} 隻${(RESG.find(x=>x[0]===RES)||['','符合'])[1]} · 行業分布：</b>`+top.map(([k,n])=>k==='?'?`<span class="muted">未知 ${n}</span>`
+  e.hidden=false; if(cur) e.open=true;
+  e.innerHTML=`<summary><b>行業分布</b> <span class="muted">${top.filter(x=>x[0]!=='?').slice(0,3).map(([k,n])=>`${esc(k)} ${n}`).join(' · ')}${L.length>3?` 等 ${L.length} 個`:''}</span></summary><div class="indrow">`+top.map(([k,n])=>k==='?'?`<span class="muted">未知 ${n}</span>`
       :`<button type="button" data-ind="${esc(k)}" title="只睇 ${esc(k)}"${cur===k?' aria-pressed="true"':''}>${esc(k)} <b class="num">${n}</b><i class="bar" style="width:${Math.max(4,Math.round(n/mx*36))}px"></i></button>`).join('')
     +(rest?`<span class="muted">其他 ${L.length-6} 個行業 ${rest} 隻</span>`:'')
-    +(cur?` <button type="button" data-ind="" title="唔再限細分行業">✕ 顯示全部行業</button>`:'');
+    +(cur?` <button type="button" data-ind="" title="唔再限細分行業">✕ 顯示全部行業</button>`:'')+'</div>';
   e.querySelectorAll('button[data-ind]').forEach(b=>b.onclick=()=>{ if(b.dataset.ind) CFS.ind='='+b.dataset.ind; else delete CFS.ind; drawCF(); renderStocks();
     if(b.dataset.ind) wlMsg(`已加入條件：細分行業 ${b.dataset.ind}（撳 × 或者「顯示全部行業」可以移除）`) });
 }
@@ -2211,17 +2225,17 @@ function renderStocks(){
   const rows=G[RES].sort((a,b)=>{const A=a[sortK],B=b[sortK];if(A==null)return 1;if(B==null)return -1;return (typeof A==='string'?A.localeCompare(B):(A-B))*sortDir});
   SCR_ROWS=rows;
   $('resbar').innerHTML=RESG.map(([k,n])=>`<button class="tog res-${k}" type="button" data-res="${k}" aria-pressed="${k===RES}">${n} <b class="num">${nfmt(G[k].length)}</b></button>`).join('')
-    +`<span class="muted small">${RES==='ok'?'全部條件都有數據而且符合。':RES==='na'?'冇一項唔符合，但有啲條件因為缺數據判斷唔到（每隻下面寫咗缺邊樣），唔可以當係符合。':'最少一項條件唔符合（每隻下面寫咗邊幾項）。'}</span>`;
+    +`<span class="muted small">${RES==='ok'?'':RES==='na'?'冇一項唔符合，但有啲條件因為缺數據判斷唔到（每隻下面寫咗缺邊樣），唔可以當係符合。':'最少一項條件唔符合（每隻下面寫咗邊幾項）。'}</span>`;
   $('resbar').querySelectorAll('[data-res]').forEach(b=>b.onclick=()=>{RES=b.dataset.res; renderStocks()});
   { const n=chipOn.length+cfOn.length, isKC=!cfOn.length&&chipOn.length===FA.length&&FA.every(x=>on.has(x[0])), pp=$('pre')&&PRE.find(x=>x.id===$('pre').value), pn=pp&&JSON.stringify([...pp.on].sort())===JSON.stringify([...on].sort())&&JSON.stringify(pp.cf||{})===JSON.stringify(CFS)?pp.id:'';
     const nm=!n?'冇條件（全部股票）':isKC?'KC 預設':pn?`我的預設「${esc(pn)}」`:'自訂條件';
-    $('scr-mini-n').innerHTML=`目前使用：<b>${nm}</b>${n?` · ${n} 項條件 · <b class="num">${nfmt(G.ok.length)}</b> 隻符合${G.na.length?` · ${nfmt(G.na.length)} 隻缺資料未能判斷`:''}`:` · 顯示全部 <b class="num">${nfmt(G.ok.length)}</b> 隻`}（股票池共 ${nfmt(S.length)} 隻）`;
+    $('scr-mini-n').innerHTML=`目前使用：<b>${nm}</b>${n?` · ${n} 項條件`:''} <span class="muted small">（股票池共 ${nfmt(S.length)} 隻）</span>`;
     const labs=tests.map(t=>t[0]);
     $('scr-conds').textContent=n?`條件：${labs.slice(0,6).join('、')}${labs.length>6?` 等 ${labs.length} 項`:''}。撳「修改條件」逐項開關。`:'而家冇篩選任何條件。';
     $('scr-all').textContent=n?'查看全部股票':'還原 KC 預設'; }
-  $('scrcount').textContent=`${nfmt(S.length)} 隻入面：${G.ok.length} 隻符合、${G.na.length} 隻因缺資料未能判斷、${G.no.length} 隻不符合`;
+  $('scrcount').textContent='';
   const vis=visCols();
-  $('scr-exp').textContent=EXP_RS()+' 趨勢 5 格 = 趨勢模板 5 項條件中咗幾多項。';
+  $('scr-exp').innerHTML=EXP_RS()+' 趨勢 5 格 = 趨勢模板 5 項條件中咗幾多項。完整計法見最底「指標計法說明」。';
   drawIndDist(rows);
   $('stockbody').innerHTML = rows.slice(0,lim).map(s=>`<tr>
     <td class="frz"><span style="white-space:nowrap"><input type="checkbox" data-cmp="${s.s}"${CMP.has(s.s)?' checked':''} aria-label="比較 ${s.s}">${star(s.s)}${tk(s)}${s.ndx?' <span class="muted small">N100</span>':''}${staleTag(s)}${fillTag(s)}</span><div class="muted small sub" title="${esc(s.n||'')}"><span class="nm">${esc(s.n||'')}</span><span class="sc">${secZh(s)}${s.ind?` · ${esc(s.ind)}`:''}</span>${RES_WHY[s.s]?`<span class="why ${RES}">${esc(RES_WHY[s.s])}</span>`:''}</div></td>
@@ -2415,7 +2429,7 @@ function wlMsg(t){ const e=$('toast'); e.textContent=t; e.hidden=false; clearTim
 function wlStars(){ document.querySelectorAll('.star[data-w]').forEach(b=>{const t=b.dataset.w, on=WL.has(t); b.setAttribute('aria-pressed',on); b.textContent=on?'★':'☆';
   b.title=on?'喺自選清單（撳一下移除）':'加入自選清單'; b.setAttribute('aria-label',`${on?'移除自選':'加入自選'} ${t}`)});
   const ws=$('s-wl'); if(ws) ws.textContent=WL.has(ws.dataset.w)?'★ 已喺自選（撳一下移除）':'☆ 加入自選';
-  $('side-wl').textContent=WL.size; if(drawn.overview) DRAW.overview() }  // sidebar count and the 今日總覽 list follow every change
+  $('side-wl').textContent=WL.size; drawStamps(); if(drawn.overview) DRAW.overview() }  // sidebar count and the 今日總覽 list follow every change
 async function wlReload(){ try{ const rows=await DB.all('watch'), m=rows.find(r=>r.id==='_lists');
     WLISTS=m&&m.lists&&m.lists.length?m.lists:WL_DEF; WL=new Map(rows.filter(r=>!String(r.id).startsWith('_')).map(r=>[r.id,r])) }catch(e){ WL=new Map(); WLISTS=WL_DEF }
   if(!WLISTS.some(l=>l.id===wlList)) wlList='all';
@@ -2539,6 +2553,14 @@ const pmLive = (x, b) => { if(x.live!=null) return x.live; if(x.src||!PM_CLOSE[x
   const [tz,m]=PM_CLOSE[x.sym], P=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(b.t)).map(p=>[p.type,p.value]));
   const day=`${P.year}-${P.month}-${P.day}`; return x.d>day || (x.d===day && (+P.hour%24)*60+(+P.minute)<m) };
 const hkHM = iso => new Date(iso).toLocaleTimeString('en-GB',{timeZone:'Asia/Hong_Kong',hour:'2-digit',minute:'2-digit',hour12:false});
+// Hong Kong time said the way people say it, counted from the report's own Hong Kong date (KC 11-13):
+// 今晚 21:30／明日凌晨 02:10／明早 07:30, so nobody has to work out which day 02:10 falls on
+const hkRel = (iso, from) => { const hd=t=>new Date(t).toLocaleDateString('en-CA',{timeZone:'Asia/Hong_Kong'}), d=hd(iso), d0=hd(from),
+    h=+new Date(iso).toLocaleString('en-GB',{timeZone:'Asia/Hong_Kong',hour:'2-digit',hourCycle:'h23'}), t=hkHM(iso);
+  const n=Math.round((Date.parse(d+'T12:00:00Z')-Date.parse(d0+'T12:00:00Z'))/864e5);
+  if(n===0) return (h<12?'今早 ':h<18?'今日 ':'今晚 ')+t;
+  if(n===1) return (h<6?'明日凌晨 ':h<12?'明早 ':h<18?'明日 ':'明晚 ')+t;
+  return `${d.slice(5)} ${t}` };
 const pmKey = e => e.imp===3 || ECON_KEY.test(e.e||'');
 // the brief's next trading day: 明日 when it is the next calendar day, else 下個交易日 (Friday -> Monday)
 const pmNextLbl = b => { const a=new Date(b.d+'T12:00:00Z'), n=new Date(b.nd+'T12:00:00Z');
@@ -2550,8 +2572,8 @@ function pmLines(b){
   if(hol.length) L.push(`<b>今日假期</b>：${hol.map(e=>`${esc(holName(e))}，${esc(e.note||'')}`).join('；')}。`);
   const out=(b.econ||[]).filter(e=>pmKey(e)&&done(e)), due=(b.econ||[]).filter(e=>pmKey(e)&&!e.hol&&!done(e)&&e.u&&Date.parse(e.u)>Date.parse(b.t));
   if(out.length) L.push(`<b>已公布</b>：${out.slice(0,3).map(e=>`${econName(e)} ${esc(e.a)}${e.c?`（預期 ${esc(e.c)}）`:''}`).join('；')}。`);
-  if(due.length) L.push(`<b>今日待公布</b>：${due.slice(0,3).map(e=>`${hkHM(e.u)} ${econName(e)}`).join('；')}（香港時間）。`);
-  else L.push('<b>今日待公布</b>：今日冇重要經濟數據。');
+  if(due.length) L.push(`<b>待公布</b>（香港時間）：${due.slice(0,3).map(e=>`<span class="nw" title="${hkFmt(e.u)}">${hkRel(e.u,b.t)}</span> ${econName(e)}`).join('；')}。`);
+  else L.push('<b>待公布</b>：今日美股交易日冇重要經濟數據。');
   if((b.earn_done||[]).length) L.push(`<b>已出業績</b>：${b.earn_done.slice(0,3).map(e=>{const m=(b.movers||{})[e.s]; return `${e.s} EPS ${e.rep}（預期 ${e.est??'—'}）${m?`，${m.when==='pre'?'盤前':'盤後'} <span class="${cls(m.pct)}">${sgn(m.pct,1)}%</span>`:''}`}).join('；')}。`);
   const nd=(b.earn_today||[]).filter(e=>e.ndx);
   if(nd.length) L.push(`<b>今日 Nasdaq-100 出業績</b>：${nd.slice(0,6).map(e=>`${e.s}${ETIME[e.tm]?`（${ETIME[e.tm]}）`:''}`).join('、')}${nd.length>6?` 等 ${nd.length} 隻`:''}。`);
@@ -2602,11 +2624,15 @@ function pmEarn(b){
 }
 function pmMovers(b){
   const M=b.movers||{}, rows=Object.entries(M).map(([s,m])=>({s,...m})).filter(x=>x.pct!=null);
-  const list=(t,xs)=>`<div class="panel tablewrap"><h3>${t}</h3><table class="cen"><thead><tr><th>代號</th><th class="r">昨日收市</th><th class="r">最新</th><th class="r">變動</th><th>時間（香港）</th></tr></thead><tbody>${xs.map(x=>`<tr><td>${BY[x.s]?tk(BY[x.s]):x.s}</td><td class="r num">${f(x.c)}</td><td class="r num">${f(x.v)}</td><td class="r num ${cls(x.pct)}">${sgn(x.pct,2)}%</td><td class="small">${x.when==='pre'?'盤前':'盤後'} ${hkFmt(x.t)}</td></tr>`).join('')||'<tr><td colspan="5" class="muted">冇數據</td></tr>'}</tbody></table></div>`;
-  const nd=rows.filter(x=>BY[x.s]&&BY[x.s].ndx).sort((a,b)=>b.pct-a.pct), wl=rows.filter(x=>WL.has(x.s)).sort((a,b)=>b.pct-a.pct);
+  const list=(t,xs,empty)=>`<div class="panel tablewrap"><h3>${t}</h3><table class="cen"><thead><tr><th>代號</th><th class="r">昨日收市</th><th class="r">最新</th><th class="r">變動</th><th>時間（香港）</th></tr></thead><tbody>${xs.map(x=>`<tr><td>${BY[x.s]?tk(BY[x.s]):x.s}</td><td class="r num">${f(x.c)}</td><td class="r num">${f(x.v)}</td><td class="r num ${cls(x.pct)}">${sgn(x.pct,2)}%</td><td class="small">${x.when==='pre'?'盤前':'盤後'} ${hkFmt(x.t)}</td></tr>`).join('')||`<tr><td colspan="5" class="muted">${empty||'冇數據'}</td></tr>`}</tbody></table></div>`;
+  // 今日盤前 and 昨晚盤後 are different sessions, so they are never ranked in one table (KC 11-13)
+  const nd=rows.filter(x=>BY[x.s]&&BY[x.s].ndx), pre=nd.filter(x=>x.when==='pre').sort((a,b)=>b.pct-a.pct), post=nd.filter(x=>x.when!=='pre').sort((a,b)=>b.pct-a.pct);
+  const wl=rows.filter(x=>WL.has(x.s)).sort((a,b)=>(a.when==='pre'?0:1)-(b.when==='pre'?0:1)||b.pct-a.pct);
   const miss=[...WL.keys()].filter(t=>!M[t]);
-  return `<div class="cols2" style="align-items:start">${list('Nasdaq-100 升得最多',nd.slice(0,8))}${list('Nasdaq-100 跌得最多',nd.slice(-8).reverse())}</div>
-    ${WL.size?list(`自選股 <span class="muted small">${wl.length} 隻有延長時段報價</span>`,wl)+(miss.length?`<p class="muted small">${miss.join('、')} 冇延長時段報價（只計 Nasdaq-100、符合 KC 條件、市值 500 億美元以上同今日出業績嘅股票）。</p>`:''):''}`;
+  const sess=(t,note,xs,empty)=>`<h3 class="pmsess">${t} <span class="muted small">${note}</span></h3><div class="cols2" style="align-items:start">${list('Nasdaq-100 升得最多',xs.filter(x=>x.pct>0).slice(0,5),empty||'冇上升')}${list('Nasdaq-100 跌得最多',xs.filter(x=>x.pct<0).slice(-5).reverse(),empty||'冇下跌')}</div>`;
+  return sess('今日盤前', pre.length?`${pre.length} 隻有盤前成交`:'', pre, pre.length?'':'未有盤前成交（報告整理時紐約仲未到 04:00，或者成交太少）')
+    + (post.length?sess('昨晚盤後', `${post.length} 隻今日未有盤前成交，用昨晚盤後最後報價`, post):'')
+    + (WL.size?list(`自選股 <span class="muted small">${wl.length} 隻有延長時段報價，盤前排先</span>`,wl)+(miss.length?`<p class="muted small">${miss.join('、')} 冇延長時段報價（只計 Nasdaq-100、符合 KC 條件、市值 500 億美元以上同今日出業績嘅股票）。</p>`:''):'');
 }
 // Same states as 經濟及新聞: a speech or statement has no number, so it is never 待公布 once its time has passed
 function pmEState(e){ const t=Date.parse(e.u)||null, now=Date.now();
@@ -2937,6 +2963,8 @@ function jStats(done){
 function jRender(){
   const rows = TR.map(calc).sort((a,b)=>(a.open+(a.otime||'')+(a.close||'')).localeCompare(b.open+(b.otime||'')+(b.close||'')));
   let cum = 0, month = '';
+  // No records yet: one clear start (記低第一單／匯入舊紀錄) instead of a row of empty statistics (KC 11-13)
+  const none=!TR.length; $('j-empty').hidden=!none; $('j-stats').hidden=none; $('js-sec').hidden=none;
   jFilterOpts(rows);
   const q = JF.sym.trim().toUpperCase(), on = !!(q||JF.mon||JF.st);
   const shown = rows.filter(t=>(!q||t.sym.includes(q)) && (!JF.mon||t.open.slice(0,7)===JF.mon) && (!JF.st||(JF.st==='plan'?!!t.isPlan:JF.st==='open'?t.isOpen:!t.isOpen&&!t.isPlan)));
@@ -3048,7 +3076,26 @@ function jMsg(t){$('j-msg').textContent=t; clearTimeout(jMsg.t); jMsg.t=setTimeo
 function jMkt(){ const fut=$('jf').elements.mkt.value==='fut';
   document.querySelectorAll('#jf .j-fut').forEach(e=>e.hidden=!fut); document.querySelectorAll('#jf .j-stk').forEach(e=>e.hidden=fut);
   $('jf').elements.sym.setAttribute('list', fut?'j-futs':'tickers');
-  if(fut && !$('jf').elements.mult.value) $('jf').elements.mult.value=20 }
+  const F=$('jf').elements; if(fut && !F.mult.value){ const m=JX_MULT[futRoot(F.sym.value)]; if(m!=null) F.mult.value=m }
+  jFutInfo(false) }
+// Futures: the multiplier comes from the product (NQ 20, MNQ 2…) and the value of one point is shown beside it.
+// An unknown code, or a multiplier that differs from the product's, has to be confirmed before saving (KC 11-13).
+const FUT_NAME={NQ:'Nasdaq-100 E-mini',MNQ:'Nasdaq-100 Micro',ES:'S&P 500 E-mini',MES:'S&P 500 Micro',YM:'道指 E-mini',MYM:'道指 Micro',RTY:'羅素 2000 E-mini',M2K:'羅素 2000 Micro',CL:'WTI 原油',MCL:'WTI 原油 Micro',GC:'黃金',MGC:'黃金 Micro'};
+const futRoot = sym => String(sym||'').trim().toUpperCase().replace(/[FGHJKMNQUVXZ]\d{1,2}$/,'');
+let jMokNeed=false, jAuto=null;
+function jFutInfo(auto){ const F=$('jf').elements, box=$('j-futinfo'), fut=F.mkt.value==='fut'; jMokNeed=false;
+  if(!fut){ box.innerHTML=''; return }
+  const sym=F.sym.value.trim().toUpperCase(), r=futRoot(sym), std=JX_MULT[r];
+  if(auto){ if(std!=null) F.mult.value=jAuto=std; else if(jAuto!=null && num(F.mult.value)===jAuto){ F.mult.value=''; jAuto=null } }  // an auto-filled number never sticks to an unknown code
+  const m=num(F.mult.value), money=x=>'US$'+(+x).toLocaleString('en-US',{maximumFractionDigits:2});
+  if(!sym){ box.className='j-fut jfutinfo small muted'; box.innerHTML='揀期貨代號（例如 NQ、MNQ、ES）就會自動帶入合約乘數同每點價值。'; return }
+  if(std!=null && m===std){ box.className='j-fut jfutinfo small ok';
+    box.innerHTML=`<b>${r}</b>（${FUT_NAME[r]}）每點價值 <b class="num">${money(std)}</b>／張。例如升 10 點 × 1 張 = ${money(10*std)}。`; return }
+  jMokNeed=true; const old=jEdit&&TR.find(x=>x.id===jEdit), pre=!!(old&&old.mult!=null&&old.mult===m&&old.sym===sym);
+  box.className='j-fut jfutinfo small warn';
+  box.innerHTML=(std!=null?`<b>${r}</b> 標準乘數係 <b class="num">${std}</b>（每點 ${money(std)}），你填咗 <b class="num">${m??'—'}</b>。`
+      :`網站未識別「${esc(sym)}」呢個期貨代號，唔知佢每點值幾多。請自己填合約乘數（每點美元）。`)
+    + (m>0?`<label><input type="checkbox" id="j-mok"${pre?' checked':''}> 我確認乘數係 <b class="num">${m}</b>：每點 ${money(m)}／張</label>`:'') }
 // With fills, the entry/exit totals are worked out from them and can't be typed
 const FILLED=['open','otime','close','ctime','qty','buy','sell'];
 function jFillsDerive(){ const F=$('jf').elements, ins=jFills.filter(x=>x.a==='in'&&x.q>0&&x.p!=null), outs=jFills.filter(x=>x.a==='out'&&x.q>0&&x.p!=null);
@@ -3266,13 +3313,16 @@ function jxInit(){
 }
 DRAW.journal = () => {
   if(!DRAW.journal.done){ DRAW.journal.done=1;
-    $('jf').insertAdjacentHTML('beforeend','<datalist id="j-futs"><option>NQ</option><option>MNQ</option><option>ES</option><option>MES</option><option>YM</option><option>RTY</option></datalist>');
+    $('jf').insertAdjacentHTML('beforeend',`<datalist id="j-futs">${Object.keys(JX_MULT).map(k=>`<option value="${k}">${FUT_NAME[k]} · 每點 US$${JX_MULT[k]}</option>`).join('')}</datalist>`);
     $('jf').elements.mkt.onchange=jMkt;
     $('j-tz').onchange=()=>Store.set('jtz',$('j-tz').value);
     $('j-addfill').onclick=()=>{ const F=$('jf').elements;
       if(!jFills.length && F.qty.value && F.buy.value) jFills.push({a:'in', d:F.open.value, tm:F.otime.value, q:num(F.qty.value), p:num(F.buy.value)});
       jFills.push({a:jFills.length?'out':'in', d:F.close.value||F.open.value||ymd(nyNow()), tm:'', q:null, p:null}); jFillsDraw() };
     $('j-new').onclick=jReset;
+    $('j-first').onclick=()=>{ $('h-jf').scrollIntoView({behavior:'smooth',block:'start'}); setTimeout(()=>$('jf').elements.sym.focus({preventScroll:true}),400) };
+    $('j-old').onclick=()=>$('j-xlf').click(); $('j-oldbak').onclick=()=>$('j-imp').click();
+    $('jf').elements.sym.addEventListener('input',()=>jFutInfo(true)); $('jf').elements.mult.addEventListener('input',()=>jFutInfo(false));
     $('jc-go').onclick=jcSave; $('jp-go').onclick=jpSave; $('jpff').elements.p.oninput=jpPrev; $('jf').elements.plan.onchange=jPlanUI;
     $('jf-sym').oninput=e=>{ JF.sym=e.target.value; jRender() };
     $('jf-mon').onchange=e=>{ JF.mon=e.target.value; jRender() };
@@ -3287,6 +3337,9 @@ DRAW.journal = () => {
         buy:num(F.buy.value), sell:num(F.sell.value), qty:num(F.qty.value), fee:num(F.fee.value)||0, tp:num(F.tp.value), sl:num(F.sl.value), risk:num(F.risk.value),
         strat:F.strat.value.trim(), mood:F.mood.value.trim(), why_in:F.why_in.value, why_out:F.why_out.value, review:F.review.value, shots:jShots, fills, upd:Date.now() };
       const old=jEdit&&TR.find(x=>x.id===jEdit); if(old&&old.pbuy!=null){ t.pbuy=old.pbuy; t.pqty=old.pqty??null }
+      if(t.mkt==='fut'){
+        if(!(t.mult>0)){ jMsg('期貨要填合約乘數（每點美元）'); F.mult.focus(); return }
+        if(jMokNeed && !($('j-mok')&&$('j-mok').checked)){ jMsg('呢個期貨代號／乘數要先剔「我確認乘數」先可以儲，避免記錯盈虧'); $('j-futinfo').scrollIntoView({block:'center'}); return } }
       if(F.plan.checked){ t.plan=true;
         if(!t.sym || t.buy==null){ jMsg('交易計劃要填代號同計劃入場價'); return }
         if(fills.length || t.close || t.sell!=null){ jMsg('交易計劃未成交，唔可以有平倉或者分批成交；成交之後撳「確認成交」'); return }
@@ -3334,7 +3387,7 @@ let SD=null;
 // One-line explanations shown right beside the numbers (KC 11-11): what high means, what RS compares against
 const EXP_RISK='0–100：分數越高，8 個風險條件觸發得越多，即風險越高（唔係跌市機率）。';
 const EXP_RS=()=>`RS 1–99：同股票池 ${nfmt(D.nuniv||S.length)} 隻比較最近 1、3、6、12 個月回報（3 個月佔 40%）嘅排名；90 即強過約 90% 股票。`;
-const EXP_B50='即係 100 隻 Nasdaq-100 成份股入面，幾多 % 收市高過自己 50 日平均價；越高 = 越多股票跟住升。';
+const EXP_B50=(bn=D.breadth.ndx)=>`即係 Nasdaq-100 成份股入面，幾多 % 收市企喺自己 50 日平均價之上。越高 = 越多成份股企喺 50 日線上，唔一定代表今日有升。分母 = 有足夠價格數據嘅成份股（今日 ${bn&&bn.n?bn.n:'—'} 隻）。`;
 function stat(label, value, cls=''){return `<div${cls?` class="${cls}"`:''}><span>${label}</span><b>${value}</b></div>`}
 // 同業: other stocks in the same 細分行業 (Yahoo industry), biggest first
 let PEER_ALL=false;
