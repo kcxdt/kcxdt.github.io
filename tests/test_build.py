@@ -257,6 +257,9 @@ def test_breadth_ignores_missing_closes():
     d = build(px, fake_meta(universe), {}, None, {}, {}, {}, {})
     b = d["breadth"]["ndx"]
     assert d["hist"][-1]["n50"] == round(b["a50"] / b["n"] * 100, 1)
+    # the tech score's own % above the 50/200-day line uses the same stocks, so the snapshot agrees with the home page
+    t = d["tech"]["hist"][-1]["v"]
+    assert round(t["pct50"], 1) == d["hist"][-1]["n50"] and round(t["pct200"], 1) == d["hist"][-1]["n200"]
 
 
 def test_checks_helpers():
