@@ -260,6 +260,13 @@ def main():
     if len(data["stocks"]) < 1000:
         sys.exit(f"only {len(data['stocks'])} stocks computed, refusing to publish")
     data["built"] = now_utc()
+    # single-stock ETFs for the search box and the stock page's 相關 ETF (never stops the build)
+    try:
+        from .etfs import etf_map
+        data["etfs"] = etf_map([s["s"] for s in data["stocks"]], ROOT / "cache" / "etfs.json")
+    except Exception as e:  # noqa: BLE001
+        print(f"ETF map skipped: {e}")
+        data["etfs"] = {}
     data["mhol"] = sorted(HOLIDAYS)
     OUT.mkdir(exist_ok=True)
     data["pm_t"], data["pm_d"] = keep_history(data, hist)
