@@ -11,6 +11,14 @@ def coverage(stocks):
     return part, full
 
 
+OLD_DAYS = 30  # fundamentals older than this count as out of date (outside the screener pool the turn is 21 days)
+
+
+def blank_records(stocks):
+    """Fetched (fts) but nothing came back: no market cap, industry or beta."""
+    return [s["s"] for s in stocks if s.get("fts") and all(s.get(k) is None for k in ("mcap", "ind", "beta"))]
+
+
 # A report covers the fiscal quarter that ended up to ~3 months before it. When the latest quarter in the data ended more
 # than QLAG days before the last report, the data is still the quarter before (a 10-K can come 90 days after year end).
 QLAG = 105
@@ -61,6 +69,15 @@ def run(data, today=None, now=None):
     part, full = coverage(st)
     add(0 if full >= part * 0.8 else 1,
         f"基本面覆蓋：{part:,} 隻有部分資料，{full:,} 隻齊備預設篩選所需資料（市值、營收增長、機構持股、Beta）")
+
+    # a fetch that came back empty (13 Nov 2026: Yahoo refused every call and 41 records lost market cap, industry and
+    # beta, AMAT and CSCO among them, while the status page said 正常)
+    blank = blank_records(st)
+    add(0 if len(blank) <= 5 else 2, f"基本面更新咗但冇資料（市值、行業、Beta 都空）：{len(blank)} 隻"
+        + (f"（例如 {'、'.join(blank[:6])}；下次更新會優先重新攞）" if blank else ""), "blank", len(blank))
+    aged = [s["s"] for s in st if s.get("fts") and (pd.Timestamp(data["asof"]) - pd.Timestamp(s["fts"])).days > OLD_DAYS]
+    add(0 if len(aged) <= 30 else 1, f"基本面超過 {OLD_DAYS} 日未更新：{len(aged)} 隻"
+        + (f"（例如 {'、'.join(aged[:6])}）" if aged else ""), "aged", len(aged))
 
     ind = sum(1 for s in st if s.get("ind"))
     add(0 if ind >= n * 0.95 else 1, f"細分行業（Industry）：{ind:,} / {n:,} 隻有資料（新股每日補）")
