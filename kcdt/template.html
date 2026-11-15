@@ -2843,9 +2843,9 @@ const hkt = iso => new Date(iso).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kon
 // Key releases (★) and Chinese names for the common ones
 const ECON_KEY=/FOMC|Fed Interest Rate|CPI|PCE|GDP|Nonfarm|Unemployment Rate|Initial Jobless|Retail Sales|ISM|PPI|JOLTS|CB Consumer Confidence|Michigan Consumer Sentiment|Durable Goods Orders/i;
 const ECON_ZH=[[/^FOMC Statement/,'議息聲明'],[/^Fed Interest Rate Decision/,'聯儲局利率決定'],[/^FOMC Press Conference/,'議息記者會'],[/^FOMC Meeting Minutes/,'議息會議紀錄'],
-  [/^Core PCE Price Index/,'核心 PCE 物價指數'],[/^PCE Price index/i,'PCE 物價指數'],[/^Core CPI Index/,'核心 CPI 指數'],[/^Core CPI/,'核心 CPI'],[/^CPI Index, n\.?s\.?a/i,'CPI 指數（未經季節調整）'],[/^CPI Index, s\.?a/i,'CPI 指數（經季節調整）'],[/^CPI, n\.?s\.?a/i,'CPI 按月（未經季節調整）'],[/^CPI/,'CPI 消費物價指數'],[/^Core PPI/,'核心 PPI'],[/^PPI/,'PPI 生產物價指數'],
+  [/^Core PCE Price Index/,'核心 PCE 物價指數'],[/^PCE Price index/i,'PCE 物價指數'],[/^Core CPI Index/,'核心 CPI 指數'],[/^Core CPI/,'核心 CPI'],[/^CPI Index, n\.?s\.?a/i,'CPI 指數（未經季節調整）'],[/^CPI Index, s\.?a/i,'CPI 指數（經季節調整）'],[/^CPI, n\.?s\.?a/i,'CPI 按月（未經季節調整）'],[/^CPI/,'CPI 消費物價指數'],[/^Core PPI/,'核心 PPI'],[/^PPI ex\.? Food\/Energy\/Transport/i,'PPI（剔除食品、能源及貿易服務）'],[/^PPI/,'PPI 生產物價指數'],
   [/^GDP$/,'GDP 經濟增長'],[/^Nonfarm Payrolls/,'非農就業'],[/^Unemployment Rate/,'失業率'],[/^Initial Jobless Claims/,'首次申領失業救濟'],[/^Continuing Jobless Claims/,'持續申領失業救濟'],
-  [/^Retail Sales/,'零售銷售'],[/^ISM Manufacturing PMI/,'ISM 製造業 PMI'],[/^ISM Non-Manufacturing PMI|^ISM Services PMI/,'ISM 服務業 PMI'],[/^JOLTs? Job Openings/i,'JOLTS 職位空缺'],
+  [/^Core Retail Sales/i,'核心零售銷售（剔除汽車）'],[/^Retail Sales Ex Gas\/Autos/i,'零售銷售（剔除汽油及汽車）'],[/^Retail Sales/,'零售銷售'],[/^ISM Manufacturing PMI/,'ISM 製造業 PMI'],[/^ISM Non-Manufacturing PMI|^ISM Services PMI/,'ISM 服務業 PMI'],[/^JOLTs? Job Openings/i,'JOLTS 職位空缺'],
   [/^CB Consumer Confidence/,'消費者信心指數'],[/^Michigan Consumer Sentiment/,'密歇根消費者信心'],[/^Durable Goods Orders/,'耐用品訂單'],[/^Core Durable Goods Orders/,'核心耐用品訂單'],
   [/^Crude Oil Inventories/,'EIA 原油庫存'],[/^New Home Sales/,'新屋銷售'],[/^Existing Home Sales/,'二手樓銷售'],[/^Building Permits/,'建築許可'],[/^Personal Income/,'個人收入'],[/^Personal Spending/,'個人支出']];
 // Fed speakers: "Fed Logan Speaks", "FOMC Member Bowman Speaks", "Fed Chair Powell Speaks", "Fed Vice Chair Jefferson Speaks"

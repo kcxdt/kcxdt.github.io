@@ -251,6 +251,13 @@ def _one(t):
     return rec
 
 
+def _blank(rec):
+    """True when Yahoo answered with nothing usable (13 Nov 2026: "401 Invalid Crumb" on every call, yfinance still
+    returns an empty info dict, and 41 good records were overwritten with blanks: AMAT, CSCO, NBIS lost market cap,
+    industry and next earnings date)."""
+    return not any(rec.get(k) is not None for k in ("mcap", "ind", "ysec", "beta", "qend")) and not rec.get("revq")
+
+
 AFTER_REPORT = 20 * 3600  # Yahoo usually has the new quarter by the next day's run
 
 
@@ -303,7 +310,8 @@ def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, 
     reports = reports or {}
     # a record with quarterly EPS but no quarter end date was saved before that date was collected: it counts as an
     # old-schema record, so it is fetched again ahead of the normal 7-day turn (11 Nov 2026: 59 such, CRM, DELL, HPQ...)
-    current = lambda r: r.get("_v", 1) >= SCHEMA and not (r.get("epsq") and not r.get("qend"))
+    # a blank record (saved while Yahoo was refusing calls) also counts as old, so it is fetched again first
+    current = lambda r: r.get("_v", 1) >= SCHEMA and not (r.get("epsq") and not r.get("qend")) and not (r and _blank(r))
     age = lambda t: (current(cache.get(t, {})), cache.get(t, {}).get("_ts", 0))
     just = {t for t in tickers if reported_since(cache.get(t, {}), now)
             or (t in cache and reported_after_fetch(cache[t], reports.get(t), now))}
@@ -319,6 +327,8 @@ def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, 
         try:
             old = cache.get(t, {})
             rec = _one(t)
+            if _blank(rec) and old and not _blank(old):  # keep the good copy and try again next run, not an empty answer
+                raise RuntimeError("Yahoo returned no data")
             rec["_ts"] = now
             # remember the last report date (Yahoo moves earningsTimestamp on to the next report)
             past = old.get("edate") if old.get("edate") and old["edate"] <= now else None
@@ -353,6 +363,10 @@ def profiles(tickers, cache_file, have=(), max_calls=450, max_age_days=180, paus
     for t in todo[:max_calls]:
         try:
             info = yf.Ticker(t).info or {}
+            old = cache.get(t, {})
+            if (old.get("ysec") or old.get("ind")) and not (info.get("sector") or info.get("industry")):
+                # refused or empty answer: keep the copy we have
+                raise RuntimeError("Yahoo returned no sector or industry")
             cache[t] = {"ysec": info.get("sector"), "ind": info.get("industry"), "_ts": now}
             done += 1
         except Exception as e:
