@@ -258,6 +258,16 @@ def _blank(rec):
     return not any(rec.get(k) is not None for k in ("mcap", "ind", "ysec", "beta", "qend")) and not rec.get("revq")
 
 
+BLANK_STREAK = 10  # this many blank answers in a row: check that Yahoo still answers for a stock it surely knows
+
+
+def _yahoo_ok():
+    try:
+        return bool((yf.Ticker("AAPL").info or {}).get("marketCap"))
+    except Exception:
+        return False
+
+
 AFTER_REPORT = 20 * 3600  # Yahoo usually has the new quarter by the next day's run
 
 
@@ -296,39 +306,48 @@ def retry_due(rec, report, now):
             and now - rec.get("_ts", 0) >= RETRY_AFTER)
 
 
-def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, reports=None, first=None, hot=None):
+def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, reports=None, first=None, hot=None,
+                 slow_age_days=21, probe=None):
     """Refresh stale entries for `tickers`: companies that just reported first, then stocks passing KC's technical
     conditions (`hot`) whose record is due, then the ones whose last fetch was still the quarter before (retried),
     then old schema, then oldest.
 
     reports: {ticker: unix time} from report_times(): Nasdaq's calendar confirms reports that Yahoo's cached
     earnings date missed (it had already moved on, or had none), so those count as just reported too.
-    first: among the just-reported, these go first (the screener's pool, ahead of stocks outside it)."""
+    first: among the just-reported, these go first (the screener's pool, ahead of stocks outside it).
+    slow_age_days: stocks outside `first` are due after this many days instead of max_age_days, so the whole market
+    can have fundamentals within the same daily call budget (they only take the calls the pool leaves over)."""
     path = pathlib.Path(cache_file)
     cache = json.loads(path.read_text()) if path.exists() else {}
     now = time.time()
     reports = reports or {}
     # a record with quarterly EPS but no quarter end date was saved before that date was collected: it counts as an
     # old-schema record, so it is fetched again ahead of the normal 7-day turn (11 Nov 2026: 59 such, CRM, DELL, HPQ...)
-    # a blank record (saved while Yahoo was refusing calls) also counts as old, so it is fetched again first
-    current = lambda r: r.get("_v", 1) >= SCHEMA and not (r.get("epsq") and not r.get("qend")) and not (r and _blank(r))
+    # a blank record saved while Yahoo was refusing calls (no _empty mark) also counts as old, so it is fetched again first
+    current = lambda r: r.get("_v", 1) >= SCHEMA and not (r.get("epsq") and not r.get("qend")) and not (r and _blank(r) and not r.get("_empty"))
     age = lambda t: (current(cache.get(t, {})), cache.get(t, {}).get("_ts", 0))
     just = {t for t in tickers if reported_since(cache.get(t, {}), now)
             or (t in cache and reported_after_fetch(cache[t], reports.get(t), now))}
     retry = {t for t in tickers if t in cache and t not in just and retry_due(cache[t], reports.get(t), now)}
     stale = sorted((t for t in tickers if t in just or t in retry or age(t)[0] is False
-                    or now - age(t)[1] > max_age_days * 86400),
+                    or now - age(t)[1] > (max_age_days if first is None or t in first else slow_age_days) * 86400),
                    key=lambda t: (0 if t in just else 1 if hot and t in hot else 2 if t in retry else 3,
                                   first is not None and t not in first, age(t)))
     print(f"fundamentals: {len(just)} reported since last fetch, refreshing those first; "
           f"{len(retry)} still on the quarter before their report, trying again")
     done = fails = 0
+    streak = []  # (ticker, previous record) of blank answers in a row
     for t in stale[:max_calls]:
         try:
             old = cache.get(t, {})
             rec = _one(t)
             if _blank(rec) and old and not _blank(old):  # keep the good copy and try again next run, not an empty answer
                 raise RuntimeError("Yahoo returned no data")
+            if _blank(rec):
+                rec["_empty"] = True  # Yahoo has nothing for it (closed-end funds, preferreds): normal turn, not every run
+                streak.append((t, cache.get(t)))
+            else:
+                streak = []
             rec["_ts"] = now
             # remember the last report date (Yahoo moves earningsTimestamp on to the next report)
             past = old.get("edate") if old.get("edate") and old["edate"] <= now else None
@@ -337,6 +356,18 @@ def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, 
                 rec["erep"] = rec["edate"]
             cache[t] = rec
             done += 1
+            if len(streak) >= BLANK_STREAK:
+                if not (probe or _yahoo_ok)():
+                    # Yahoo is refusing calls, not these stocks: undo the blanks and stop (13 Nov 2026: Invalid Crumb)
+                    for u, prev in streak:
+                        if prev is None:
+                            cache.pop(u, None)
+                        else:
+                            cache[u] = prev
+                    done -= len(streak)
+                    print(f"Yahoo answers blank for a known stock too: stopping, {len(streak)} blank answers not saved")
+                    break
+                streak = []
         except Exception as e:
             fails += 1
             print("fundamentals failed:", t, e)
@@ -707,6 +738,10 @@ def headlines(feeds=("Markets", "Earnings", "Technology"), n=60):
             src = it.findtext("{http://purl.org/dc/elements/1.1/}creator") or "Nasdaq"
             out.append(dict(t=when, title=title, link=link, src=src.strip(), cat=cat))
     out.sort(key=lambda x: x["t"] or "", reverse=True)
+    # the same story is often posted twice under two links a few minutes apart (13 Nov 2026: "Q3 Earnings Results
+    # Reconfirm Broad-Based Strength..." at 07:37 and 07:40): keep the newest copy of each title
+    titles = set()
+    out = [x for x in out if not (" ".join(x["title"].lower().split()) in titles or titles.add(" ".join(x["title"].lower().split())))]
     print(f"headlines: {len(out)}")
     return out[:n]
 

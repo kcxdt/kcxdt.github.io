@@ -1302,7 +1302,7 @@ function livePaint(){
   if(pageEtf()) etfLive();
   const e=$('s-live'), t=pageSym(), q=t&&LQ[t];
   if(!e) return; e.hidden=!q; if(!q) return;
-  const c=lChg(q,t), base=q.sess==='post'?'今日收市':'上日收市';
+  const c=lChg(q,t), base=q.sess==='post'?' '+lDay(q.at).slice(5)+' 收市':'上日收市'  /* weekend: Friday's date, not 「今日」 */;
   e.innerHTML=`延遲價 <b class="num" style="color:var(--ink)">${f(q.p)}</b>${c==null?'':` <span class="${cls(c)}">${sgn(c,2)}%</span> 對${base}`}<br>${LSESS[q.sess]||'交易時段'} · 美東 ${lHM(q.at)} · 延遲最少 15 分鐘`;
   intraPaint(t);
 }
@@ -1494,6 +1494,9 @@ function route(){
   if(!READY && v!=='market' && v!=='overview' && v!=='close' && v!=='playbook') v='wait';  // needs the stock rows: stocksReady() calls route() again
   // #s/CLMB@2026-10-29 = opened from the 歷史 page's 10-29 snapshot: the stock page says it shows the latest data
   const sT=v==='stock'?h.slice(2).split('@')[0]:null, sFrom=v==='stock'?h.split('@')[1]||null:null;
+  // a stock link for a ticker outside the pool (#s/QQQ, an old bookmark): an ETF opens its ETF page; anything else says so
+  if(v==='stock' && !BY[sT] && READY){ if(etfIndex()[sT]){ location.replace('#e/'+encodeURIComponent(sT)); return }
+    wlMsg(`搵唔到 ${sT}：唔喺網站股票池（市值 3 億美元以上、股價 12 美元以上、上市滿一年）`) }
   if(v==='stock' && !BY[sT]) v='overview';
   if(v==='etf' && !/^[A-Z0-9.^=-]{1,12}$/.test(h.slice(2))) v='overview';
   document.querySelectorAll('.view').forEach(x=>x.hidden = x.id!=='v-'+v);
@@ -2326,7 +2329,7 @@ const HOW = () => `
   <div><h4>基本面同缺數據</h4><ul>
     <li>營收增長 = 最近一季按年。EPS 增長 = <b>GAAP</b>（原本會計盈利）最近一季對去年同季（個股頁寫明比較邊兩季）；另有經調整 EPS（公司公布、分析師比較用）同淨利潤增長可以揀欄位睇。去年同季蝕錢而家賺錢顯示「轉盈」，而家蝕錢就寫「轉虧」、「虧損擴大」或「虧損收窄」；去年基數接近零、或者 GAAP 同經調整相差大（可能有一次性項目）會加 ⚠，百分比要小心睇。</li>
     <li>3 季按年 = 最近 3 季每季按年增長嘅最低值（Nasdaq／Yahoo 季度 GAAP 數據，唔夠先用經調整 EPS）；預測 EPS = 分析師預測（Yahoo）。</li>
-    <li>基本面每隻股票大約 7 日輪流更新一次（個股頁有寫最後更新日期）。拎唔到就顯示「—」：用到嗰項嘅條件判斷唔到，股票會放喺「因缺資料未能判斷」，唔會當係符合。出咗業績但數據仲係上一季（睇「資料季度」）會標「業績後待更新」，系統每 12 小時自動再試，最多試 45 日。</li>
+    <li>基本面喺選股器範圍內（Nasdaq-100 同接近上升趨勢）嘅股票大約 7 日輪流更新一次，其餘股票大約 21 日一次（個股頁有寫最後更新日期）。拎唔到就顯示「—」：用到嗰項嘅條件判斷唔到，股票會放喺「因缺資料未能判斷」，唔會當係符合。出咗業績但數據仲係上一季（睇「資料季度」）會標「業績後待更新」，系統每 12 小時自動再試，最多試 45 日。</li>
     <li>趨勢分同 RS 只用價格，所以每隻都有；基本面：${fcovTxt}（市值、營收增長、機構持股、Beta 都有）。</li></ul></div>`;
 function csvDownload(name, lines){
   const q=v=>v==null?'':/[",\n]/.test(String(v))?'"'+String(v).replace(/"/g,'""')+'"':String(v);
@@ -2884,7 +2887,7 @@ DRAW.about = () => {
   const E=econRows(), unc=E.filter(e=>e.unconf&&e.d<=wkEnd).length, uncNext=E.filter(e=>e.unconf&&e.d>wkEnd).length, late=E.filter(e=>e.state==='late').length;
   const rows=[
     ['價格、指數、市場寬度','Yahoo Finance',hkFmt(D.built),`${n.toLocaleString('en-US')} 隻股票，價格截至 ${D.asof} 收市`, stale?spill(2,'過期'):spill(0,'正常')],
-    ['營收／EPS（基本面）','Nasdaq、Yahoo Finance',fNew?`最新 ${fNew}，最舊 ${FTS[0]}`:'—',`共 ${nfmt(n)} 隻：${fcovTxt}（市值、營收增長、機構持股、Beta）· 每隻約 7 日輪流更新，剛出業績同新符合 KC 條件嘅優先`, old?spill(old>50?1:0,old>50?`${old} 隻出咗業績未更新`:`正常 · ${old} 隻等緊來源出新一季`)+' <a class="small" href="#screener" id="ab-stale">喺選股器睇</a>'+`<div class="small muted">${oldNew} 隻係近 7 日先出業績；Yahoo 同 Nasdaq 通常要幾日先有新一季數字，系統每 12 小時再試</div>`:spill(0,'正常')],
+    ['營收／EPS（基本面）','Nasdaq、Yahoo Finance',fNew?`最新 ${fNew}，最舊 ${FTS[0]}`:'—',`共 ${nfmt(n)} 隻：${fcovTxt}（市值、營收增長、機構持股、Beta）· 選股器範圍內嘅股票每 7 日、其餘每 21 日輪流更新（新加入嘅會喺之後幾個交易日逐步補齊），剛出業績同新符合 KC 條件嘅優先`, old?spill(old>50?1:0,old>50?`${old} 隻出咗業績未更新`:`正常 · ${old} 隻等緊來源出新一季`)+' <a class="small" href="#screener" id="ab-stale">喺選股器睇</a>'+`<div class="small muted">${oldNew} 隻係近 7 日先出業績；Yahoo 同 Nasdaq 通常要幾日先有新一季數字，系統每 12 小時再試</div>`:spill(0,'正常')],
     ['業績日','Nasdaq 業績日曆、Yahoo Finance（公司已定＝已排期，其餘＝預計）',hkFmt(D.built),`美東日期＋盤前／盤後 · ${nfmt(ed.length)} 隻有下次日期，${nfmt(conf)} 隻已排期`, past?spill(past>30?1:0,past>30?`${past} 隻預計日已過，未確認公布`:`正常 · ${past} 隻預計日已過，未確認公布`)+`<div class="small muted">${D.asof} 之前嘅預計日，Nasdaq 日曆未見實際 EPS；確認咗就會消失</div>`:spill(0,'正常')],
     ['美國經濟數據','Nasdaq、ForexFactory（對照按月／按年）',hkFmt(D.econ_t||D.news_t),`今個星期同下個星期 ${E.length} 項${uncNext?` · 下星期有 ${uncNext} 項要到下星期一先分得出按月定按年（對照來源只出當週）`:''}`, late||unc?spill(1,[late&&`${late} 項等數據源更新`,unc&&`${unc} 項按月／按年未確認`].filter(Boolean).join('，')):spill(0,'正常')],
     ['市場新聞','Nasdaq',hkFmt(D.news_t),`${(D.news||[]).length} 條`, (D.news||[]).length?spill(0,'正常'):spill(2,'拎唔到')],
@@ -3636,7 +3639,7 @@ function showEtf(t){ const E=etfIndex(), e=E[t]||{s:t,n:'',k:'X'};
 }
 function etfLive(){ const t=pageEtf(), q=t&&LQ[t]; if(!t) return;
   if(!q){ return }
-  const c=q.prev?(q.p/q.prev-1)*100:null, base=q.sess==='post'?'今日收市':'上日收市';
+  const c=q.prev?(q.p/q.prev-1)*100:null, base=q.sess==='post'?' '+lDay(q.at).slice(5)+' 收市':'上日收市'  /* weekend: Friday's date, not 「今日」 */;
   $('e-px').textContent=f(q.p);
   $('e-live').innerHTML=`${c==null?'':`<span class="${cls(c)}">${sgn(c,2)}%</span> 對${base} · `}${LSESS[q.sess]||'交易時段'} · 美東 ${lHM(q.at)}<br>延遲最少 15 分鐘`;
 }

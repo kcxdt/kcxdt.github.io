@@ -364,10 +364,31 @@ def test_fundamentals_keep_good_copy_when_yahoo_answers_blank(tmp_path=None):
     fetch.time.sleep = lambda s: None
     try:
         fetch._one = lambda t: dict(blank)
-        out = fetch.fundamentals(["AMAT", "WIPED"], path)
+        many = [f"F{i}" for i in range(12)]
+        out = fetch.fundamentals(["AMAT", "WIPED"] + many, path, probe=lambda: False)
+        assert "F0" not in out and "_empty" not in out["WIPED"]   # Yahoo down: the blank streak is not saved
         assert out["AMAT"] == good                      # good copy kept, not overwritten
         fetch._one = lambda t: dict(good, mcap=2.2e11)
         out = fetch.fundamentals(["WIPED"], path)       # a blank record is fetched again at once, not after 7 days
         assert out["WIPED"]["mcap"] == 2.2e11
     finally:
         fetch._one, fetch.time.sleep = real_one, real_sleep
+
+
+def test_fundamentals_outside_pool_use_the_slow_turn_and_empty_stays_quiet(tmp_path=None):
+    import json, tempfile, time as _t
+    d = pathlib.Path(tmp_path or tempfile.mkdtemp())
+    path = d / "f.json"
+    now = _t.time()
+    rec = lambda age, **kw: {"mcap": 1e9, "ind": "X", "qend": "2026-09-30", "_v": fetch.SCHEMA, "_ts": now - age * 86400, **kw}
+    path.write_text(json.dumps({"POOL": rec(8), "OUT10": rec(10), "OUT25": rec(25),
+                                "FUND": {"_v": fetch.SCHEMA, "_ts": now - 86400, "_empty": True}}))
+    asked = []
+    real_one, real_sleep = fetch._one, fetch.time.sleep
+    fetch.time.sleep = lambda s: None
+    fetch._one = lambda t: asked.append(t) or rec(0)
+    try:
+        fetch.fundamentals(["POOL", "OUT10", "OUT25", "FUND", "NEW"], path, first={"POOL"}, probe=lambda: True)
+    finally:
+        fetch._one, fetch.time.sleep = real_one, real_sleep
+    assert asked == ["POOL", "NEW", "OUT25"]   # pool first; 10-day-old outside the pool not due; known-empty left alone

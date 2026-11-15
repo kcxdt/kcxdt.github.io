@@ -231,6 +231,11 @@ def main():
                                                          or retry_due(cached[t], reports.get(t), now))} - set(want)
     print(f"fundamentals: {len(extra)} stocks outside the screener pool reported since their last fetch")
     pool, want = set(want), sorted(set(want) | extra)
+    if mode == "warm":
+        # KC, 15 Nov 2026: every stock page should have revenue / EPS, not only the screener's pool (ORCL, HD, BAC had
+        # none). The midday run fills the rest of the market with the calls the pool leaves over (same 300-call cap,
+        # pool first), on a 21-day turn; a stock that left the pool keeps being refreshed (CRM, DELL sat at 28 Oct).
+        want = sorted(set(want) | set(meta.index))
     del cached
     fund = fundamentals(want, fpath, max_calls=budget["fund"], reports=reports, first=pool, hot=kc_technical(px, meta))
     say("fundamentals")
