@@ -421,7 +421,7 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
 
     return dict(
         asof=asof,
-        hist=hist, tech=tech(close, high, meta), panic=_panic(indicator_frame(close, high, close["^VIX"]).dropna()),
+        hist=hist, tech=tech(close, high, nd), panic=_panic(indicator_frame(close, high, close["^VIX"]).dropna()),
         rebound=_rebound(close["QQQ"].dropna()) if "QQQ" in close else None,
         stocks=stocks, idx=idx, sectors=sectors, minis=minis,
         breadth=dict(usa=breadth(stocks), all=breadth([s for s in stocks if s["idx"]]),
@@ -449,12 +449,14 @@ def _rebound(qqq):
     return rebound(qqq) if len(qqq) >= 25 else None
 
 
-def tech(close, high, meta):
-    """Nasdaq-100 temperature history in the same shape as the S&P one, or None without ^NDX/^VXN."""
+def tech(close, high, members):
+    """Nasdaq-100 temperature history in the same shape as the S&P one, or None without ^NDX/^VXN.
+    members: the Nasdaq-100 stocks in today's pool, the same list as the breadth counts (breadth.ndx and n50/n200),
+    so the % above the 50/200-day line agrees everywhere (11-12: home 55.6% = 55/99, snapshot said 55.45% = 56/101)."""
     from .tech import TECH_RULES, tech_indicator_frame, tech_score
     if "^NDX" not in close or "^VXN" not in close:
         return None
-    ind = tech_indicator_frame(close, high, [t for t in meta.index if meta.at[t, "ndx"]]).dropna().tail(HIST_DAYS)
+    ind = tech_indicator_frame(close, high, members).dropna().tail(HIST_DAYS)
     hist = []
     for d, row in ind.iterrows():
         score, pts = tech_score(row)
