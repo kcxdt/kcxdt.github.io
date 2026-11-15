@@ -30,6 +30,12 @@ def main():
             data["earn_live"] = live
     except Exception as e:  # results are a bonus; never lose the econ / news refresh over them
         print("live results failed:", e)
+    if not data.get("etfs"):  # the close build makes the ETF map; a site built before that feature gets it here
+        try:
+            from .etfs import etf_map
+            data["etfs"] = etf_map([s["s"] for s in data["stocks"]], "cache/etfs.json")
+        except Exception as e:
+            print("ETF map failed:", e)
     try:
         # the page is rebuilt from today's template, so the stored checks must follow today's rules too: after a
         # rule change (12 Nov 2026, past-due dates) the page counted 6 while the checks from the close build said 15
