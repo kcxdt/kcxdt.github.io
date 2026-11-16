@@ -480,7 +480,11 @@ tr.nextev td{background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
 .wllists{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 .wllists input{font:inherit;font-size:14px;padding:5px 8px;border-radius:6px;border:1px solid var(--ctlline);background:var(--ctl);color:var(--ink);width:10em}
 .wltag{display:inline-block;font-size:12px;padding:0 6px;margin:1px 3px 1px 0;border-radius:5px;background:var(--soft);color:var(--muted);white-space:nowrap}
-.wlpick{position:fixed;z-index:10;background:var(--raise);border:1px solid var(--ctlline);border-radius:10px;padding:12px 14px;box-shadow:0 8px 24px var(--shade);display:grid;gap:8px;min-width:200px;max-width:min(300px,92vw)}
+.wlpick{position:fixed;z-index:30;background:var(--raise);border:1px solid var(--ctlline);border-radius:10px;padding:12px 14px;box-shadow:0 8px 24px var(--shade);display:grid;gap:8px;min-width:200px;max-width:min(300px,92vw)}
+.login-who{font-size:12px;color:var(--muted);max-width:38vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.login-who:empty{display:none}
+@media (min-width:1100px){.login-who{display:none}}  /* the sidebar already shows who is signed in */
+.loaderr{border-color:var(--hot);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .wlpick label{display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer}
 .wlpick .row{display:flex;gap:8px;justify-content:flex-end}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:8px 16px;border-radius:999px;font-size:14px;z-index:9;max-width:90vw}
@@ -493,6 +497,8 @@ nav.tabs a em{font-style:normal}
 @media (min-width:1100px){
   .wrap{grid-template-columns:210px minmax(0,1fr);column-gap:0;padding-right:0}
   .wrap>:not(nav){width:calc(100% - 64px);max-width:1600px;justify-self:center;box-sizing:border-box}
+  .wrap>.wlpick,.wrap>.toast{width:auto;max-width:min(300px,92vw);box-sizing:content-box}  /* floating boxes keep their own size, not the page column (they sat under the sidebar) */
+  .wrap>.toast{max-width:min(640px,90vw)}
   nav.tabs{position:fixed;inset:0 auto 0 0;width:210px;box-sizing:border-box;margin:0;padding:22px 12px 16px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;gap:0;z-index:20}
   nav.tabs>div{position:static;display:flex;flex-direction:column;gap:3px;flex:1 0 auto;min-height:100%}
   nav.tabs .side-brand{display:flex;align-items:center;gap:10px;padding:0 6px 14px;border-radius:0}
@@ -665,7 +671,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
       <div class="qsug" id="qsug" role="listbox" aria-label="搜尋結果" hidden></div>
     </form>
     <span class="themesw" role="group" aria-label="背景顏色"><button type="button" data-theme="dark">深色</button><button type="button" data-theme="light">白色</button></span>
-    <button class="tog" id="login" hidden>用 Gmail 登入</button>
+    <span class="login-who" id="login-who"></span><button class="tog" id="login" hidden>用 Gmail 登入</button>
   </header>
   <details class="stamps" id="stamps"></details>
   <div class="stale" id="stale" role="alert" hidden></div>
@@ -815,6 +821,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
     <section aria-labelledby="h-wl">
       <p class="purpose">自選清單＝追蹤你已關注嘅股票。想睇今日有咩變化去<a href="#ideas">機會及訊號</a>；想按條件搵新股票去<a href="#screener">選股器</a>。</p>
       <div class="sechead"><h2 id="h-wl">自選清單</h2><span class="badge small" id="wl-where"></span></div>
+      <div class="panel loaderr" id="wl-err" role="alert" hidden></div>
       <div class="panel wlsum" id="wl-sum" role="status"></div>
       <div class="wllists" id="wl-lists"></div>
       <div class="controls" id="wl-filter"></div>
@@ -929,6 +936,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
   <main class="view" id="v-journal" hidden>
     <section aria-labelledby="h-jn">
       <div class="sechead"><h2 id="h-jn">交易日誌</h2><span class="small"><span class="badge" id="j-where">儲存位置：呢部機嘅瀏覽器</span> <span class="badge" id="j-count" hidden></span> <span class="muted" id="loginmsg"></span></span></div>
+      <div class="panel loaderr" id="j-err" role="alert" hidden></div>
       <div class="panel jempty" id="j-empty" hidden><h3>未有交易紀錄</h3>
         <p class="muted small">由第一單開始記，或者匯入你之前嘅紀錄。有紀錄之後，呢度先會顯示勝率、盈虧、回撤呢啲統計。</p>
         <div class="cfbar"><button class="tog" type="button" id="j-first" aria-pressed="true">記低第一單 ↓</button><button class="tog" type="button" id="j-old">匯入舊紀錄（Excel／CSV）</button><button class="tog" type="button" id="j-oldbak">匯入備份檔（JSON）</button></div></div>
@@ -1545,6 +1553,7 @@ function pbCard(d){ return `<article class="pb-day" id="pb${d.id}">${pbHead(d)}
 const pbMatch=d=>pbFilt==='all'||(pbFilt==='live'?d.mode==='live':pbFilt.startsWith('t:')?d.tags.includes(pbFilt.slice(2)):d.r===pbFilt);
 // screenshots: one Firestore read each, only when the card scrolls near the screen
 const PBIMG={}; let pbIO=null;
+const PBIMG_CLEAR=()=>{ for(const k in PBIMG) delete PBIMG[k] };
 function pbWatchImgs(){ pbIO&&pbIO.disconnect();
   pbIO=new IntersectionObserver(es=>es.forEach(async en=>{ if(!en.isIntersecting) return; const b=en.target; pbIO.unobserve(b);
     const id=b.dataset.pbimg; try{ PBIMG[id]=PBIMG[id]||(await DB.get('pbimg',id)||{}).src; if(PBIMG[id]) b.querySelector('img').src=PBIMG[id] }catch(e){} }),{rootMargin:'600px'});
@@ -2397,19 +2406,43 @@ const LocalDB = {
   async put(col,rec){const a=Store.get(col,[]), i=a.findIndex(x=>x.id===rec.id); i<0?a.push(rec):a[i]=rec; Store.set(col,a); if(JSON.stringify(Store.get(col,[]))!==JSON.stringify(a)) throw new Error('full')},
   async del(col,id){Store.set(col,Store.get(col,[]).filter(x=>x.id!==id))}};
 let DB = LocalDB;
+// true until Firebase says whether someone is signed in, so pages say 讀取緊 instead of 呢部機／未有紀錄 for that second
+let AUTH_WAIT = true;
+function loadErr(id, on, text, retry){ const e=$(id); e.hidden=!on; if(!on) return;
+  e.innerHTML=`<span>${text}</span><button class="tog" type="button">重試</button>`;
+  e.querySelector('button').onclick=async b=>{ b.target.disabled=true; b.target.textContent='讀取緊…'; await retry() } }
+const LOGIN_ERR={'auth/popup-closed-by-user':'已取消登入','auth/cancelled-popup-request':'已取消登入','auth/user-cancelled':'已取消登入',
+  'auth/network-request-failed':'登入唔到：網絡有問題，遲啲再試','auth/too-many-requests':'試得太多次，等一陣再登入',
+  'auth/unauthorized-domain':'呢個網址未獲准用 Gmail 登入，請用 kcxdt.github.io 開','auth/web-storage-unsupported':'呢個瀏覽器封鎖咗登入需要嘅儲存，請用 Safari 或 Chrome 開',
+  'auth/operation-not-supported-in-this-environment':'呢個 app 內置瀏覽器唔支援 Gmail 登入，請用 Safari 或 Chrome 開'};
 const FB_CONFIG = { // KC's Firebase web app (public identifiers, not secrets; access is enforced by firestore.rules)
   apiKey: "AIzaSyA-sJb7y9GnC0xfhICiCpA6S4qeQO8Ys8E", authDomain: "kcdt-14ca6.firebaseapp.com", projectId: "kcdt-14ca6",
   storageBucket: "kcdt-14ca6.firebasestorage.app", messagingSenderId: "10043567090", appId: "1:10043567090:web:dcfcf387e9b8a579a4596b"};
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
+// signed out (by the person, or the session ended): nothing of the account stays on screen
+function authSignedOut(){ PBIMG_CLEAR();
+  if(DRAW.journal.done){ ['j-cl','j-pf','j-xl','j-img'].forEach(id=>{ const d=$(id); if(d&&d.open) d.close() }); jReset() }
+  $('wlpick').hidden=true; if(DRAW.screener.done){ $('pre-name').value='' } }
+// Firebase never answered (blocked script, no network): carry on with this browser's copy
+function authGiveUp(){ if(!AUTH_WAIT) return; AUTH_WAIT=false; if(DRAW.journal.done) jReload(); if(DRAW.screener.done) drawPre(); wlReload() }
 async function initLogin(){
-  if(!FB_CONFIG) return;
+  if(!FB_CONFIG){ authGiveUp(); return }
+  setTimeout(authGiveUp, 15000);
   const [{initializeApp},A,F] = await Promise.all(['app','auth','firestore'].map(m=>import(FB_SDK+'firebase-'+m+'.js')));
   const app=initializeApp(FB_CONFIG), auth=A.getAuth(app), fs=F.getFirestore(app), btn=$('login');
   btn.hidden=false;
-  btn.onclick=async()=>{ if(auth.currentUser){await A.signOut(auth);return}
-    try{await A.signInWithPopup(auth,new A.GoogleAuthProvider())}catch(e){ if(e.code==='auth/popup-blocked') A.signInWithRedirect(auth,new A.GoogleAuthProvider()) } };
+  btn.onclick=async()=>{ if(btn.disabled) return;
+    if(auth.currentUser){ try{ await A.signOut(auth) }catch(e){ wlMsg('登出唔到，遲啲再試') } return }
+    btn.disabled=true; const was=btn.textContent; btn.textContent='登入緊…';
+    try{ await A.signInWithPopup(auth,new A.GoogleAuthProvider()) }
+    catch(e){ if(e.code==='auth/popup-blocked'){ wlMsg('瀏覽器擋咗登入視窗，而家轉去 Google 登入頁…'); try{ await A.signInWithRedirect(auth,new A.GoogleAuthProvider()) }catch(e2){ wlMsg(LOGIN_ERR[e2.code]||`登入唔到（${e2.code||e2.message}）`) } }
+      else wlMsg(LOGIN_ERR[e.code]||`登入唔到（${e.code||e.message}），遲啲再試`) }
+    finally{ btn.disabled=false; if(btn.textContent==='登入緊…') btn.textContent=was } };
+  // a sign-in that came back from the Google page (the popup-blocked route): show why if it failed
+  A.getRedirectResult(auth).catch(e=>wlMsg(LOGIN_ERR[e.code]||`登入唔到（${e.code||e.message}）`));
   A.onAuthStateChanged(auth, async user=>{
-    if(!user){ DB=LocalDB; btn.textContent='用 Gmail 登入'; btn.title=''; $('side-name').textContent='未登入'; $('side-sub').textContent='紀錄存喺呢部機'; $('side-sub').classList.add('local'); $('side-av').textContent='KC'; }
+    AUTH_WAIT=false;
+    if(!user){ const was=DB!==LocalDB; DB=LocalDB; $('login-who').textContent=''; if(was) authSignedOut(); btn.textContent='用 Gmail 登入'; btn.title=''; $('side-name').textContent='未登入'; $('side-sub').textContent='紀錄存喺呢部機'; $('side-sub').classList.add('local'); $('side-av').textContent='KC'; }
     else {
       const col=c=>F.collection(fs,'users',user.uid,c);
       DB={ where:`儲存位置：雲端帳戶 · ${user.email}`,
@@ -2417,7 +2450,7 @@ async function initLogin(){
         async get(c,id){const d=await F.getDoc(F.doc(col(c),id)); return d.exists()?d.data():null},
         async put(c,rec){await F.setDoc(F.doc(col(c),rec.id),rec)},
         async del(c,id){await F.deleteDoc(F.doc(col(c),id))}};
-      btn.textContent='登出'; btn.title=user.email;
+      btn.textContent='登出'; btn.title=user.email; $('login-who').textContent=user.email||'';
       { const nm=user.displayName||String(user.email||'').split('@')[0]||'已登入'; $('side-name').textContent=nm; $('side-sub').textContent='已登入 · 雲端同步'; $('side-sub').classList.remove('local'); $('side-av').textContent=nm.slice(0,2).toUpperCase(); }
       // first sign-in on this browser: move what was saved here into the account
       let moved=0;
@@ -2507,7 +2540,7 @@ function drawCF(){
 }
 // 我的預設: DB 'presets' rows {id: name, on, cf, g3x}
 let PRE=[];
-async function drawPre(sel=$('pre').value){ PRE=await DB.all('presets');
+async function drawPre(sel=$('pre').value){ if(AUTH_WAIT){ PRE=[] } else try{ PRE=await DB.all('presets') }catch(e){ PRE=[]; preMsg('我的預設讀取唔到，遲啲 reload 再試') }
   $('pre').innerHTML='<option value="">我的預設…</option>'+PRE.map(p=>p.id).sort().map(n=>`<option${n===sel?' selected':''}>${esc(n)}</option>`).join('');
   $('pre-del').hidden=!PRE.some(p=>p.id===sel)}
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -2523,7 +2556,7 @@ function initPre(){
     if(!PRE.some(x=>x.id===n) && PRE.length>=PRE_MAX){preMsg(`最多儲 ${PRE_MAX} 個預設，請先刪走啲唔用嘅`);return}
     try{await DB.put('presets',{id:n,on:[...on],cf:{...CFS},g3x:G3X,upd:Date.now()})}catch(e){preMsg('儲唔到，遲啲再試');return}
     await drawPre(n); preMsg(DB===LocalDB?'已儲存（暫時儲喺呢部機）':'已儲存到你個帳戶')};
-  $('pre-del').onclick=async()=>{const n=$('pre').value; await DB.del('presets',n); $('pre-name').value=''; await drawPre(''); preMsg('已刪除')};
+  $('pre-del').onclick=async()=>{const n=$('pre').value; try{ await DB.del('presets',n) }catch(e){ preMsg('刪唔到，遲啲再試'); return } $('pre-name').value=''; await drawPre(''); preMsg('已刪除')};
   $('cf-clear').onclick=()=>{CFS={}; drawCF(); renderStocks()};
   // ＋ 新增條件: pick a metric, then 高過 / 低過 / 介乎 a number (or one of its options); stored like the 自訂條件 grid
   $('cb-k').innerHTML=CFG.map(g=>`<optgroup label="${g}">${CF.filter(x=>x[1]===g).map(x=>`<option value="${x[0]}">${x[2]}</option>`).join('')}</optgroup>`).join('');
@@ -2561,25 +2594,38 @@ DRAW.screener = () => {
 };
 
 // ---------- 自選清單 ----------
-// DB 'watch' rows {id: ticker, st: watch|break|hold, note, added, ls: [list ids]}, plus one row '_lists' {lists:[{id,n}]}
-// holding the person's named lists (長線, 短炒 …). Rows saved before lists existed have no ls and belong to the first list.
+// DB 'watch' rows {id: ticker, st: watch|break|hold, note, added, ls: [list ids]}, plus one row per named list (長線, 短炒 …)
+// '_l_<list id>' {n, o: order}, so two devices adding lists at the same time never overwrite each other. Older saves kept
+// all lists in one row '_lists' {lists:[{id,n}]}: it is split into '_l_' rows on the next read. Rows saved before lists
+// existed have no ls and belong to the first list.
 const WST={watch:'觀察中',break:'等突破',hold:'持倉中'}, WLN_MAX=20, WL_DEF=[{id:'main',n:'我的自選'}];
-let WL=new Map(), wlFilter='all', WLISTS=WL_DEF, wlList='all', wlEdit=null;
+let WL=new Map(), wlFilter='all', WLISTS=WL_DEF, wlList='all', wlEdit=null, WL_ERR=false;
 const wlLs = r => (r.ls&&r.ls.length?r.ls:[WLISTS[0].id]).filter(id=>WLISTS.some(l=>l.id===id));
-const wlSaveLists = () => DB.put('watch',{id:'_lists',lists:WLISTS,upd:Date.now()});
+// save one list (and the default one too while it only exists on the page, so stocks in it keep their list)
+async function wlSaveList(l){ if(!l.saved && l.id!==WL_DEF[0].id && !WLISTS[0].saved && WLISTS[0].id===WL_DEF[0].id) await wlSaveList(WLISTS[0]);
+  await DB.put('watch',{id:'_l_'+l.id, n:l.n, o:l.o??WLISTS.indexOf(l), upd:Date.now()}); l.saved=true }
+const wlNotReady = () => { if(!WL_ERR) return false; wlMsg('自選清單未讀到，請先撳「重試」'); return true };
 const star = t => `<button class="star" data-w="${t}" aria-pressed="${WL.has(t)}" title="${WL.has(t)?'喺自選清單（撳一下移除）':'加入自選清單'}" aria-label="${WL.has(t)?'移除自選':'加入自選'} ${t}">${WL.has(t)?'★':'☆'}</button>`;
 function wlMsg(t){ const e=$('toast'); e.textContent=t; e.hidden=false; clearTimeout(wlMsg.t); wlMsg.t=setTimeout(()=>e.hidden=true,3500) }
 function wlStars(){ document.querySelectorAll('.star[data-w]').forEach(b=>{const t=b.dataset.w, on=WL.has(t); b.setAttribute('aria-pressed',on); b.textContent=on?'★':'☆';
   b.title=on?'喺自選清單（撳一下移除）':'加入自選清單'; b.setAttribute('aria-label',`${on?'移除自選':'加入自選'} ${t}`)});
   const ws=$('s-wl'); if(ws) ws.textContent=WL.has(ws.dataset.w)?'★ 已喺自選（撳一下移除）':'☆ 加入自選';
   $('side-wl').textContent=WL.size; drawStamps(); if(drawn.overview) DRAW.overview() }  // sidebar count and the 今日總覽 list follow every change
-async function wlReload(){ try{ const rows=await DB.all('watch'), m=rows.find(r=>r.id==='_lists');
-    WLISTS=m&&m.lists&&m.lists.length?m.lists:WL_DEF; WL=new Map(rows.filter(r=>!String(r.id).startsWith('_')).map(r=>[r.id,r])) }catch(e){ WL=new Map(); WLISTS=WL_DEF }
+async function wlReload(){ if(AUTH_WAIT){ wlStars(); if(drawn.watch) drawWatch(); return }
+  try{ const rows=await DB.all('watch'), m=rows.find(r=>r.id==='_lists');
+    let ls=rows.filter(r=>String(r.id).startsWith('_l_')).map(r=>({id:r.id.slice(3), n:r.n, o:r.o??0, saved:true}));
+    if(m&&m.lists){ // older single-row save: move each list into its own row, then drop the old row
+      for(const [i,l] of m.lists.entries()) if(!ls.some(x=>x.id===l.id)){ const x={id:l.id, n:l.n, o:i}; await DB.put('watch',{id:'_l_'+l.id, n:l.n, o:i, upd:Date.now()}); x.saved=true; ls.push(x) }
+      await DB.del('watch','_lists') }
+    ls.sort((a,b)=>a.o-b.o||a.id.localeCompare(b.id));
+    WLISTS=ls.length?ls:WL_DEF.map(l=>({...l})); WL=new Map(rows.filter(r=>!String(r.id).startsWith('_')).map(r=>[r.id,r])); WL_ERR=false }
+  catch(e){ console.warn('watchlist read failed', e); WL_ERR=true; WL=new Map(); WLISTS=WL_DEF.map(l=>({...l})); wlMsg('自選清單讀取唔到（網絡問題？），去「自選清單」撳重試') }
   if(!WLISTS.some(l=>l.id===wlList)) wlList='all';
   wlStars(); if(drawn.watch) drawWatch(); if(drawn.ideas && chgScope==='wl') drawChanges(); if(drawn.market) briefWatch() }
 async function wlPut(r){ r={...r, upd:Date.now()}; try{ await DB.put('watch',r); WL.set(r.id,r); return true }
   catch(e){ wlMsg(DB===LocalDB?'自選清單儲唔到：瀏覽器空間滿咗':'自選清單儲唔到雲端，遲啲再試'); return false } }
 async function wlToggle(t, btn){
+  if(wlNotReady()) return;
   if(WLISTS.length>1 && btn) return wlPick(t, btn);
   if(WL.has(t)){ try{ await DB.del('watch',t); WL.delete(t) }catch(e){ wlMsg('刪唔到，遲啲再試') } }
   else if(WL.size>=WL_MAX) wlMsg(`自選清單最多 ${WL_MAX} 隻，請先移除啲唔再留意嘅`);
@@ -2613,27 +2659,30 @@ function drawLists(all){
     + (cur&&wlEdit==='ren'?form(cur.n,'改名'):cur?`<button class="tog" type="button" id="wln-ren">改名</button>${WLISTS.length>1?`<button class="tog" type="button" id="wln-del">${wlEdit==='del'?'確定刪除？（只喺呢個清單嘅股票會移除）':'刪除清單'}</button>`:''}`:'');
   $('wl-lists').querySelectorAll('button[data-l]').forEach(b=>b.onclick=()=>{wlList=b.dataset.l; wlEdit=null; drawWatch()});
   const go=(k)=>{wlEdit=k; drawWatch(); const i=$('wln-name'); if(i){i.focus(); i.select()}};
-  if($('wln-add')) $('wln-add').onclick=()=>WLISTS.length>=WLN_MAX?wlMsg(`最多 ${WLN_MAX} 個清單`):go('new');
-  if($('wln-ren')) $('wln-ren').onclick=()=>go('ren');
+  if($('wln-add')) $('wln-add').onclick=()=>wlNotReady()?0:WLISTS.length>=WLN_MAX?wlMsg(`最多 ${WLN_MAX} 個清單`):go('new');
+  if($('wln-ren')) $('wln-ren').onclick=()=>wlNotReady()?0:go('ren');
   if($('wln-x')) $('wln-x').onclick=()=>go(null);
   if($('wln-name')) $('wln-name').onkeydown=e=>{if(e.key==='Enter') $('wln-ok').click(); if(e.key==='Escape') go(null)};
   if($('wln-ok')) $('wln-ok').onclick=async()=>{const n=$('wln-name').value.trim(); if(!n){wlMsg('先改個名');return}
     if(WLISTS.some(l=>l.n===n && !(wlEdit==='ren'&&l.id===wlList))){wlMsg('已經有同名清單');return}
-    const keep=WLISTS;
-    if(wlEdit==='new'){ const id='l'+Date.now().toString(36); WLISTS=[...WLISTS,{id,n}]; wlList=id }
-    else WLISTS=WLISTS.map(l=>l.id===wlList?{...l,n}:l);
-    try{ await wlSaveLists(); wlMsg(wlEdit==='new'?`已建立「${n}」：去選股器、機會頁或者個股頁撳 ☆ 加股票`:'已改名') }catch(e){ WLISTS=keep; wlMsg('儲唔到，遲啲再試') }
+    if(wlNotReady()) return;
+    const keep=WLISTS; let l;
+    if(wlEdit==='new'){ l={id:'l'+Date.now().toString(36), n, o:Math.max(0,...WLISTS.map(x=>x.o??0))+1}; WLISTS=[...WLISTS,l]; wlList=l.id }
+    else { l={...WLISTS.find(x=>x.id===wlList), n}; WLISTS=WLISTS.map(x=>x.id===wlList?l:x) }
+    try{ await wlSaveList(l); wlMsg(wlEdit==='new'?`已建立「${n}」：去選股器、機會頁或者個股頁撳 ☆ 加股票`:'已改名') }catch(e){ WLISTS=keep; wlMsg('儲唔到，遲啲再試') }
     wlEdit=null; drawWatch()};
-  if($('wln-del')) $('wln-del').onclick=async()=>{ if(wlEdit!=='del'){go('del');return}
+  if($('wln-del')) $('wln-del').onclick=async()=>{ if(wlNotReady()) return; if(wlEdit!=='del'){go('del');return}
     const id=wlList, keep=WLISTS; WLISTS=WLISTS.filter(l=>l.id!==id);
-    try{ await wlSaveLists();
+    try{ if(!WLISTS[0].saved) await wlSaveList(WLISTS[0]);  // the list left first must be a saved row, or it falls back to 我的自選
+      await DB.del('watch','_l_'+id);
       for(const r of [...WL.values()]){ const ls=(r.ls&&r.ls.length?r.ls:[keep[0].id]); if(!ls.includes(id)) continue;
         const left=ls.filter(x=>x!==id); if(left.length) await wlPut({...r, ls:left}); else { await DB.del('watch',r.id); WL.delete(r.id) } }
       wlMsg('已刪除清單') }catch(e){ WLISTS=keep; wlMsg('刪唔到，遲啲再試') }
     wlList='all'; wlEdit=null; wlStars(); drawWatch()};
 }
 function drawWatch(){
-  $('wl-where').textContent=DB.where.replace(/（.*$/,''); $('wl-where').classList.toggle('warnb', DB===LocalDB);
+  $('wl-where').textContent=AUTH_WAIT?'讀取緊紀錄…':DB.where.replace(/（.*$/,''); $('wl-where').classList.toggle('warnb', DB===LocalDB&&!AUTH_WAIT);
+  loadErr('wl-err', WL_ERR, '自選清單讀取唔到（可能係網絡問題）。你嘅清單仲喺雲端，冇唔見；撳重試再讀一次。', wlReload);
   const every=[...WL.values()].filter(r=>BY[r.id]).sort((a,b)=>(a.added||'').localeCompare(b.added||'')||a.id.localeCompare(b.id));
   drawLists(every);
   const all=wlList==='all'?every:every.filter(r=>wlLs(r).includes(wlList)), many=WLISTS.length>1;
@@ -3284,7 +3333,14 @@ function jReset(){ jEdit=null; jShots=[]; jFills=[]; $('jf').reset(); $('jf').el
 const J_MAX=1000, PRE_MAX=50, WL_MAX=200;  // per person; presets and watchlist are tiny but the watchlist is read on every visit
 function jCount(){ const e=$('j-count'), n=TR.length; e.hidden=false; e.textContent=`已用 ${n.toLocaleString('en-US')} / ${J_MAX.toLocaleString('en-US')} 單`;
   e.style.borderColor=n>=J_MAX*0.9?'var(--hot)':''; e.title=n>=J_MAX*0.9?'就快到上限：記得下載完整備份，再刪走舊紀錄':'' }
-async function jReload(){ TR = await DB.all('trades'); $('j-where').textContent = DB.where; $('j-where').classList.toggle('warnb', DB===LocalDB); jCount(); jRender() }
+let J_ERR=false;
+async function jReload(){
+  if(AUTH_WAIT){ TR=[]; $('j-where').textContent='讀取緊紀錄…'; $('j-where').classList.remove('warnb'); $('j-count').hidden=true; jRender(); $('j-empty').hidden=true; return }
+  $('j-where').textContent = DB.where; $('j-where').classList.toggle('warnb', DB===LocalDB);
+  try{ TR = await DB.all('trades'); J_ERR=false }
+  catch(e){ console.warn('journal read failed', e); TR=[]; J_ERR=true }
+  loadErr('j-err', J_ERR, '交易紀錄讀取唔到（可能係網絡問題）。你嘅紀錄仲喺雲端，冇唔見；撳重試再讀一次。未讀到之前唔好匯入。', jReload);
+  jCount(); jRender(); if(J_ERR){ $('j-empty').hidden=true; $('j-count').hidden=true } }
 // ---------- 交易日誌：匯入 Excel／CSV ----------
 // Reads the first sheet's header row, matches column names to journal fields (Chinese or English, incl. our own CSV export),
 // lets the person fix the mapping, previews, then saves. The trade id comes from the trade's contents, so importing the same file twice overwrites.
@@ -3453,7 +3509,7 @@ async function jxOpen(fl){
   $('jx-sheetw').hidden=wb.SheetNames.length<2; $('jx-sheet').innerHTML=wb.SheetNames.map(n=>`<option>${esc(n)}</option>`).join(''); $('jx-sheet').value=best;
   jxSheet(best); $('j-xl').showModal() }
 function jxInit(){
-  $('j-xlf').onchange=e=>{ const fl=e.target.files[0]; e.target.value=''; if(fl) jxOpen(fl) };
+  $('j-xlf').onchange=e=>{ const fl=e.target.files[0]; e.target.value=''; if(!fl) return; if(J_ERR||AUTH_WAIT){ jMsg('紀錄未讀到，請先撳「重試」再匯入'); return } jxOpen(fl) };
   $('jx-sheet').onchange=()=>jxSheet($('jx-sheet').value);
   $('jx-hrow').onchange=()=>{ const n=Math.max(1,Math.min(JX.rows.length,+$('jx-hrow').value||1)); JX.hrow=n-1; JX.map=jxAutoMap(JX.rows[JX.hrow]||[]); jxDraw() };
   $('jx-tz').onchange=jxDraw;
@@ -3514,18 +3570,22 @@ DRAW.journal = () => {
       if(!jEdit && TR.length>=J_MAX){ jMsg(`已經儲咗 ${J_MAX.toLocaleString('en-US')} 單（上限）。請先「下載完整備份」，再刪走啲舊紀錄。`); return }
       try{ await DB.put('trades', t) }catch(_){ jMsg(DB===LocalDB?'儲唔到：瀏覽器空間滿咗，試下刪走啲截圖':'儲唔到：網絡或者截圖太大，遲啲再試'); return }
       await jReload(); jReset(); jMsg('已儲存') };
-    $('j-del').onclick=async()=>{ if(!jEdit) return; await DB.del('trades', jEdit); await jReload(); jReset(); jMsg('已刪除') };
+    $('j-del').onclick=async()=>{ if(!jEdit) return; try{ await DB.del('trades', jEdit) }catch(_){ jMsg('刪唔到：網絡有問題，遲啲再試'); return }
+      await jReload(); jReset(); jMsg('已刪除') };
     $('j-csv').onclick=()=>{ const r2=x=>x==null?null:Math.round(x*100)/100;
       csvDownload(`kcdt-journal-${ymd(nyNow())}.csv`, [['代號','市場','方向','合約月份','合約乘數','開倉日期','開倉時間','平倉日期','平倉時間','入場價','出場價','數量','分批筆數','手續費','成本／名義值','出場金額','淨盈虧','淨盈虧%','計劃風險','R','持倉','時段（美東）','策略類型','預計止盈','預計止盈%','預計止損','預計止損%','買入理由','賣出理由','復盤筆記','交易情緒'],
         ...TR.map(calc).sort((a,b)=>(a.open+(a.otime||'')).localeCompare(b.open+(b.otime||''))).map(t=>[t.sym,t.fut?'期貨':'股票',SIDE[t.side]||'Long',t.cm,t.fut?t.mult:null,t.open,t.otime,t.close,t.ctime,r2(t.pin),r2(t.pout),t.qIn,(t.fills||[]).length||null,t.fee,r2(t.cost),t.isOpen?null:r2(t.rev),t.isOpen?null:r2(t.pl),t.isOpen?null:r2(t.plp),r2(t.risk),t.R==null?null:r2(t.R),t.holdTxt,t.sess,t.strat,t.tp,r2(t.tpp),t.sl,r2(t.slp),t.why_in,t.why_out,t.review,t.mood])]) };
-    $('j-bak').onclick=async()=>{ const bak={app:'KCDT',v:2,saved:new Date().toISOString(),trades:await DB.all('trades'),presets:await DB.all('presets'),watch:await DB.all('watch').catch(()=>[])};
+    $('j-bak').onclick=async()=>{ let bak; try{ bak={app:'KCDT',v:2,saved:new Date().toISOString(),trades:await DB.all('trades'),presets:await DB.all('presets'),watch:await DB.all('watch')} }
+      catch(_){ jMsg('備份讀取唔到：網絡有問題，遲啲再試'); return }
       const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(bak)],{type:'application/json'})); a.download=`kcdt-backup-${ymd(nyNow())}.json`; a.click(); };
     $('j-imp').onchange=async e=>{ const fl=e.target.files[0]; e.target.value=''; if(!fl) return;
+      if(J_ERR||AUTH_WAIT||WL_ERR){ jMsg('紀錄未讀到，請先撳「重試」再匯入'); return }
       let bak; try{ bak=JSON.parse(await fl.text()) }catch(_){ jMsg('呢個唔係 KCDT 備份檔'); return }
       if(!bak||bak.app!=='KCDT'||!Array.isArray(bak.trades)){ jMsg('呢個唔係 KCDT 備份檔'); return }
       const had=new Set(TR.map(x=>x.id)); let n=0, same=0;
       const add=new Set(bak.trades.filter(t=>t&&t.id&&!had.has(t.id)).map(t=>t.id)).size;
-      const P0=await DB.all('presets').catch(()=>[]), pAdd=new Set((bak.presets||[]).filter(x=>x&&x.id&&!P0.some(y=>y.id===x.id)).map(x=>x.id)).size,
+      let P0; try{ P0=await DB.all('presets') }catch(_){ jMsg('紀錄未讀到，遲啲再試'); return }
+      const pAdd=new Set((bak.presets||[]).filter(x=>x&&x.id&&!P0.some(y=>y.id===x.id)).map(x=>x.id)).size,
             wAdd=new Set((bak.watch||[]).filter(x=>x&&x.id&&!String(x.id).startsWith('_')&&!WL.has(x.id)).map(x=>x.id)).size;
       if(P0.length+pAdd>PRE_MAX||WL.size+wAdd>WL_MAX){ jMsg(`匯入之後選股預設會有 ${P0.length+pAdd} 個（上限 ${PRE_MAX}）、自選股 ${WL.size+wAdd} 隻（上限 ${WL_MAX}），超過上限。請先刪走啲舊嘅。`); return }
       if(had.size+add>J_MAX){ jMsg(`匯入之後會有 ${(had.size+add).toLocaleString('en-US')} 單，超過上限 ${J_MAX.toLocaleString('en-US')} 單。請先刪走啲舊紀錄。`); return }
@@ -3706,5 +3766,5 @@ window.addEventListener('hashchange', route);
 route();
 wlReload();
 if(window.KCDT_STOCKS) stocksReady(); else if(window.KCDT_STOCKS_ERR) stocksFailed();
-initLogin().catch(e=>console.warn('login unavailable', e));
+initLogin().catch(e=>{ console.warn('login unavailable', e); authGiveUp() });
 </script>
