@@ -248,6 +248,12 @@ button.csort:hover{color:var(--ink)}
   .peers td.frz .muted{max-width:8em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 .colpick{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;margin-top:8px}
 .cmp table td,.cmp table th{text-align:right}
+/* phones (11-16): label + two stocks fit one 390px screen; long names/industries wrap to two short lines; 3-4 stocks get a swipe hint */
+.cmp .cmphint{margin:0 16px 6px;font-size:13px}.cmp .cmphint[hidden]{display:none}.cmp td.cn .cns{display:none}
+@media (max-width:640px){.cmp table td,.cmp table th{padding-left:6px;padding-right:6px}
+  .cmp table td:first-child{max-width:5.2em;white-space:normal}
+  .cmp table td.nowrap,.cmp table td.cn{white-space:normal;max-width:8.5em;overflow-wrap:anywhere}
+  .cmp td.cn .cnf{display:none!important}.cmp td.cn .cns,.cmp td.nowrap .indf{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal;text-align:right}}
 .cmp table td:first-child,.cmp table th:first-child{text-align:left;color:var(--muted)}
 .how{display:grid;gap:10px;font-size:13.5px}
 .how h4{margin:0;font-size:14px}
@@ -2307,10 +2313,19 @@ function drawCmp(){
   $('cmpbar-go').hidden=L.length<2;
   if(L.length<2){$('cmp').hidden=true;return}
   $('cmp').hidden=false;
-  const rows=[['公司',s=>`<td class="small">${esc(s.n||'')}</td>`],['符合 KC 條件',s=>`<td>${passKC(s)?'<span class="yes">✓</span>':'—'}</td>`],...COLS.map(c=>[c[1],c[3]])];
-  $('cmp').innerHTML=`<div class="sechead" style="margin-bottom:6px"><h3>並排比較</h3></div><table><thead><tr><th></th>${L.map(s=>`<th>${star(s.s)}${tk(s)} <button class="star unx" data-uncmp="${s.s}" aria-label="唔再比較 ${s.s}" title="唔再比較">×</button></th>`).join('')}</tr></thead><tbody>${rows.map(([h,td])=>`<tr><td>${h}</td>${L.map(td).join('')}</tr>`).join('')}</tbody></table>`;
+  const rows=[['公司',s=>`<td class="small cn" title="${esc(s.n||'')}"><span class="cnf">${esc(s.n||'')}</span><span class="cns">${esc(shortCo(s.n))}</span></td>`],['符合 KC 條件',s=>`<td>${passKC(s)?'<span class="yes">✓</span>':'—'}</td>`],...COLS.map(c=>[c[1],c[3]])];
+  $('cmp').innerHTML=`<div class="sechead" style="margin-bottom:6px"><h3>並排比較</h3></div><p class="cmphint muted" hidden>← 向左掃睇其餘股票（共 ${L.length} 隻；左邊指標名會留喺度）</p><table><thead><tr><th></th>${L.map(s=>`<th>${star(s.s)}${tk(s)} <button class="star unx" data-uncmp="${s.s}" aria-label="唔再比較 ${s.s}" title="唔再比較">×</button></th>`).join('')}</tr></thead><tbody>${rows.map(([h,td])=>`<tr><td>${h}</td>${L.map(td).join('')}</tr>`).join('')}</tbody></table>`;
   $('cmp').querySelectorAll('[data-uncmp]').forEach(b=>b.onclick=e=>{e.stopPropagation();CMP.delete(b.dataset.uncmp);drawCmp();renderStocks()});
+  cmpHint();
 }
+// only when the stocks don't all fit across (usually 3-4 stocks on a phone)
+function cmpHint(){ const c=$('cmp'), h=c&&c.querySelector('.cmphint'), t=c&&c.querySelector('table'); if(!h||!t||c.hidden) return;
+  h.hidden=t.scrollWidth<=c.clientWidth+2 }
+addEventListener('resize',()=>cmpHint());
+// "Climb Global Solutions, Inc." -> "Climb Global Solutions": drop the legal ending so the name fits a phone column
+function shortCo(n){ let x=String(n||''), y;
+  do{ y=x; x=x.replace(/[,\s]+(inc|corp|corporation|co|company|ltd|limited|plc|n\.?v|s\.?a|ag|se|l\.?p|llc|holdings?|group|incorporated|class [a-c]|common stock|ordinary shares|american depositary shares)\.?$/i,'').trim() }while(x!==y&&x);
+  return x||String(n||'') }
 // 指標計法說明 (matches kcdt/compute.py)
 const HOW = () => `
   <div><h4>股票池（所有指標都喺呢度比較）</h4><p>全美股市值 3 億美元以上、股價 12 美元以上，加埋 Nasdaq-100 同 S&amp;P 500/400/600 成份股，今日共 <b>${(D.nuniv||S.length).toLocaleString('en-US')}</b> 隻。要有最少 253 個交易日（約一年）價格先會計入；上市唔夠一年嘅新股唔喺池入面，所以冇 RS、趨勢模板，選股器都唔會出現。價格係 Yahoo Finance 嘅調整後價格（已計拆股同派息）；個別日子冇報價會用上一日收市補，最多補 3 日；最後一日要補價嘅股票會標「補價」，唔計入當日升跌家數、成交量同 52 週新高新低。</p></div>
