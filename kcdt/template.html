@@ -948,25 +948,27 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
         <p class="jstep">1. 開倉 <span class="muted small">（必填：代號、日期、數量、入場價）</span></p>
         <div class="jgrid">
           <label>市場<select name="mkt"><option value="stk">股票</option><option value="fut">期貨</option></select></label>
-          <label>方向<select name="side"><option value="L">Long 做多</option><option value="S">Short 做空</option></select></label>
+          <label>方向<select name="side"><option value="L">Long 做多（買入）</option><option value="S">Short 做空（沽空）</option></select></label>
           <label><span class="j-stk">股票代號</span><span class="j-fut">期貨代號</span><input name="sym" required list="tickers" style="text-transform:uppercase"></label>
           <label class="j-fut">合約月份<input name="cm" placeholder="例如 2026-12 或 NQZ6"></label>
           <label class="j-fut">合約乘數（每點美元）<input name="mult" type="number" step="any" min="0" placeholder="揀代號自動帶入"></label>
           <label>開倉日期<input name="open" type="date" required></label>
+          <label>開倉時段<select name="osess"><option value="">未揀</option><option value="pre">盤前（美東 04:00–09:30）</option><option value="reg">盤中（09:30–16:00）</option><option value="post">盤後（16:00–20:00）</option><option value="night">夜盤（20:00–04:00）</option></select></label>
           <label><span><span class="j-pl">計劃</span><span class="j-stk">股數</span><span class="j-fut">合約數</span></span><input name="qty" type="number" step="any" min="0" required></label>
           <label><span><span class="j-pl">計劃</span>入場價</span><input name="buy" type="number" step="any" min="0" required></label>
           <label>預計止損<input name="sl" type="number" step="any" min="0"></label>
         </div>
         <div class="j-fut jfutinfo small" id="j-futinfo" role="status"></div>
+        <div class="jfutinfo small" id="j-sideinfo" role="status"></div>
         <label class="small jplan"><input type="checkbox" name="plan"> 只係交易計劃（未成交）：入場價同數量係計劃嘅，成交之後喺交易紀錄撳「確認成交」填實際成交價、數量同時間。計劃唔計入任何統計。</label>
         <p class="jstep">2. 平倉 <span class="muted small">（未平倉就留空，之後喺交易紀錄撳「平倉」都得）</span></p>
         <div class="jgrid">
           <label>平倉日期<input name="close" type="date"></label>
           <label>出場價<input name="sell" type="number" step="any" min="0"></label>
         </div>
-        <details class="jmore" id="j-more"><summary>3. 更多資料（可選）<span class="muted small">：時間、手續費、策略、止盈、風險、情緒、分批進出、理由、截圖</span></summary>
+        <details class="jmore" id="j-more"><summary>3. 更多資料（可選）<span class="muted small">：準確時間、手續費、策略、止盈、風險、情緒、分批進出、理由、截圖</span></summary>
         <div class="jgrid">
-          <label>開倉時間<input name="otime" type="time"></label>
+          <label>開倉時間（準確時間，可選）<input name="otime" type="time"></label>
           <label>平倉時間<input name="ctime" type="time"></label>
           <label>手續費（USD）<input name="fee" type="number" step="any" min="0" value="0"></label>
           <label>策略類型<input name="strat" list="j-strats"></label>
@@ -979,7 +981,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
             <button class="tog" type="button" id="j-addfill">加一筆</button></div>
           <div id="j-fills" style="display:grid;gap:6px"></div>
         </div>
-        <p class="muted small">時間用 <select id="j-tz" aria-label="時間時區"><option value="HK">香港時間</option><option value="NY">美東時間</option></select> 填（只影響「按時段」統計）。</p>
+        <p class="muted small">時間用 <select id="j-tz" aria-label="時間時區"><option value="HK">香港時間</option><option value="NY">美東時間</option></select> 填（冇揀開倉時段先會用開倉時間推算時段；有時間嘅話持倉時間會計到分鐘）。</p>
         <div class="jgrid wide">
           <label>買入理由<textarea name="why_in" rows="3"></textarea></label>
           <label>賣出理由<textarea name="why_out" rows="3"></textarea></label>
@@ -998,10 +1000,11 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
       <div class="panel tablewrap"><table>
         <thead><tr><th id="js-h">策略</th><th class="r">樣本（已平倉）</th><th class="r">勝率</th><th class="r">平均盈虧</th><th class="r">平均 R</th><th class="r">總盈虧</th><th class="r">最大回撤</th></tr></thead>
         <tbody id="js-body"></tbody></table></div>
-      <p class="note">只計已平倉交易。R = 淨盈虧 ÷ 計劃風險；計劃風險冇填就用 |入場價 − 止損| × 數量 × 乘數，兩樣都冇就唔計 R（「平均 R」後面括號係有 R 嘅單數）。最大回撤 = 呢組交易按平倉先後累計盈虧，由高位跌落嚟最多嘅金額。時段按美東時間開倉時間分。樣本少過 10 單，數字參考價值有限。</p>
+      <p class="note">只計已平倉交易。R = 淨盈虧 ÷ 計劃風險；計劃風險冇填就用 |入場價 − 止損| × 數量 × 乘數，兩樣都冇就唔計 R（「平均 R」後面括號係有 R 嘅單數）。最大回撤 = 呢組交易按平倉先後累計盈虧，由高位跌落嚟最多嘅金額。時段按你揀嘅開倉時段；冇揀就用開倉時間推算（美東 04:00–09:30 盤前、09:30–16:00 盤中、16:00–20:00 盤後、20:00–04:00 夜盤）。樣本少過 10 單，數字參考價值有限。</p>
     </section>
     <section aria-labelledby="h-jl">
       <div class="sechead"><h2 id="h-jl">交易紀錄</h2><div class="controls"><button class="tog" id="j-csv">匯出 CSV（Excel 用）</button><button class="tog" id="j-bak">下載完整備份</button><label class="tog">匯入 Excel／CSV<input type="file" id="j-xlf" accept=".xlsx,.xls,.xlsm,.csv,.tsv,text/csv" hidden></label><label class="tog">匯入備份<input type="file" id="j-imp" accept=".json,application/json" hidden></label></div></div>
+      <div class="panel jfutinfo warn small" id="j-sidefix" role="status"></div>
       <div class="panel tablewrap"><table id="jtable" data-sort="jl">
         <thead><tr><th>代號</th><th>方向</th><th>開倉</th><th>平倉</th><th class="r">入場價</th><th class="r">出場價</th><th class="r">數量</th><th class="r">手續費</th><th class="r">成本／名義值</th><th class="r">出場金額</th><th class="r">淨盈虧</th><th class="r">淨盈虧 %</th><th class="r">R</th><th class="r">持倉</th><th>策略</th><th class="r">止盈</th><th class="r">止損</th><th>情緒</th><th class="r">累計盈虧</th><th>截圖</th></tr>
           <tr class="jflt"><th><input id="jf-sym" type="search" list="jf-syms" placeholder="搵代號" aria-label="篩選代號" autocomplete="off"><datalist id="jf-syms"></datalist></th><th></th>
@@ -1018,7 +1021,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
       <h3>欄位對應 <span class="muted small" id="jx-mapn"></span></h3>
       <p class="muted small">排位同「新增交易」一樣：每格揀 Excel 邊一欄填入去，已經按欄名自動對好咗，唔啱可以改。最少要有股票代號、開倉日期、股數同入場價。</p>
       <div class="jgrid" id="jx-map"></div>
-      <p class="muted small">時間用 <select id="jx-tz" aria-label="時間時區"><option value="HK">香港時間</option><option value="NY">美東時間</option></select> 填（只影響「按時段」統計）。</p>
+      <p class="muted small">時間用 <select id="jx-tz" aria-label="時間時區"><option value="HK">香港時間</option><option value="NY">美東時間</option></select> 填（冇揀開倉時段先會用開倉時間推算時段；有時間嘅話持倉時間會計到分鐘）。</p>
       <div class="jgrid wide" id="jx-map2"></div>
       <div class="jshots"><span class="muted small" id="jx-shots"></span></div>
       <h3>預覽 <span class="muted small" id="jx-sum"></span></h3>
@@ -1045,7 +1048,8 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
       <p class="muted small" id="jp-info"></p>
       <div class="jgrid">
         <label>成交日期<input name="d" type="date" required></label>
-        <label><span>成交時間 <span id="jp-tz"></span></span><input name="tm" type="time"></label>
+        <label>開倉時段<select name="ss"><option value="">未揀</option><option value="pre">盤前</option><option value="reg">盤中</option><option value="post">盤後</option><option value="night">夜盤</option></select></label>
+        <label><span>成交時間（可選）<span id="jp-tz"></span></span><input name="tm" type="time"></label>
         <label>實際成交價<input name="p" type="number" step="any" min="0" required></label>
         <label>實際數量<input name="q" type="number" step="any" min="0" required></label>
         <label>手續費（USD）<input name="fee" type="number" step="any" min="0" value="0"></label>
@@ -1448,7 +1452,23 @@ function etfIndex(){ if(ETFBY) return ETFBY; ETFBY={};
   for(const [u,L] of Object.entries(D.etfs||{})) for(const e of L) ETFBY[e[0]]={s:e[0],n:e[1],k:e[2],x:e[3],u};
   for(const x of D.sectors||[]) ETFBY[x.t]=ETFBY[x.t]||{s:x.t,n:`${x.n}板塊 ETF`,k:'X',sec:x};
   ETFBY.QQQ=ETFBY.QQQ||{s:'QQQ',n:'Invesco QQQ（追蹤 Nasdaq-100）',k:'X'};
+  for(const [t,n] of [['SPY','SPDR S&P 500 ETF（追蹤標普 500）'],['IWM','iShares Russell 2000 ETF（追蹤羅素 2000）'],['DIA','SPDR Dow Jones ETF（追蹤道指）']]) ETFBY[t]=ETFBY[t]||{s:t,n,k:'X'};
+  for(const [s,n,k,x,b,ix] of IDX_ETF) ETFBY[s]={s,n,k,x,b,ix};
   return ETFBY }
+// Index leveraged / inverse ETFs (KC 11-16: SQQQ / TQQQ were missing; Nasdaq's list files them as index funds, not single-stock ones).
+// [ticker, name, L/S, factor, base ETF (searching QQQ lists them), index]
+const IDX_ETF=[
+  ['TQQQ','ProShares UltraPro QQQ','L',3,'QQQ','Nasdaq-100'],['SQQQ','ProShares UltraPro Short QQQ','S',3,'QQQ','Nasdaq-100'],
+  ['QLD','ProShares Ultra QQQ','L',2,'QQQ','Nasdaq-100'],['QID','ProShares UltraShort QQQ','S',2,'QQQ','Nasdaq-100'],['PSQ','ProShares Short QQQ','S',1,'QQQ','Nasdaq-100'],
+  ['UPRO','ProShares UltraPro S&P 500','L',3,'SPY','標普 500'],['SPXL','Direxion Daily S&P 500 Bull 3X','L',3,'SPY','標普 500'],
+  ['SPXU','ProShares UltraPro Short S&P 500','S',3,'SPY','標普 500'],['SPXS','Direxion Daily S&P 500 Bear 3X','S',3,'SPY','標普 500'],
+  ['SSO','ProShares Ultra S&P 500','L',2,'SPY','標普 500'],['SDS','ProShares UltraShort S&P 500','S',2,'SPY','標普 500'],['SH','ProShares Short S&P 500','S',1,'SPY','標普 500'],
+  ['SOXL','Direxion Daily Semiconductor Bull 3X','L',3,'SMH','費城半導體'],['SOXS','Direxion Daily Semiconductor Bear 3X','S',3,'SMH','費城半導體'],
+  ['TECL','Direxion Daily Technology Bull 3X','L',3,'XLK','科技板塊'],['TECS','Direxion Daily Technology Bear 3X','S',3,'XLK','科技板塊'],
+  ['TNA','Direxion Daily Small Cap Bull 3X','L',3,'IWM','羅素 2000'],['TZA','Direxion Daily Small Cap Bear 3X','S',3,'IWM','羅素 2000'],
+  ['UDOW','ProShares UltraPro Dow30','L',3,'DIA','道指'],['SDOW','ProShares UltraPro Short Dow30','S',3,'DIA','道指']];
+// what a leveraged / inverse ETF tracks: a stock (u) or an index (ix)
+const etfOf = e => e.ix || e.u;
 // the sector ETF for a stock: SMH for semiconductors, otherwise its sector's SPDR fund
 const SEC_ETF={'Technology':'XLK','Communication Services':'XLC','Consumer Cyclical':'XLY','Financial Services':'XLF','Industrials':'XLI',
   'Healthcare':'XLV','Energy':'XLE','Consumer Defensive':'XLP','Utilities':'XLU','Basic Materials':'XLB','Real Estate':'XLRE'};
@@ -1461,7 +1481,7 @@ function qMatches(raw){
   add(BY[q1]);
   S.filter(s=>s.s.startsWith(q1)).sort((a,b)=>a.s.length-b.s.length||(b.mcap||0)-(a.mcap||0)).forEach(add);
   if(q.length>=2) S.filter(s=>(s.n||'').toUpperCase().includes(q)).sort((a,b)=>(b.mcap||0)-(a.mcap||0)).forEach(add);
-  const E=etfIndex(), direct=Object.values(E).filter(e=>e.s===q1||(q1.length>=3&&e.s.startsWith(q1))).slice(0,6);
+  const E=etfIndex(), direct=Object.values(E).filter(e=>e.s===q1||(q1.length>=3&&e.s.startsWith(q1))||(q1.length>=2&&e.b===q1)).slice(0,8);
   const top=st[0], rel=top?relatedEtfs(top):{one:[],broad:[]};
   return {q, st, direct:direct.filter(e=>!rel.one.includes(e)&&!rel.broad.includes(e)), top, rel} }
 const qRow=(href,t,name,tag,tc)=>`<a class="qi" role="option" href="${href}"><b>${esc(t)}</b><span>${esc(name||'')}</span>${tag?`<i class="${tc||''}">${tag}</i>`:'<i style="border:0"></i>'}</a>`;
@@ -1476,7 +1496,7 @@ function qDraw(){
     h+=`<div class="qh">${esc(m.top.s)} 相關 ETF${m.rel.one.length?` · ${m.rel.one.length} 隻追蹤 ${esc(m.top.s)}`:''}</div>`+m.rel.one.map(etfRow).join('')+m.rel.broad.map(etfRow).join('') }
   if(m.direct.length) h+=`<div class="qh">ETF</div>`+m.direct.map(etfRow).join('');
   if(!h) h=`<div class="qn">搵唔到「${esc(m.q)}」。可能未納入股票池（市值 3 億美元以上、股價 12 美元以上、上市滿一年），或者代號打錯。</div>`;
-  else if(m.rel.one.length) h+=`<div class="qf">槓桿／反向 ETF 每日重設倍數，持有超過一日嘅回報唔等於股價升跌乘倍數。</div>`;
+  else if(m.rel.one.length||m.direct.some(e=>e.ix)) h+=`<div class="qf">槓桿／反向 ETF 每日重設倍數，持有超過一日嘅回報唔等於股價升跌乘倍數。</div>`;
   box.innerHTML=h; box.hidden=false; $('q').setAttribute('aria-expanded','true');
   const items=[...box.querySelectorAll('.qi')]; QSEL=Math.min(QSEL,Math.max(0,items.length-1)); items.forEach((x,i)=>x.setAttribute('aria-selected',i===QSEL));
   items.forEach(x=>x.addEventListener('mousedown',e=>e.preventDefault()));  // keep focus so the click lands
@@ -3124,7 +3144,11 @@ const legs = t => t.fills&&t.fills.length ? {ins:t.fills.filter(x=>x.a==='in'), 
 // Entry time in New York (the trade's times were typed in Hong Kong or New York time)
 function nyTime(d, tm, tz){ if(!d||!tm) return null; if(tz==='NY') return tm;
   return new Date(`${d}T${tm}:00+08:00`).toLocaleTimeString('en-GB',{timeZone:'America/New_York',hour:'2-digit',minute:'2-digit',hour12:false}) }
-const SESS = tm => !tm?'未填時間':tm<'09:30'?'盤前（美東 09:30 前）':tm<'10:00'?'開市首 30 分鐘':tm<'12:00'?'上午（10:00–12:00）':tm<'14:00'?'午市（12:00–14:00）':tm<'16:00'?'尾市（14:00–16:00）':'收市後（16:00 後）';
+// 開倉時段 (KC 11-16): picked on the form (osess); older trades without one get it from the entry time in New York
+const OSESS={pre:'盤前',reg:'盤中',post:'盤後',night:'夜盤'};
+const sessAt = ny => !ny?'':ny<'04:00'?'night':ny<'09:30'?'pre':ny<'16:00'?'reg':ny<'20:00'?'post':'night';
+const sessKey = t => OSESS[t.osess]?t.osess:sessAt(nyTime(t.open, t.otime, t.tz));
+const SESS = t => OSESS[sessKey(t)]||'未填時段';
 function calc(t){
   const fut=t.mkt==='fut', mult=fut?(t.mult||20):1, dir=t.side==='S'?-1:1, {ins,outs}=legs(t), fee=t.fee||0;
   // 交易計劃: nothing has traded yet, so no position, no P&L and no part in any statistic
@@ -3144,7 +3168,7 @@ function calc(t){
   const hold = days(t.open, t.close || ymd(nyNow()));
   return {...t, fut, mult, dir, qIn, qOut, openQ, pin, pout, cost, rev, pl, realized, plp:pl==null||!cost?null:pl/cost*100, isOpen, risk,
     R: pl!=null&&risk&&!isOpen?pl/risk:null, hold, holdD: mins!=null&&mins>=0&&mins<2880?mins/1440:hold, holdTxt: mins!=null&&mins>=0&&mins<2880?(mins<60?`${mins} 分鐘`:`${Math.floor(mins/60)} 小時${mins%60?` ${mins%60} 分`:''}`):`${hold} 日`,
-    sess: SESS(nyTime(t.open, t.otime, t.tz)), tpp: t.tp&&pin?(t.tp/pin-1)*100:null, slp: t.sl&&pin?(t.sl/pin-1)*100:null};
+    sess: SESS(t), tpp: t.tp&&pin?(t.tp/pin-1)*100:null, slp: t.sl&&pin?(t.sl/pin-1)*100:null};
 }
 const usd = (x,d=2) => x==null?'—':(x<0?'-':'')+'$'+f(Math.abs(x),d);
 const px = (t,x) => x==null?'—':t.fut?f(x,2):usd(x);  // futures prices are index points
@@ -3182,8 +3206,8 @@ function jRender(){
   $('jbody').innerHTML = shown.map(t=>{ if(!t.isOpen && t.pl!=null) cum += t.pl;
     const m = t.open.slice(0,7), head = m!==month ? `<tr class="grp"><td colspan="21">${m.slice(0,4)} 年${MON[+m.slice(5)-1]}月</td></tr>` : ''; month = m;
     return head + `<tr data-id="${t.id}" class="${t.isOpen?'open':t.isPlan?'open plan':''}"><td><b>${esc(t.sym)}</b>${t.fut?` <span class="badge">期貨${t.cm?' '+esc(t.cm):''}</span>`:''}</td>
-      <td class="small ${t.side==='S'?'down':'up'}">${SIDE[t.side]||'Long'}</td>
-      <td class="num small">${t.open}${t.otime?' '+t.otime:''}</td><td class="num small" data-v="${t.isOpen||t.isPlan?9e12:((t.close||'')+(t.ctime||'00:00')).replace(/\D/g,'')}">${t.isPlan?`<span class="badge">交易計劃</span> <button class="tog sm" type="button" data-fill="${t.id}">確認成交</button>`:t.isOpen?`<span class="muted">${t.qOut?`已平 ${f(t.qOut,0)}／`:''}未平倉</span> <button class="tog sm" type="button" data-close="${t.id}">平倉</button>`:(t.close||'')+(t.ctime?' '+t.ctime:'')}</td>
+      <td class="small ${t.side==='S'?'down':'up'}">${SIDE[t.side]||'Long'}${jSideOdd(t)?` <span class="badge warnb" title="${esc(t.sym)} 係反向 ETF：買入佢應該記 Long">方向？</span>`:''}</td>
+      <td class="num small" data-v="${(t.open+(t.otime||'')).replace(/\D/g,'')}">${t.open}${OSESS[sessKey(t)]?` <span class="badge">${OSESS[sessKey(t)]}</span>`:''}${t.otime?' '+t.otime:''}</td><td class="num small" data-v="${t.isOpen||t.isPlan?9e12:((t.close||'')+(t.ctime||'00:00')).replace(/\D/g,'')}">${t.isPlan?`<span class="badge">交易計劃</span> <button class="tog sm" type="button" data-fill="${t.id}">確認成交</button>`:t.isOpen?`<span class="muted">${t.qOut?`已平 ${f(t.qOut,0)}／`:''}未平倉</span> <button class="tog sm" type="button" data-close="${t.id}">平倉</button>`:(t.close||'')+(t.ctime?' '+t.ctime:'')}</td>
       <td class="r num"${t.pbuy!=null&&!t.isPlan?` title="計劃入場價 ${t.pbuy}"`:''}>${t.isPlan?'<span class="muted small">計劃 </span>':''}${px(t,t.pin)}${t.pbuy!=null&&!t.isPlan&&t.pbuy!==t.pin?`<div class="muted small">計劃 ${px(t,t.pbuy)}</div>`:''}</td><td class="r num">${t.pout!=null?px(t,t.pout):(t.isOpen||t.isPlan)&&!t.fut?`<span data-live="${esc(t.sym)}" data-jl="1">${liveCell(t.sym,1)}</span>`:'—'}</td>
       <td class="r num">${f(t.qIn,0)}${t.fills&&t.fills.length?` <span class="muted small">分 ${t.fills.length} 筆</span>`:''}</td><td class="r num">${usd(t.fee||0)}</td>
       <td class="r num">${usd(t.cost)}</td>${t.isOpen||t.isPlan?`<td class="r num">—</td><td class="r num">${t.qOut?`<span class="muted small" title="未計入任何統計，全部平倉先計">已平部分 ${usd(t.realized)}</span>`:'—'}</td><td class="r num">—</td>`
@@ -3193,7 +3217,7 @@ function jRender(){
       <td class="r num small">${t.tp?px(t,t.tp)+` <span class="up">${sgn(t.tpp,1)}%</span>`:'—'}</td><td class="r num small">${t.sl?px(t,t.sl)+` <span class="down">${sgn(t.slp,1)}%</span>`:'—'}</td>
       <td class="small">${esc(t.mood||'')}</td><td class="r num ${cls(cum)}">${t.isOpen||t.isPlan?'':usd(cum)}</td>
       <td><div style="display:flex;gap:4px">${(t.shots||[]).map((s,i)=>`<img src="${s}" alt="截圖 ${i+1}" data-big="1">`).join('')}</div></td></tr>`}).join('') || `<tr><td colspan="21" class="muted">${on?'冇交易符合篩選。':'未有紀錄。喺上面填一單交易就得。'}</td></tr>`;
-  sortApply('jl'); liveSoon();
+  sortApply('jl'); liveSoon(); jSideFix(rows);
   $('jbody').querySelectorAll('[data-close]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); jCloseOpen(b.dataset.close) });
   $('jbody').querySelectorAll('[data-fill]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); jPlanFillOpen(b.dataset.fill) });
   $('jbody').querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=e=>{ if(e.target.dataset.big){jZoom(e.target.src);return} jLoad(tr.dataset.id)});
@@ -3243,14 +3267,14 @@ function jPlanFillOpen(id){ const t=TR.find(x=>x.id===id); if(!t) return; const 
   const q=LQ[t.sym]; $('h-jpf').textContent=`確認成交：${t.sym}`;
   $('jp-info').textContent=`${SIDE[t.side]||'Long'} · 計劃入場 ${t.buy!=null?px(t,t.buy):'—'}${t.qty?` · 計劃數量 ${f(t.qty,0)}`:''}${t.sl?` · 止損 ${px(t,t.sl)}`:''}${t.tp?` · 止盈 ${px(t,t.tp)}`:''}${q?` · 延遲價 ${f(q.p)}（美東 ${lHM(q.at)}）`:''}`;
   $('jp-tz').textContent=`（${t.tz==='NY'?'美東':'香港'}時間）`;
-  F.d.value=ymd(nyNow()); F.tm.value=''; F.p.value=t.buy??''; F.q.value=t.qty??''; F.fee.value=0; $('jp-msg').textContent=''; jpPrev(); $('j-pf').showModal() }
+  F.d.value=ymd(nyNow()); F.tm.value=''; F.ss.value=t.osess||''; F.p.value=t.buy??''; F.q.value=t.qty??''; F.fee.value=0; $('jp-msg').textContent=''; jpPrev(); $('j-pf').showModal() }
 function jpPrev(){ const t=TR.find(x=>x.id===jpId); if(!t) return; const F=$('jpff').elements, p=num(F.p.value);
   $('jp-prev').innerHTML = p!=null&&t.buy ? `同計劃價相差 <b class="num">${sgn((p/t.buy-1)*100,2)}%</b>（${px(t,p-t.buy)}）` : '' }
 async function jpSave(){ const t=TR.find(x=>x.id===jpId); if(!t) return; const F=$('jpff').elements, M=x=>$('jp-msg').textContent=x;
   const d=F.d.value, tm=F.tm.value, p=num(F.p.value), q=num(F.q.value), fee=num(F.fee.value)||0;
   if(!d||p==null||!(q>0)) return M('要填成交日期、實際成交價同數量');
   if(!TR.includes(t)) return;
-  const u={...t, plan:false, pbuy:t.buy, pqty:t.qty??null, open:d, otime:tm, buy:p, qty:q, fee:(t.fee||0)+fee, upd:Date.now()};
+  const u={...t, plan:false, pbuy:t.buy, pqty:t.qty??null, open:d, otime:tm, osess:F.ss.value||sessAt(nyTime(d,tm,t.tz)), buy:p, qty:q, fee:(t.fee||0)+fee, upd:Date.now()};
   const btn=$('jp-go'); btn.disabled=true;
   try{ await DB.put('trades', u) }catch(_){ btn.disabled=false; return M('儲唔到：網絡有問題，遲啲再試') }
   btn.disabled=false; $('j-pf').close(); if(jEdit===t.id) jReset(); await jReload(); jMsg(`${t.sym} 已確認成交，而家係未平倉`) }
@@ -3302,6 +3326,31 @@ function jFutInfo(auto){ const F=$('jf').elements, box=$('j-futinfo'), fut=F.mkt
   box.innerHTML=(std!=null?`<b>${r}</b> 標準乘數係 <b class="num">${std}</b>（每點 ${money(std)}），你填咗 <b class="num">${m??'—'}</b>。`
       :`網站未識別「${esc(sym)}」呢個期貨代號，唔知佢每點值幾多。請自己填合約乘數（每點美元）。`)
     + (m>0?`<label><input type="checkbox" id="j-mok"${pre?' checked':''}> 我確認乘數係 <b class="num">${m}</b>：每點 ${money(m)}／張</label>`:'') }
+// Inverse ETFs (KC 11-16: bought SQQQ, picked Short because SQQQ is bearish, and the gain showed as a loss).
+// Buying any ETF is Long; Short means selling it short. The form explains it, a Short inverse ETF needs a tick,
+// and older Short rows are listed with a one-click 改做 Long (never changed without KC pressing it).
+const jEtfK = sym => { const e=etfIndex()[String(sym||'').trim().toUpperCase()]; return e&&(e.k==='L'||e.k==='S')?e:null };
+const jSideOdd = t => t.side==='S' && !t.fut && !t.plan && !t.sideok && (jEtfK(t.sym)||{}).k==='S';
+let jSideNeed=false;
+function jSideInfo(){ const F=$('jf').elements, box=$('j-sideinfo'), e=F.mkt.value==='fut'?null:jEtfK(F.sym.value); jSideNeed=false;
+  if(!e){ box.className='jfutinfo small'; box.innerHTML=''; return }
+  const what=`<b>${e.s}</b> 係 ${etfTag([e.s,e.n,e.k,e.x])} ${esc(etfOf(e))} 嘅 ETF${e.k==='S'?`（${esc(etfOf(e))} 跌，佢升）`:''}。`;
+  if(F.side.value==='L'){ box.className='jfutinfo small ok'; box.innerHTML=`${what}買入 ${e.s} = <b>Long 做多</b>：${e.s} 升你就賺。`; return }
+  const old=jEdit&&TR.find(x=>x.id===jEdit), pre=!!(old&&old.sideok&&old.sym===e.s&&old.side==='S');
+  jSideNeed=e.k==='S'; box.className='jfutinfo small warn';
+  box.innerHTML=`${what}<b>你揀咗 Short 做空</b>，即係「沽空 ${e.s}」：${e.s} 跌先賺，升就蝕。${e.k==='S'?`如果你係<b>買入</b> ${e.s}（睇淡 ${esc(etfOf(e))}），應該揀 <b>Long 做多</b>。`:''}`
+    + (e.k==='S'?`<label><input type="checkbox" id="j-sok"${pre?' checked':''}> 我真係沽空（借貨賣出）${e.s}</label>`:'') }
+function jSideFix(rows){ const odd=rows.filter(jSideOdd), box=$('j-sidefix');
+  if(!odd.length){ box.innerHTML=''; return }
+  box.innerHTML=`<b>有 ${odd.length} 單反向 ETF 記咗 Short（做空），請睇下方向啱唔啱：</b>買入反向 ETF（例如 SQQQ）應該記 <b>Long</b>，佢升你就賺；記成 Short 會將賺錢計成蝕錢。`
+    + odd.map(t=>{ const c=calc({...t,side:'L'});
+      return `<div class="cfbar" style="margin-top:6px"><span><b>${esc(t.sym)}</b> ${t.open} 開倉 · 入場 ${px(t,t.pin)}${t.pout!=null?` · 出場 ${px(t,t.pout)} · 而家計 <span class="${cls(t.pl)}">${usd(t.pl)}</span>，改做 Long 會係 <b class="${cls(c.pl)}">${usd(c.pl)}</b>`:''}</span>
+        <button class="tog sm" type="button" data-sfl="${t.id}" aria-pressed="true">我係買入，改做 Long</button><button class="tog sm" type="button" data-sok="${t.id}">我真係沽空，唔使改</button></div>` }).join('');
+  const put=async(id,ch,msg)=>{ const t=TR.find(x=>x.id===id); if(!t) return;
+    try{ await DB.put('trades', {...t, ...ch, upd:Date.now()}) }catch(_){ jMsg('儲唔到：網絡有問題，遲啲再試'); return }
+    if(jEdit===id) jReset(); await jReload(); jMsg(msg(t)) };
+  box.querySelectorAll('[data-sfl]').forEach(b=>b.onclick=()=>put(b.dataset.sfl,{side:'L'},t=>`${t.sym} 已改做 Long 做多`));
+  box.querySelectorAll('[data-sok]').forEach(b=>b.onclick=()=>put(b.dataset.sok,{sideok:true},t=>`${t.sym} 保留 Short，唔會再提`)) }
 // With fills, the entry/exit totals are worked out from them and can't be typed
 const FILLED=['open','otime','close','ctime','qty','buy','sell'];
 function jFillsDerive(){ const F=$('jf').elements, ins=jFills.filter(x=>x.a==='in'&&x.q>0&&x.p!=null), outs=jFills.filter(x=>x.a==='out'&&x.q>0&&x.p!=null);
@@ -3323,12 +3372,12 @@ function jFillsDraw(){
 function jLoad(id){ const t = TR.find(x=>x.id===id), F=$('jf'); if(!t) return; jEdit=id;
   for(const el of F.elements) if(el.name) el.value = t[el.name] ?? (el.name==='mkt'?'stk':el.name==='side'?'L':'');
   F.elements.plan.checked=!!t.plan; jPlanUI();
-  jShots=[...(t.shots||[])]; jShotsDraw(); jFills=(t.fills||[]).map(x=>({...x})); jFillsDraw(); if(t.tz) $('j-tz').value=t.tz; jMkt();
+  jShots=[...(t.shots||[])]; jShotsDraw(); jFills=(t.fills||[]).map(x=>({...x})); jFillsDraw(); if(t.tz) $('j-tz').value=t.tz; jMkt(); jSideInfo();
   $('j-more').open=!!(t.otime||t.ctime||t.fee||t.strat||t.tp||t.risk||t.mood||t.why_in||t.why_out||t.review||(t.shots||[]).length||(t.fills||[]).length);
   $('h-jf').textContent='修改交易：'+t.sym; $('j-del').hidden=false; $('j-save').textContent='儲存修改';
   $('h-jf').scrollIntoView({behavior:'smooth',block:'start'}) }
 function jReset(){ jEdit=null; jShots=[]; jFills=[]; $('jf').reset(); $('jf').elements.open.value=ymd(nyNow()); jShotsDraw(); jFillsDraw(); jMkt();
-  $('j-tz').value=Store.get('jtz','HK'); $('h-jf').textContent='新增交易'; $('j-del').hidden=true; $('j-save').textContent='儲存交易'; jPlanUI() }
+  $('j-tz').value=Store.get('jtz','HK'); jSideInfo(); $('h-jf').textContent='新增交易'; $('j-del').hidden=true; $('j-save').textContent='儲存交易'; jPlanUI() }
 // Per-person cap so the shared free Firebase quota (1 GB stored, 50,000 reads a day) lasts; opening the journal reads every trade once
 const J_MAX=1000, PRE_MAX=50, WL_MAX=200;  // per person; presets and watchlist are tiny but the watchlist is read on every visit
 function jCount(){ const e=$('j-count'), n=TR.length; e.hidden=false; e.textContent=`已用 ${n.toLocaleString('en-US')} / ${J_MAX.toLocaleString('en-US')} 單`;
@@ -3351,6 +3400,7 @@ const JX_F=[  // in the 新增交易 form's order and labels; the last three are
   ['sym','股票代號',1,['代號','股票代號','代碼','股票代碼','證券代碼','代號／合約','symbol','ticker','code','stock','instrument','合約','產品','證券']],
   ['open','開倉日期',1,['開倉日期','開倉','入場日期','買入日期','開倉日','opendate','entrydate','buydate','opened','date','日期','交易日期','成交日期']],
   ['otime','開倉時間',0,['開倉時間','入場時間','買入時間','opentime','entrytime','buytime','time','時間','成交時間']],
+  ['osess','開倉時段',0,['開倉時段','時段','交易時段','開倉時段美東','session','tradingsession','entrysession']],
   ['close','平倉日期',0,['平倉日期','平倉','出場日期','賣出日期','平倉日','closedate','exitdate','selldate','closed']],
   ['ctime','平倉時間',0,['平倉時間','出場時間','賣出時間','closetime','exittime','selltime']],
   ['qty','股數',1,['數量','股數','合約數','手數','成交數量','持倉數量','qty','quantity','shares','size','contracts','position']],
@@ -3407,6 +3457,10 @@ function jxNum(v){ if(v===''||v==null) return null; if(typeof v==='number') retu
   if(!s||isNaN(+s)) return null; return neg?-s:+s }
 function jxSide(v){ const s=String(v??'').trim().toLowerCase(); if(!s) return null;
   if(/short|sell|^s$|沽|賣|空|做淡/.test(s)) return 'S'; if(/long|buy|^l$|^b$|買|多|做好/.test(s)) return 'L'; return null }
+// 開倉時段 in a sheet: 盤前／盤中／盤後／夜盤 or English; also our older export's finer buckets (開市首 30 分鐘, 尾市 …)
+function jxSess(v){ const s=String(v??'').trim().toLowerCase(); if(!s) return '';
+  if(/夜|overnight|night/.test(s)) return 'night'; if(/盤前|pre/.test(s)) return 'pre';
+  if(/盤後|收市後|after|post|ext/.test(s)) return 'post'; if(/盤中|開市|上午|午市|尾市|日內|正常|regular|rth|intraday|market/.test(s)) return 'reg'; return '' }
 // Futures when the sheet says so, or the code is an index future (bare ES/CL/GC are also stock tickers, so they need a month: ESZ5)
 const jxMkt = (v,sym) => /期貨|fut|^f$/i.test(String(v??'')) || /^(M?NQ|MES|M?YM|RTY|M2K)([FGHJKMNQUVXZ]\d{1,2})?$|^(M?NQ|M?ES|M?YM|RTY|M2K|M?CL|M?GC)[FGHJKMNQUVXZ]\d{1,2}$/i.test(sym) ? 'fut' : 'stk';
 const JX_MULT = {NQ:20,MNQ:2,ES:50,MES:5,YM:5,MYM:0.5,RTY:50,M2K:5,CL:1000,MCL:100,GC:100,MGC:10};
@@ -3420,7 +3474,7 @@ function jxRow(r, M, dmy, tz){ const g=k=>M[k]==null?'':r[M[k]];
   if(qty==null||!qty) return {bad:'冇數量'}; if(buy==null) return {bad:'冇入場價'};
   const mkt=jxMkt(g('mkt'),sym), side=jxSide(g('side'))||(qty<0?'S':'L');
   const t={ sym, mkt, side, cm:'', mult:mkt==='fut'?(JX_MULT[sym.replace(/[FGHJKMNQUVXZ]\d{1,2}$/,'')]||20):null,  // futures multiplier from the code (NQ 20, MNQ 2…)
-    open:o.d, otime:jxTime(g('otime'))||o.t, close:c?c.d:null, ctime:c?(jxTime(g('ctime'))||c.t):'', tz,
+    open:o.d, osess:jxSess(g('osess')), otime:jxTime(g('otime'))||o.t, close:c?c.d:null, ctime:c?(jxTime(g('ctime'))||c.t):'', tz,
     buy:Math.abs(buy), sell:sell==null?null:Math.abs(sell), qty:Math.abs(qty), fee:Math.abs(jxNum(g('fee'))||0),
     tp:jxNum(g('tp')), sl:jxNum(g('sl')), risk:jxNum(g('risk')),
     strat:String(g('strat')).trim(), mood:String(g('mood')).trim(), why_in:String(g('why_in')), why_out:String(g('why_out')), review:String(g('review')), shots:[], fills:[] };
@@ -3486,7 +3540,7 @@ function jxDraw(){ const head=(JX.rows[JX.hrow]||[]).map(String), cols=Math.max(
   JX.ok=ok;
   $('jx-sum').textContent=`${ok.length} 單讀到${(n=>n?`，連 ${n} 張截圖`:'')(ok.reduce((a,[,t])=>a+t._img.length,0))}${upd?`（${upd} 單之前匯入過，會用表入面嘅數更新）`:''}${bad.length?`，${bad.length} 行有問題會略過`:''}`;
   $('jx-prev').innerHTML=ok.slice(0,30).map(([n,t])=>`<tr><td class="muted">${n}</td><td><b>${esc(t.sym)}</b></td><td>${t.mkt==='fut'?'期貨':'股票'}</td><td class="${t.side==='S'?'down':'up'}">${SIDE[t.side]}</td>
-    <td class="num">${t.open}${t.otime?' '+t.otime:''}</td><td class="num">${t.close?t.close+(t.ctime?' '+t.ctime:''):'<span class="muted">未平倉</span>'}</td>
+    <td class="num">${t.open}${OSESS[t.osess]?' '+OSESS[t.osess]:''}${t.otime?' '+t.otime:''}</td><td class="num">${t.close?t.close+(t.ctime?' '+t.ctime:''):'<span class="muted">未平倉</span>'}</td>
     <td class="r num">${f(t.buy,2)}</td><td class="r num">${t.sell==null?'—':f(t.sell,2)}</td><td class="r num">${f(t.qty,0)}</td><td class="r num">${f(t.fee,2)}</td><td>${esc(t.strat)}</td><td>${t._img.length?t._img.length+' 張':''}</td></tr>`).join('')
     +(ok.length>30?`<tr><td colspan="12" class="muted">……仲有 ${ok.length-30} 單</td></tr>`:'')+(ok.length?'':'<tr><td colspan="12" class="muted">一單都讀唔到。睇下欄位對應啱唔啱，或者「欄名喺第幾行」。</td></tr>');
   $('jx-bad').innerHTML=bad.slice(0,10).map(([n,why])=>`<li>第 ${n} 行：${why}</li>`).join('')+(bad.length>10?`<li>……仲有 ${bad.length-10} 行</li>`:'');
@@ -3527,7 +3581,10 @@ function jxInit(){
 DRAW.journal = () => {
   if(!DRAW.journal.done){ DRAW.journal.done=1;
     $('jf').insertAdjacentHTML('beforeend',`<datalist id="j-futs">${Object.keys(JX_MULT).map(k=>`<option value="${k}">${FUT_NAME[k]} · 每點 US$${JX_MULT[k]}</option>`).join('')}</datalist>`);
-    $('jf').elements.mkt.onchange=jMkt;
+    $('jf').elements.mkt.onchange=()=>{ jMkt(); jSideInfo() };
+    $('jf').elements.side.onchange=jSideInfo; $('jf').elements.sym.addEventListener('input',jSideInfo);
+    // a typed time fills in 開倉時段 when none is picked yet
+    $('jf').elements.otime.addEventListener('change',()=>{ const F=$('jf').elements; if(!F.osess.value&&F.otime.value) F.osess.value=sessAt(nyTime(F.open.value,F.otime.value,$('j-tz').value)) });
     $('j-tz').onchange=()=>Store.set('jtz',$('j-tz').value);
     $('j-addfill').onclick=()=>{ const F=$('jf').elements;
       if(!jFills.length && F.qty.value && F.buy.value) jFills.push({a:'in', d:F.open.value, tm:F.otime.value, q:num(F.qty.value), p:num(F.buy.value)});
@@ -3546,10 +3603,11 @@ DRAW.journal = () => {
       const fills=jFills.filter(x=>x.q>0&&x.p!=null);
       const t={ id: jEdit || Date.now().toString(36)+Math.random().toString(36).slice(2,6), sym:F.sym.value.trim().toUpperCase(),
         mkt:F.mkt.value, side:F.side.value, cm:F.mkt.value==='fut'?F.cm.value.trim():'', mult:F.mkt.value==='fut'?num(F.mult.value):null,
-        open:F.open.value, otime:F.otime.value, close:F.close.value||null, ctime:F.ctime.value, tz:$('j-tz').value,
+        open:F.open.value, osess:F.osess.value, otime:F.otime.value, close:F.close.value||null, ctime:F.ctime.value, tz:$('j-tz').value,
         buy:num(F.buy.value), sell:num(F.sell.value), qty:num(F.qty.value), fee:num(F.fee.value)||0, tp:num(F.tp.value), sl:num(F.sl.value), risk:num(F.risk.value),
         strat:F.strat.value.trim(), mood:F.mood.value.trim(), why_in:F.why_in.value, why_out:F.why_out.value, review:F.review.value, shots:jShots, fills, upd:Date.now() };
       const old=jEdit&&TR.find(x=>x.id===jEdit); if(old&&old.pbuy!=null){ t.pbuy=old.pbuy; t.pqty=old.pqty??null }
+      jSideInfo(); if(jSideNeed){ if(!($('j-sok')&&$('j-sok').checked)){ jMsg(`${t.sym} 係反向 ETF：買入佢請揀 Long 做多；真係沽空就剔「我真係沽空」先儲`); $('j-sideinfo').scrollIntoView({block:'center'}); return } t.sideok=true }
       if(t.mkt==='fut'){
         if(!(t.mult>0)){ jMsg('期貨要填合約乘數（每點美元）'); F.mult.focus(); return }
         if(jMokNeed && !($('j-mok')&&$('j-mok').checked)){ jMsg('呢個期貨代號／乘數要先剔「我確認乘數」先可以儲，避免記錯盈虧'); $('j-futinfo').scrollIntoView({block:'center'}); return } }
@@ -3573,7 +3631,7 @@ DRAW.journal = () => {
     $('j-del').onclick=async()=>{ if(!jEdit) return; try{ await DB.del('trades', jEdit) }catch(_){ jMsg('刪唔到：網絡有問題，遲啲再試'); return }
       await jReload(); jReset(); jMsg('已刪除') };
     $('j-csv').onclick=()=>{ const r2=x=>x==null?null:Math.round(x*100)/100;
-      csvDownload(`kcdt-journal-${ymd(nyNow())}.csv`, [['代號','市場','方向','合約月份','合約乘數','開倉日期','開倉時間','平倉日期','平倉時間','入場價','出場價','數量','分批筆數','手續費','成本／名義值','出場金額','淨盈虧','淨盈虧%','計劃風險','R','持倉','時段（美東）','策略類型','預計止盈','預計止盈%','預計止損','預計止損%','買入理由','賣出理由','復盤筆記','交易情緒'],
+      csvDownload(`kcdt-journal-${ymd(nyNow())}.csv`, [['代號','市場','方向','合約月份','合約乘數','開倉日期','開倉時間','平倉日期','平倉時間','入場價','出場價','數量','分批筆數','手續費','成本／名義值','出場金額','淨盈虧','淨盈虧%','計劃風險','R','持倉','開倉時段','策略類型','預計止盈','預計止盈%','預計止損','預計止損%','買入理由','賣出理由','復盤筆記','交易情緒'],
         ...TR.map(calc).sort((a,b)=>(a.open+(a.otime||'')).localeCompare(b.open+(b.otime||''))).map(t=>[t.sym,t.fut?'期貨':'股票',SIDE[t.side]||'Long',t.cm,t.fut?t.mult:null,t.open,t.otime,t.close,t.ctime,r2(t.pin),r2(t.pout),t.qIn,(t.fills||[]).length||null,t.fee,r2(t.cost),t.isOpen?null:r2(t.rev),t.isOpen?null:r2(t.pl),t.isOpen?null:r2(t.plp),r2(t.risk),t.R==null?null:r2(t.R),t.holdTxt,t.sess,t.strat,t.tp,r2(t.tpp),t.sl,r2(t.slp),t.why_in,t.why_out,t.review,t.mood])]) };
     $('j-bak').onclick=async()=>{ let bak; try{ bak={app:'KCDT',v:2,saved:new Date().toISOString(),trades:await DB.all('trades'),presets:await DB.all('presets'),watch:await DB.all('watch')} }
       catch(_){ jMsg('備份讀取唔到：網絡有問題，遲啲再試'); return }
@@ -3701,14 +3759,14 @@ function stockEtfs(s){ const r=relatedEtfs(s), L=[...r.one,...r.broad];
 function showEtf(t){ const E=etfIndex(), e=E[t]||{s:t,n:'',k:'X'};
   $('e-tk').textContent=t; $('e-name').textContent=e.n||'';
   const u=e.u&&BY[e.u];
-  $('e-kind').innerHTML=e.u?`單一股票 ETF · 追蹤 <a href="#s/${encodeURIComponent(e.u)}">${e.u}</a>${u?` ${esc(u.n||'')}`:''}`:e.sec?'板塊 ETF':'ETF';
-  $('e-tags').innerHTML=[e.k!=='X'?`<span class="badge">${etfTag([e.s,e.n,e.k,e.x])} ${e.u}</span>`:'', e.sec?`<span class="badge">5 日 ${sgn(e.sec.d5,2)}% · 1 個月 ${sgn(e.sec.m1,2)}%</span>`:''].join('');
-  $('e-note').innerHTML=e.k==='L'||e.k==='S'?`<b>${etfTag([e.s,e.n,e.k,e.x])}：</b>目標係每日回報等於 ${e.u} 當日升跌嘅 ${e.k==='S'?'負 ':''}${+e.x} 倍，倍數每日重設。持有超過一日，回報會同「${e.u} 期間升跌 × ${e.k==='S'?'-':''}${+e.x}」有出入：上落反覆嘅日子會慢慢蝕（波動耗損），單邊走勢時可能多過倍數。只供了解產品，唔係買賣建議。`
+  $('e-kind').innerHTML=e.ix?`指數槓桿／反向 ETF · 追蹤 ${esc(e.ix)}${e.b?`（<a href="#e/${e.b}">${e.b}</a>）`:''}`:e.u?`單一股票 ETF · 追蹤 <a href="#s/${encodeURIComponent(e.u)}">${e.u}</a>${u?` ${esc(u.n||'')}`:''}`:e.sec?'板塊 ETF':'ETF';
+  $('e-tags').innerHTML=[e.k!=='X'?`<span class="badge">${etfTag([e.s,e.n,e.k,e.x])} ${esc(etfOf(e))}</span>`:'', e.sec?`<span class="badge">5 日 ${sgn(e.sec.d5,2)}% · 1 個月 ${sgn(e.sec.m1,2)}%</span>`:''].join('');
+  $('e-note').innerHTML=e.k==='L'||e.k==='S'?`<b>${etfTag([e.s,e.n,e.k,e.x])}：</b>目標係每日回報等於 ${esc(etfOf(e))} 當日升跌嘅 ${e.k==='S'?'負 ':''}${+e.x} 倍，倍數每日重設。持有超過一日，回報會同「${esc(etfOf(e))} 期間升跌 × ${e.k==='S'?'-':''}${+e.x}」有出入：上落反覆嘅日子會慢慢蝕（波動耗損），單邊走勢時可能多過倍數。${e.k==='S'?`<br><b>交易日誌點記：</b>買入 ${e.s} 係「Long 做多」（${e.s} 升你就賺），雖然佢本身係睇淡 ${esc(etfOf(e))} 嘅產品；只有沽空（借貨賣出）${e.s} 先係「Short 做空」。`:''}只供了解產品，唔係買賣建議。`
     :e.k==='I'?`<b>期權收息 ETF：</b>持有（或模擬持有）${e.u} 再賣出認購期權收期權金，分派較高，但 ${e.u} 大升時升幅有上限，大跌時照跌。只供了解產品，唔係買賣建議。`
     :e.sec?`板塊 ETF，網站每日收市計佢嘅升跌（大市頁「板塊」）：當日 ${sgn(e.sec.d1,2)}%、5 日 ${sgn(e.sec.d5,2)}%、10 日 ${sgn(e.sec.d10,2)}%、1 個月 ${sgn(e.sec.m1,2)}%。`
     :t==='QQQ'?'追蹤 Nasdaq-100 指數嘅 ETF。':'呢隻 ETF 唔喺網站嘅名單入面，下面只有延遲價同圖表。';
-  const sib=e.u?(D.etfs[e.u]||[]).map(x=>E[x[0]]).filter(x=>x.s!==t):[];
-  $('e-sib').hidden=!sib.length; if(sib.length){ $('h-esib').textContent=`其他追蹤 ${e.u} 嘅 ETF`; $('e-sib-b').innerHTML=etfRows(sib) }
+  const sib=e.ix?Object.values(E).filter(x=>x.ix===e.ix&&x.s!==t):e.u?(D.etfs[e.u]||[]).map(x=>E[x[0]]).filter(x=>x.s!==t):[];
+  $('e-sib').hidden=!sib.length; if(sib.length){ $('h-esib').textContent=`其他追蹤 ${esc(etfOf(e))} 嘅 ETF`; $('e-sib-b').innerHTML=etfRows(sib) }
   $('e-px').textContent='—'; $('e-live').textContent=LIVE_URL?'延遲價載入緊…':'';
   tvPaint(); etfLive(); liveSoon();
 }
@@ -3752,7 +3810,8 @@ function stocksReady(){
   if(!D.fcov) FCOV=[S.filter(s=>s.fts).length, S.filter(s=>['mcap','sq','sa','inst','beta'].every(k=>s[k]!=null)).length];
   fcovTxt=`${nfmt(FCOV[0])} 隻有部分基本面資料，${nfmt(FCOV[1])} 隻齊備篩選所需資料`;
   drawStamps();
-  $('tickers').innerHTML = S.map(s=>`<option value="${s.s}">${s.n||''}</option>`).join('');
+  $('tickers').innerHTML = S.map(s=>`<option value="${s.s}">${s.n||''}</option>`).join('')
+    + Object.values(etfIndex()).map(e=>`<option value="${e.s}">${e.k==='X'?'ETF':etfTag([e.s,e.n,e.k,e.x])+' '+esc(etfOf(e))+' · ETF'}</option>`).join('');
   if(!$('v-wait').hidden) route();
   wlStars(); if(drawn.market && brief.T) brief(brief.T);
   if(drawn.close) DRAW.close();
