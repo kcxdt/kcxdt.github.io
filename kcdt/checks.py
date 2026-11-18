@@ -73,8 +73,8 @@ def run(data, today=None, now=None):
     # a fetch that came back empty (13 Nov 2026: Yahoo refused every call and 41 records lost market cap, industry and
     # beta, AMAT and CSCO among them, while the status page said 正常)
     blank = blank_records(st)
-    add(0 if len(blank) <= 5 else 2, f"基本面更新咗但冇資料（市值、行業、Beta 都空）：{len(blank)} 隻"
-        + (f"（例如 {'、'.join(blank[:6])}；下次更新會優先重新攞）" if blank else ""), "blank", len(blank))
+    add(0 if not blank else 1 if len(blank) <= 5 else 2, f"基本面更新咗但冇資料（市值、行業、Beta 都空）：{len(blank)} 隻"
+        + (f"（例如 {'、'.join(blank[:6])}；篩選範圍內會優先重試）" if blank else ""), "blank", len(blank))
     aged = [s["s"] for s in st if s.get("fts") and (pd.Timestamp(data["asof"]) - pd.Timestamp(s["fts"])).days > OLD_DAYS]
     add(0 if len(aged) <= 30 else 1, f"基本面超過 {OLD_DAYS} 日未更新：{len(aged)} 隻"
         + (f"（例如 {'、'.join(aged[:6])}）" if aged else ""), "aged", len(aged))
@@ -94,8 +94,11 @@ def run(data, today=None, now=None):
     fill = [s["s"] for s in st if s.get("fill")]
     add(0 if len(fill) <= 30 else 1, f"冇 {data['asof']} 報價、用之前收市補嘅股票：{len(fill)} 隻"
         + (f"（例如 {'、'.join(fill[:6])}；表入面標「補價」，唔計入升跌家數、成交量同新高新低）" if fill else ""), "fill", len(fill))
+    gaps = [s["s"] for s in st if s.get("prevMissing")]
+    if gaps:
+        add(1, f"上個交易日缺收市價，無法計單日升跌：{len(gaps)} 隻（{'、'.join(gaps)}）", "prevgap", len(gaps))
     old = len(past_due(st, data["asof"]))
-    add(0 if old <= 30 else 1, f"預計業績日已過但未確認公布：{old} 隻（{data['asof']} 之前嘅日子；下次業績日顯示「未知」）",
+    add(0 if old <= 30 else 1, f"預計業績日已過但未確認公布：{old} 隻（{data['asof']} 之前嘅日子；等候核實公布）",
         "past", old)
     now = pd.Timestamp(now) if now is not None else pd.Timestamp.now(tz="America/New_York")
     want, pm = pm_expected(now), data.get("pm_d")

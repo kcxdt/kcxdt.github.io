@@ -10,6 +10,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+from .verified import supplement_prices
 from .checks import QLAG
 from .compute import DOW30, INDICES, SECTORS
 
@@ -219,6 +220,24 @@ def _estimate_growth(df):
     return val("0y"), val("+1y")
 
 
+def report_history(series):
+    """Only rows with reported EPS provide evidence of an actual release."""
+    dates = sorted({pd.Timestamp(d).date() for d in series.dropna().index}, reverse=True)
+    if not dates:
+        return {}
+    out = {"reported": dates[0].isoformat()}
+    latest = pd.Timestamp(max(series.dropna().index))
+    if latest.tzinfo is not None:
+        latest = latest.tz_convert("America/New_York")
+        minutes = latest.hour * 60 + latest.minute
+        if minutes >= 960 or 0 < minutes < 570:
+            out["report_session"] = "amc" if minutes >= 960 else "bmo"
+    # Use last year's equivalent quarter only for a regular quarterly reporter.
+    if len(dates) >= 4 and all(65 <= (a-b).days <= 115 for a, b in zip(dates[:3], dates[1:4])):
+        out["expected_month"] = (pd.Timestamp(dates[3]) + pd.DateOffset(years=1)).strftime("%Y-%m")
+    return out
+
+
 def _one(t):
     tk = yf.Ticker(t)
     info = tk.info or {}
@@ -240,6 +259,7 @@ def _one(t):
         e = tk.get_earnings_dates(limit=16)
         if e is not None and not e.empty and "Reported EPS" in e:
             e = e["Reported EPS"].dropna().sort_index(ascending=False)
+            rec.update(report_history(e))
             rec["epsh"] = [float(x) for x in e.tolist()[:8]]
     except Exception as ex:
         print("earnings dates failed:", t, ex)
@@ -292,16 +312,20 @@ RETRY_AFTER = 12 * 3600  # a record still on the quarter before its last report 
 RETRY_DAYS = 45  # ... for up to this many days after the report; then it goes back to the normal 7-day turn
 
 
+def _reported_time(rec):
+    return pd.Timestamp(rec["reported"] + " 16:00", tz="America/New_York").timestamp() if rec.get("reported") else 0
+
+
 def quarter_behind(rec, report=None):
     """True when the latest quarter in the record ended more than QLAG days before the company's last report
     (Yahoo's own, or Nasdaq's confirmed `report` time): the record is still the quarter before."""
-    rep, q = max(rec.get("erep") or 0, report or 0), rec.get("qend")
+    rep, q = max(rec.get("erep") or 0, report or 0, _reported_time(rec)), rec.get("qend")
     return bool(rep and q) and rep - pd.Timestamp(q).timestamp() > QLAG * 86400
 
 
 def retry_due(rec, report, now):
     """Fetched after the report, but Yahoo did not have the new quarter yet: try again (at most every RETRY_AFTER)."""
-    rep = max(rec.get("erep") or 0, report or 0)
+    rep = max(rec.get("erep") or 0, report or 0, _reported_time(rec))
     return (quarter_behind(rec, report) and rep + AFTER_REPORT <= now < rep + RETRY_DAYS * 86400
             and now - rec.get("_ts", 0) >= RETRY_AFTER)
 
@@ -324,14 +348,17 @@ def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, 
     # a record with quarterly EPS but no quarter end date was saved before that date was collected: it counts as an
     # old-schema record, so it is fetched again ahead of the normal 7-day turn (11 Nov 2026: 59 such, CRM, DELL, HPQ...)
     # a blank record saved while Yahoo was refusing calls (no _empty mark) also counts as old, so it is fetched again first
+    blank_due = {t for t in tickers if first and t in first and cache.get(t) and
+                 all(cache[t].get(k) is None for k in ("mcap", "ind", "beta")) and
+                 now - cache[t].get("_attempt", 0) >= RETRY_AFTER}
     current = lambda r: r.get("_v", 1) >= SCHEMA and not (r.get("epsq") and not r.get("qend")) and not (r and _blank(r) and not r.get("_empty"))
     age = lambda t: (current(cache.get(t, {})), cache.get(t, {}).get("_ts", 0))
     just = {t for t in tickers if reported_since(cache.get(t, {}), now)
             or (t in cache and reported_after_fetch(cache[t], reports.get(t), now))}
     retry = {t for t in tickers if t in cache and t not in just and retry_due(cache[t], reports.get(t), now)}
-    stale = sorted((t for t in tickers if t in just or t in retry or age(t)[0] is False
+    stale = sorted((t for t in tickers if t in just or t in retry or t in blank_due or age(t)[0] is False
                     or now - age(t)[1] > (max_age_days if first is None or t in first else slow_age_days) * 86400),
-                   key=lambda t: (0 if t in just else 1 if hot and t in hot else 2 if t in retry else 3,
+                   key=lambda t: (0 if t in just or t in blank_due else 1 if hot and t in hot else 2 if t in retry else 3,
                                   first is not None and t not in first, age(t)))
     print(f"fundamentals: {len(just)} reported since last fetch, refreshing those first; "
           f"{len(retry)} still on the quarter before their report, trying again")
@@ -354,6 +381,9 @@ def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, 
             rec["erep"] = past if past and (not rec.get("edate") or rec["edate"] > now) else old.get("erep")
             if rec.get("edate") and rec["edate"] <= now:
                 rec["erep"] = rec["edate"]
+            rec["_attempt"] = now
+            rep = reports.get(t)
+            rec["_fails"] = old.get("_fails", 0) + 1 if _blank(rec) or quarter_behind(rec, rep) else 0
             cache[t] = rec
             done += 1
             if len(streak) >= BLANK_STREAK:
@@ -370,6 +400,8 @@ def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, 
                 streak = []
         except Exception as e:
             fails += 1
+            if old:
+                old.update(_attempt=now, _fails=old.get("_fails", 0) + 1)
             print("fundamentals failed:", t, e)
             if fails > 25:
                 print("too many failures, stopping fundamentals refresh for this run")
@@ -474,7 +506,9 @@ def nasdaq_quarters(tickers, cache_file, max_age_days=7, max_calls=400, workers=
 
     with ThreadPoolExecutor(workers) as ex:
         got = [(t, rec) for t, rec in ex.map(one, stale) if rec is not None]
-    cache.update(got)
+    for t, rec in got:
+        if rec.get("nrev") or not cache.get(t, {}).get("nrev"):
+            cache[t] = rec
     print(f"nasdaq quarters: {len(got)}/{len(stale)} refreshed, {len(cache)} cached")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(cache))
@@ -514,7 +548,7 @@ def _earn_rows(day, tries=3, far=False):
             time.sleep(3 * (i + 1))
         finally:
             time.sleep(0.5)
-    return []
+    return None
 
 
 def earnings_calendar(days=63, back=100, cache_file=None, today=None):
@@ -534,6 +568,9 @@ def earnings_calendar(days=63, back=100, cache_file=None, today=None):
             seen = json.loads(path.read_text())
         except Exception:
             seen = {}
+    future_path = path.with_suffix(".upcoming.json") if path else None
+    previous = json.loads(future_path.read_text()) if future_path and future_path.exists() else {}
+    updated = {}
     recent = (start - pd.Timedelta(days=4)).strftime("%Y-%m-%d")  # late EPS figures still arriving
     span = [d for d in pd.date_range(start - pd.Timedelta(days=back), periods=back + days) if d.weekday() < 5]
     cached = lambda d: d < start and d.strftime("%Y-%m-%d") in seen and d.strftime("%Y-%m-%d") < recent
@@ -548,22 +585,32 @@ def earnings_calendar(days=63, back=100, cache_file=None, today=None):
             for sym in seen[day]:
                 done[sym] = max(done.get(sym, day), day)
             continue
-        got = []
+        got = set(seen.get(day, []))
+        for sym in got:
+            done[sym] = max(done.get(sym, day), day)
+        if fetched[d] is None:
+            for sym, record in (previous.get(day, {}) if d >= start else {}).items():
+                out.setdefault(sym, record[:3] + [record[3], True])
+                updated.setdefault(day, {})[sym] = record
+            continue
         for row in fetched[d]:
             sym = (row.get("symbol") or "").strip().replace(".", "-")
             if not sym:
                 continue
-            if d >= start and sym not in out:
-                out[sym] = [day, EARN_TIME.get(row.get("time")), _cap_bn(row.get("marketCap"))]
-            elif d < start and re.search(r"\d", str(row.get("eps") or "")):  # "$1.23", "($0.12)"; blank until published
+            has_result = row.get("eps") is not None and re.search(r"\d", str(row["eps"]))
+            if d <= start and has_result:
                 done[sym] = max(done.get(sym, day), day)
-                got.append(sym)
-        if d < start:
-            seen[day] = got
+                got.add(sym)
+            elif d >= start and sym not in out:
+                out[sym] = [day, EARN_TIME.get(row.get("time")), _cap_bn(row.get("marketCap"))]
+                updated.setdefault(day, {})[sym] = out[sym] + [start.strftime("%Y-%m-%d")]
+        if d <= start:
+            seen[day] = sorted(got)
     if path:
         first = (start - pd.Timedelta(days=back + 10)).strftime("%Y-%m-%d")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps({k: v for k, v in sorted(seen.items()) if k >= first}))
+        future_path.write_text(json.dumps({k: v for k, v in updated.items() if k >= start.strftime("%Y-%m-%d")}))
     print(f"earnings calendar: {len(out)} companies in the next {days} days, {len(done)} reported in the last {back}")
     return out, done
 
@@ -583,16 +630,38 @@ def earnings_dates(tickers, cache_file, known=(), max_calls=300, recheck_days=3,
     todo = [t for t in tickers if t not in known and not has_next(t)
             and now - cache.get(t, {}).get("_ts", 0) > recheck_days * 86400]
     order = {t: i for i, t in enumerate(tickers)}
-    todo.sort(key=lambda t: (cache.get(t, {}).get("_ts", 0) > 0, order[t]))
+    todo.sort(key=lambda t: (cache.get(t, {}).get("_ts", 0), order[t]))
     done = fails = 0
     for t in todo[:max_calls]:
         try:
-            info = yf.Ticker(t).info or {}
-            cache[t] = {"ts": info.get("earningsTimestamp") or info.get("earningsTimestampStart"),
-                        "est": info.get("isEarningsDateEstimate"), "_ts": now}
+            stock = yf.Ticker(t)
+            info = stock.info or {}
+            ts = info.get("earningsTimestamp")
+            est = info.get("isEarningsDateEstimate")
+            end = None
+            if (ts or 0) <= now:
+                start = info.get("earningsTimestampStart")
+                if (start or 0) > now:
+                    ts, end, est = start, info.get("earningsTimestampEnd"), True
+                else:
+                    dates = sorted((stock.calendar or {}).get("Earnings Date") or [])
+                    if dates:
+                        times = [pd.Timestamp(d).tz_localize("America/New_York").timestamp() for d in dates]
+                        if times[0] > now:
+                            ts, end, est = times[0], times[-1], True
+            history = {}
+            if (ts or 0) <= now + 7 * 86400:
+                releases = stock.get_earnings_dates(limit=8)
+                if releases is not None and "Reported EPS" in releases:
+                    history = report_history(releases["Reported EPS"])
+            previous = cache.get(t, {})
+            if (ts or 0) <= now < (previous.get("ts") or 0):
+                raise ValueError("source no longer supplies previous future date")
+            cache[t] = {"ts": ts, "end": end, "est": est, "_ts": now, **history}
             done += 1
         except Exception as e:
             fails += 1
+            cache.setdefault(t, {})["error_at"] = now
             print("earnings date failed:", t, e)
             if fails > 25:
                 print("too many failures, stopping the earnings date refresh for this run")
@@ -641,7 +710,7 @@ def _econ_day(ask, tries=2):
     return None
 
 
-def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, now=None):
+def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, now=None, published_url=None):
     """US releases for this week and next: [{d, u (UTC time), e (event), a (actual), c (consensus), p (previous)}].
 
     Nasdaq files each day's releases under the next day's date (the 2026-10-28 FOMC decision comes back for
@@ -671,6 +740,18 @@ def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, n
         got[day] = _econ_day((pd.Timestamp(day) + pd.Timedelta(days=1)).strftime("%Y-%m-%d"))
         time.sleep(0.5)
     sig = lambda rows: sorted((x.get("gmt"), x.get("eventName"), x.get("previous")) for x in rows) if rows else None
+    # A fresh runner may have no cache for a day the provider temporarily omits.
+    missing = {day for i, day in enumerate(days) if not kept.get(day) and
+               (not got[day] or (i+1 < len(days) and sig(got[day]) == sig(got[days[i+1]])))}
+    if missing and published_url:
+        try:
+            response = requests.get(published_url, timeout=15)
+            response.raise_for_status()
+            for row in response.json().get("econ", []):
+                if row.get("d") in missing and row.get("e") and not row.get("hol"):
+                    kept.setdefault(row["d"], []).append({k: row.get(k) for k in ("d","u","e","a","c","p")})
+        except (requests.RequestException, ValueError, TypeError, AttributeError) as exc:
+            print("previous economic calendar unavailable:", exc)
     out = []
     for i, day in enumerate(days):
         rows = got[day]
@@ -830,8 +911,36 @@ def fill_last_day(px, quotes=None):
     return n
 
 
+def repair_split_gaps(px, history=None):
+    """Use recorded corporate actions to validate jumps across missing sessions throughout the input."""
+    close = px["Close"]
+    for t in close:
+        observations = close[t].dropna()
+        positions = pd.Series(close.index.get_indexer(observations.index), index=observations.index)
+        ratios = observations.shift() / observations.where(observations > 0)
+        jumps = ratios[(positions.diff() > 1) & ((ratios >= 1.9) | (ratios <= 0.53))]
+        if jumps.empty:
+            continue
+        try:
+            bars = (history or (lambda symbol: yf.Ticker(symbol).history(period="2y", actions=True)))(t)
+            splits = bars["Stock Splits"]
+            for after, ratio in jumps.items():
+                before = observations.index[observations.index.get_loc(after) - 1]
+                factors = [float(v) for d, v in splits.items()
+                           if before.date() < d.date() <= after.date() and v > 0 and v != 1]
+                if len(factors) != 1 or abs(ratio / factors[0] - 1) > 0.10:
+                    continue
+                for field in ("Open", "High", "Low", "Close"):
+                    px[field].loc[:before, t] /= factors[0]
+                px["Volume"].loc[:before, t] *= factors[0]
+        except Exception as exc:
+            print("split check failed:", t, exc)
+
+
 def fetch_prices(u):
     extra = [t for t, _ in INDICES] + [t for t, _ in SECTORS] + DOW30 + ["QQQ", "^NDX", "^VXN"]
     px = prices(sorted(set(list(u.index) + extra)))
     fill_last_day(px)
+    repair_split_gaps(px)
+    supplement_prices(px)
     return px

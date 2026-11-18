@@ -9,8 +9,24 @@ import json
 import pandas as pd
 
 from .__main__ import OUT, now_utc, write_page
-from .checks import run as run_checks
+from .checks import fund_stale, run as run_checks
+from .compute import enrich_earnings
 from .fetch import economic_calendar, headlines
+
+
+def apply_live_results(data):
+    live = data.get("earn_live") or {}
+    if not live.get("d"):
+        return
+    reports = {r["s"]: r for r in live.get("rows", []) if r.get("rep") is not None}
+    for row in data["stocks"]:
+        report = reports.get(row["s"])
+        if report and live["d"] >= (row.get("erep") or ""):
+            if row.get("issuer", {}).get("date", live["d"]) < live["d"]:
+                row.pop("issuer", None)
+            row.pop("issuerPending", None)
+            enrich_earnings(row, {"reported": live["d"], "report_session": report.get("tm")}, {})
+            row["fst"] = fund_stale(row)
 
 
 def main():
@@ -30,6 +46,7 @@ def main():
             data["earn_live"] = live
     except Exception as e:  # results are a bonus; never lose the econ / news refresh over them
         print("live results failed:", e)
+    apply_live_results(data)
     if not data.get("etfs"):  # the close build makes the ETF map; a site built before that feature gets it here
         try:
             from .etfs import etf_map

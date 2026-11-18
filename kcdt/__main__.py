@@ -194,6 +194,8 @@ def say(msg, t0=time.time()):
 
 
 def main():
+    if os.name == "nt" and not sys.stdout.isatty() and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     mode = os.environ.get("KCDT_MODE", "close")
     budget = BUDGET[mode]
     hist = os.environ.get("KCDT_HISTORY", ROOT / "hist")
@@ -260,7 +262,7 @@ def main():
         return
     data = build(px, meta, fund, fear_greed(ROOT / "cache" / "fear_greed.json"), earn, done, prof, ydates)
     data["econ"], data["econ_t"] = economic_calendar(labels_file="cache/econ_labels.json",
-                                                         days_file="cache/econ_days.json"), now_utc()
+                                                         days_file="cache/econ_days.json", published_url=SITE + "data.json"), now_utc()
     data["news"], data["news_t"] = headlines(), now_utc()
     if len(data["stocks"]) < 1000:
         sys.exit(f"only {len(data['stocks'])} stocks computed, refusing to publish")

@@ -9,6 +9,7 @@ import math
 import numpy as np
 import pandas as pd
 
+from .verified import apply_issuer_report, security_directory
 from .checks import coverage, fund_stale
 
 DOW30 = ["AAPL", "AMGN", "AMZN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS",
@@ -233,6 +234,43 @@ def yahoo_next(f, y):
     return ny_day(ts), (ny_session(ts) if src.get("est") is False else None), src.get("est") is False, seen
 
 
+def enrich_earnings(row, fund, lookup):
+    for source in (fund, lookup):
+        reported = source.get("reported")
+        if reported and reported >= (row.get("erep") or ""):
+            if reported > (row.get("erep") or ""):
+                row.pop("lastSession", None)
+                row.pop("emonth", None)
+            row["erep"] = reported
+            if source.get("report_session"):
+                row["lastSession"] = source["report_session"]
+            if source.get("expected_month"):
+                row["emonth"] = source["expected_month"]
+            if reported == row.get("edate") and row.get("etime"):
+                row["lastSession"] = row.get("etime")
+            if row.get("edate") and reported <= row["edate"] and (
+                    reported == row["edate"] or not row.get("econf") and
+                    (pd.Timestamp(row["edate"]) - pd.Timestamp(reported)).days <= AFTER_REPORT_DAYS):
+                row["edate"], row["etime"] = None, None
+                row.pop("econf", None)
+    if lookup.get("error_at"):
+        row["ederr"] = ny_day(lookup["error_at"])
+    if lookup.get("_ts"):
+        row["edchecked"] = ny_day(lookup["_ts"])
+    if lookup.get("ts") and ny_day(lookup["ts"]) == row.get("edate"):
+        end = ny_day(lookup.get("end"))
+        if end and end > row["edate"] and not row.get("econf"):
+            row["edend"] = end
+    for ts, confirmed in ((lookup.get("ts"), lookup.get("est") is False),
+                          (fund.get("edate"), fund.get("eest") is False)):
+        if ts and confirmed and row.get("econf") and ny_day(ts) == row.get("edate") and ny_session(ts) == row.get("etime") and ny_session(ts):
+            row["edts"] = int(ts)
+            break
+    if fund.get("_attempt"):
+        row["fattempt"] = int(fund["_attempt"])
+        row["ffails"] = fund.get("_fails", 0)
+
+
 def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates=None):
     """px: dict of OHLCV DataFrames. meta: DataFrame indexed by ticker with n, gics, ndx, sp500...
     fund: {ticker: cached Yahoo record}."""
@@ -252,7 +290,8 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
     ind = indicator_frame(close, high, close["^VIX"]).dropna().tail(HIST_DAYS)
 
     # ---- per-stock technicals over the whole universe ----
-    tick = [t for t in meta.index if t in close and close[t].dropna().shape[0] >= 253]
+    directory = security_directory(px["Close"].reindex(days), asof)
+    tick = [t for t in meta.index if t not in directory and t in close and close[t].dropna().shape[0] >= 253]
     c, h, l, v = close[tick], high[tick], low[tick], vol[tick]
     ma50, ma200 = c.rolling(50).mean(), c.rolling(200).mean()
     hi252, lo252 = h.rolling(252).max(), l.rolling(252).min()
@@ -304,6 +343,8 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             row.update(fill=int(r.iloc[::-1].notna().cumsum().eq(0).sum()),
                        pxd=real.index[-1].strftime("%Y-%m-%d") if len(real) else None,
                        chg=None, vol=None, rvol=None, nh=False, nl=False)
+        elif r is not None and pd.isna(r.iloc[-2]):
+            row.update(chg=None, prevMissing=True)
         # yesterday's technical state: the page works out what changed today
         if not pd.isna(prev[t]) and not pd.isna(ma200p[t]):
             row.update(pd50=_f((prev[t] / ma50p[t] - 1) * 100, 1), pd200=_f((prev[t] / ma200p[t] - 1) * 100, 1),
@@ -322,14 +363,16 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
         if yd and ysure and yd < asof:
             row["erep"] = max(row.get("erep") or "", yd)
             yd = None
-        elif yd and yseen and yd < yseen:
+        elif yd and yseen and yd < yseen and (ny_day(((ydates or {}).get(t) or {}).get("end")) or yd) < yseen:
             yd = None
         if yd:
             row["edate"], row["etime"] = yd, yt
             if ysure:
                 row["econf"] = True  # Yahoo says the company set this date
         if earn and t in earn:
-            e = list(earn[t]) + [None] * 3
+            e = list(earn[t]) + [None] * 5
+            if e[4]:
+                row.update(ederr=asof, edchecked=e[3])
             if e[2] and row.get("mcap") is None:
                 row["ecap"] = e[2]  # market cap from the calendar, for sorting stocks without fundamentals
             # Nasdaq's entries with a before/after-the-market time are the company's date. Without a time they can be
@@ -351,9 +394,14 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             # a guessed date a few weeks after a report: the quarter it was guessing is the one already reported
             # (TECH reported 4 Nov while the calendar still projected 11 Nov)
             row["edate"], row["etime"] = None, None
+        enrich_earnings(row, fund.get(t) or {}, (ydates or {}).get(t) or {})
+        bar_source = px["Close"].attrs.get("verified_bars", {}).get(t)
+        if bar_source and bar_source["day"] in {asof, days[-2].strftime("%Y-%m-%d")}:
+            row["barSource"] = bar_source
+        apply_issuer_report(row, asof)
         if fund_stale(row):
             row["fst"] = True  # 業績後待更新: the page shows this flag, the checks count the same rule
-        if row.get("edate") and row["edate"] < asof:
+        if row.get("edate") and (row.get("edend") or row["edate"]) < asof:
             # an expected date that has passed: the next one is unknown; keep the old date only while no report
             # on or after it (within a few days' slip) is confirmed
             was = row["edate"]
@@ -420,7 +468,7 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
                           l=[_f(x) for x in low[t].tail(60)], c=[_f(x) for x in close[t].tail(60)]))
 
     return dict(
-        asof=asof,
+        asof=asof, special=directory,
         hist=hist, tech=tech(close, high, nd), panic=_panic(indicator_frame(close, high, close["^VIX"]).dropna()),
         rebound=_rebound(close["QQQ"].dropna()) if "QQQ" in close else None,
         stocks=stocks, idx=idx, sectors=sectors, minis=minis,
@@ -503,12 +551,18 @@ def stock_pages(px, stocks, days=260):
     close = P["Close"]
     ma50, ma200 = close.rolling(50).mean(), close.rolling(200).mean()
     idx = close.index[-days:]
+    # Daily quotes used on the stock page must belong to that actual session.
+    bars = {k: px[k].reindex(idx) for k in ("Open", "High", "Low", "Close", "Volume")}
+    o, h, l, c = (bars[k] for k in ("Open", "High", "Low", "Close"))
+    valid_range = (l > 0) & (h >= l) & (o >= l) & (o <= h) & (c >= l) & (c <= h)
+    for k in ("Open", "High", "Low"):
+        bars[k] = bars[k].where(valid_range)
     dates = [d.strftime("%Y-%m-%d") for d in idx]
     out = {}
     for row in stocks:
         t = row["s"]
         col = lambda df, d=2: [_f(x, d) for x in df[t].loc[idx]]
-        out[t] = dict(row, d=dates, o=col(P["Open"]), h=col(P["High"]), l=col(P["Low"]), cl=col(close),
-                      v=[None if pd.isna(x) else int(x) for x in P["Volume"][t].loc[idx]],
+        out[t] = dict(row, d=dates, o=col(bars["Open"]), h=col(bars["High"]), l=col(bars["Low"]), cl=col(bars["Close"]),
+                      v=[None if pd.isna(x) else int(x) for x in bars["Volume"][t].loc[idx]],
                       m50=col(ma50), m200=col(ma200))
     return out

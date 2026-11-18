@@ -84,7 +84,7 @@ def treasury(now):
 
 def _earn_day(day):
     from .fetch import _earn_rows  # same request, with retries
-    return _earn_rows(day)
+    return _earn_rows(day) or []
 
 
 def _money(x):
