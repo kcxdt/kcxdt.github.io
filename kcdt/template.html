@@ -409,6 +409,18 @@ th .qi:hover{border-color:var(--selline);color:var(--ink)}
 /* journal */
 .jform form{display:grid;gap:12px}
 .jgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px 14px}
+/* futures only in the list: 手續費, 成本／名義值, 出場金額 (columns 8–10) are hidden (KC 11-18) */
+#jtable.allfut thead tr:first-child th:nth-child(n+8):nth-child(-n+10),#jtable.allfut tbody tr:not(.grp) td:nth-child(n+8):nth-child(-n+10){display:none}
+.jgrid label.jo.on{grid-column:1/-1}
+.jgrid .jol{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.jgrid .jol .tog.sm{font-size:12px;padding:1px 8px}
+.jopt{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px;border:1px dashed var(--line);border-radius:8px}
+.jopt .chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:var(--panel);overflow:hidden}
+.jopt .chip button{font:inherit;font-size:13px;background:none;border:0;color:var(--ink);padding:3px 4px 3px 10px;cursor:pointer}
+.jopt .chip button+button{color:var(--muted);padding:3px 9px 3px 4px}
+.jopt .chip button+button:hover{color:var(--hot)}
+.jopt .chip.cur{border-color:var(--accent,var(--ink))}
+.jopt input{max-width:180px}
 .jgrid.wide{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
 .jgrid label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
 .jgrid input,.jgrid textarea{font:inherit;font-size:14px;padding:6px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel);color:var(--ink);min-width:0}
@@ -971,10 +983,10 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
           <label>開倉時間（準確時間，可選）<input name="otime" type="time"></label>
           <label>平倉時間<input name="ctime" type="time"></label>
           <label>手續費（USD）<input name="fee" type="number" step="any" min="0" value="0"></label>
-          <label>策略類型<input name="strat" list="j-strats"></label>
+          <label class="jo" for="j-strat"><span class="jol">策略類型<button class="tog sm" type="button" data-jo="strat" aria-expanded="false">選項</button></span><input name="strat" id="j-strat" list="j-strats" autocomplete="off"><span class="jopt" id="jo-strat" hidden></span></label>
           <label>預計止盈<input name="tp" type="number" step="any" min="0"></label>
           <label>計劃風險（USD）<input name="risk" type="number" step="any" min="0" placeholder="留空 = 用止損計"></label>
-          <label>交易情緒<input name="mood" list="j-moods"></label>
+          <label class="jo" for="j-mood"><span class="jol">交易情緒<button class="tog sm" type="button" data-jo="mood" aria-expanded="false">選項</button></span><input name="mood" id="j-mood" list="j-moods" autocomplete="off"><span class="jopt" id="jo-mood" hidden></span></label>
         </div>
         <div class="fills">
           <div class="cfbar"><span class="muted small">分批進出（可選）：有加倉或者分段平倉先填。填咗嘅話，上面嘅數量、入場價、出場價會自動用加權平均計。</span>
@@ -992,8 +1004,8 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
         </details>
         <div class="cfbar"><button class="tog" type="submit" aria-pressed="true" id="j-save">儲存交易</button><button class="tog" type="button" id="j-del" hidden>刪除呢單交易</button><span class="muted small" id="j-msg"></span></div>
       </form>
-      <datalist id="j-strats"><option>趨勢跟隨</option><option>突破</option><option>回調買入</option><option>反彈</option><option>業績</option><option>開市突破</option><option>即日反轉</option></datalist>
-      <datalist id="j-moods"><option>冷靜理性</option><option>恐懼割肉</option><option>FOMO 追高</option><option>貪心</option><option>報復性交易</option></datalist>
+      <datalist id="j-strats"></datalist>
+      <datalist id="j-moods"></datalist>
     </section>
     <section aria-labelledby="h-js" id="js-sec">
       <div class="sechead"><h2 id="h-js">復盤統計</h2><div class="controls" id="js-by"></div></div>
@@ -3202,6 +3214,7 @@ function jRender(){
     $('jf-sum').innerHTML = `顯示 ${shown.length} / ${rows.length} 單${d.length?` · 已平倉 ${d.length} 單，淨盈虧 <b class="${cls(tot)}">${usd(tot)}</b>，勝率 ${f(w/d.length*100,0)}%`:''} <button class="tog sm" type="button" id="jf-clr">清除篩選</button>`;
     $('jf-clr').onclick=()=>{ JF={sym:'',mon:'',st:''}; $('jf-sym').value=''; jRender() } }
   else $('jf-sum').textContent = '';
+  $('jtable').classList.toggle('allfut', shown.length>0 && shown.every(t=>t.fut));
   // 累計盈虧 runs over the trades shown, so a filter (e.g. PLTR) shows that stock's own running total
   $('jbody').innerHTML = shown.map(t=>{ if(!t.isOpen && t.pl!=null) cum += t.pl;
     const m = t.open.slice(0,7), head = m!==month ? `<tr class="grp"><td colspan="21">${m.slice(0,4)} 年${MON[+m.slice(5)-1]}月</td></tr>` : ''; month = m;
@@ -3209,9 +3222,9 @@ function jRender(){
       <td class="small ${t.side==='S'?'down':'up'}">${SIDE[t.side]||'Long'}${jSideOdd(t)?` <span class="badge warnb" title="${esc(t.sym)} 係反向 ETF：買入佢應該記 Long">方向？</span>`:''}</td>
       <td class="num small" data-v="${(t.open+(t.otime||'')).replace(/\D/g,'')}">${t.open}${OSESS[sessKey(t)]?` <span class="badge">${OSESS[sessKey(t)]}</span>`:''}${t.otime?' '+t.otime:''}</td><td class="num small" data-v="${t.isOpen||t.isPlan?9e12:((t.close||'')+(t.ctime||'00:00')).replace(/\D/g,'')}">${t.isPlan?`<span class="badge">交易計劃</span> <button class="tog sm" type="button" data-fill="${t.id}">確認成交</button>`:t.isOpen?`<span class="muted">${t.qOut?`已平 ${f(t.qOut,0)}／`:''}未平倉</span> <button class="tog sm" type="button" data-close="${t.id}">平倉</button>`:(t.close||'')+(t.ctime?' '+t.ctime:'')}</td>
       <td class="r num"${t.pbuy!=null&&!t.isPlan?` title="計劃入場價 ${t.pbuy}"`:''}>${t.isPlan?'<span class="muted small">計劃 </span>':''}${px(t,t.pin)}${t.pbuy!=null&&!t.isPlan&&t.pbuy!==t.pin?`<div class="muted small">計劃 ${px(t,t.pbuy)}</div>`:''}</td><td class="r num">${t.pout!=null?px(t,t.pout):(t.isOpen||t.isPlan)&&!t.fut?`<span data-live="${esc(t.sym)}" data-jl="1">${liveCell(t.sym,1)}</span>`:'—'}</td>
-      <td class="r num">${f(t.qIn,0)}${t.fills&&t.fills.length?` <span class="muted small">分 ${t.fills.length} 筆</span>`:''}</td><td class="r num">${usd(t.fee||0)}</td>
-      <td class="r num">${usd(t.cost)}</td>${t.isOpen||t.isPlan?`<td class="r num">—</td><td class="r num">${t.qOut?`<span class="muted small" title="未計入任何統計，全部平倉先計">已平部分 ${usd(t.realized)}</span>`:'—'}</td><td class="r num">—</td>`
-        :`<td class="r num">${usd(t.rev)}</td><td class="r num ${cls(t.pl)}">${usd(t.pl)}</td><td class="r num ${cls(t.plp)}">${t.plp==null?'—':sgn(t.plp,2)+'%'}</td>`}
+      <td class="r num">${f(t.qIn,0)}${t.fills&&t.fills.length?` <span class="muted small">分 ${t.fills.length} 筆</span>`:''}</td><td class="r num">${t.fut&&!t.fee?'—':usd(t.fee||0)}</td>
+      <td class="r num">${t.fut?'—':usd(t.cost)}</td>${t.isOpen||t.isPlan?`<td class="r num">—</td><td class="r num">${t.qOut?`<span class="muted small" title="未計入任何統計，全部平倉先計">已平部分 ${usd(t.realized)}</span>`:'—'}</td><td class="r num">—</td>`
+        :`<td class="r num">${t.fut?'—':usd(t.rev)}</td><td class="r num ${cls(t.pl)}">${usd(t.pl)}</td><td class="r num ${cls(t.plp)}">${t.plp==null?'—':sgn(t.plp,2)+'%'}</td>`}
       <td class="r num ${cls(t.R)}">${t.R==null?'—':sgn(t.R,2)+'R'}</td>
       <td class="r num" data-v="${t.holdD}"><b>${t.holdTxt}</b></td><td class="small">${esc(t.strat||'')}</td>
       <td class="r num small">${t.tp?px(t,t.tp)+` <span class="up">${sgn(t.tpp,1)}%</span>`:'—'}</td><td class="r num small">${t.sl?px(t,t.sl)+` <span class="down">${sgn(t.slp,1)}%</span>`:'—'}</td>
@@ -3389,7 +3402,29 @@ async function jReload(){
   try{ TR = await DB.all('trades'); J_ERR=false }
   catch(e){ console.warn('journal read failed', e); TR=[]; J_ERR=true }
   loadErr('j-err', J_ERR, '交易紀錄讀取唔到（可能係網絡問題）。你嘅紀錄仲喺雲端，冇唔見；撳重試再讀一次。未讀到之前唔好匯入。', jReload);
-  jCount(); jRender(); if(J_ERR){ $('j-empty').hidden=true; $('j-count').hidden=true } }
+  jCount(); jRender(); if(J_ERR){ $('j-empty').hidden=true; $('j-count').hidden=true }
+  await joLoad() }
+// 策略類型／交易情緒 options (KC 11-18): the person's own list, kept in their account as watch row '_jo' {strat:[], mood:[]}
+// (rows starting with '_' are not stocks, and the full backup already carries the watch rows). Starts from the defaults;
+// a new value typed on a saved trade is added too. 「選項」 opens chips: tap = fill in, × = remove, plus a box to add one.
+const JO_DEF={strat:['趨勢跟隨','突破','回調買入','反彈','業績','開市突破','即日反轉'], mood:['冷靜理性','恐懼割肉','FOMO 追高','貪心','報復性交易']};
+let JO={strat:[...JO_DEF.strat], mood:[...JO_DEF.mood]}, JO_OK=false;
+async function joLoad(){ if(AUTH_WAIT) return;
+  try{ const r=(await DB.all('watch')).find(x=>x.id==='_jo'); JO={strat:Array.isArray(r&&r.strat)?r.strat:[...JO_DEF.strat], mood:Array.isArray(r&&r.mood)?r.mood:[...JO_DEF.mood]}; JO_OK=true }
+  catch(_){ JO_OK=false }
+  joDraw() }
+async function joSave(){ if(!JO_OK){ jMsg('選項未讀到，遲啲再試'); return false }
+  try{ await DB.put('watch',{id:'_jo', strat:JO.strat, mood:JO.mood, upd:Date.now()}); return true }catch(_){ jMsg('選項儲唔到，遲啲再試'); return false } }
+function joDraw(){ $('j-strats').innerHTML=JO.strat.map(v=>`<option value="${esc(v)}">`).join(''); $('j-moods').innerHTML=JO.mood.map(v=>`<option value="${esc(v)}">`).join('');
+  ['strat','mood'].forEach(k=>{ const box=$('jo-'+k), cur=$('jf').elements[k].value.trim();
+    box.innerHTML=JO[k].map((v,i)=>`<span class="chip${v===cur?' cur':''}"><button type="button" data-i="${i}" title="填入「${esc(v)}」">${esc(v)}</button><button type="button" data-x="${i}" aria-label="刪除選項 ${esc(v)}" title="刪除呢個選項">×</button></span>`).join('')
+      +`<input type="text" placeholder="新增${k==='strat'?'策略':'情緒'}" aria-label="新增選項" maxlength="40"><button class="tog sm" type="button" data-add="1">新增</button>`;
+    box.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{ $('jf').elements[k].value=JO[k][+b.dataset.i]; joDraw() });
+    box.querySelectorAll('[data-x]').forEach(b=>b.onclick=async()=>{ const v=JO[k][+b.dataset.x]; JO[k]=JO[k].filter(x=>x!==v); if(await joSave()) jMsg(`已刪除選項「${v}」（舊交易照舊保留）`); joDraw() });
+    const inp=box.querySelector('input'), add=async()=>{ const v=inp.value.trim(); if(!v) return;
+      if(JO[k].includes(v)){ jMsg('已經有呢個選項'); return } JO[k]=[...JO[k],v]; if(await joSave()){ $('jf').elements[k].value=v; jMsg(`已新增選項「${v}」`) } joDraw() };
+    box.querySelector('[data-add]').onclick=add; inp.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); add() } } }) }
+async function joAuto(t){ let ch=false; ['strat','mood'].forEach(k=>{ if(t[k]&&!JO[k].includes(t[k])){ JO[k]=[...JO[k],t[k]]; ch=true } }); if(ch&&await joSave()) joDraw() }
 // ---------- 交易日誌：匯入 Excel／CSV ----------
 // Reads the first sheet's header row, matches column names to journal fields (Chinese or English, incl. our own CSV export),
 // lets the person fix the mapping, previews, then saves. The trade id comes from the trade's contents, so importing the same file twice overwrites.
@@ -3597,6 +3632,9 @@ DRAW.journal = () => {
     $('jf-sym').oninput=e=>{ JF.sym=e.target.value; jRender() };
     $('jf-mon').onchange=e=>{ JF.mon=e.target.value; jRender() };
     $('jf-st').onchange=e=>{ JF.st=e.target.value; jRender() }; ['p','q','fee'].forEach(k=>$('jcf').elements[k].oninput=jcPrev);
+    document.querySelectorAll('[data-jo]').forEach(b=>b.onclick=e=>{ e.preventDefault(); const k=b.dataset.jo, box=$('jo-'+k), on=box.hidden;
+      box.hidden=!on; b.closest('label').classList.toggle('on',on); b.setAttribute('aria-expanded',on); b.textContent=on?'收起':'選項'; if(on) joDraw() });
+    ['strat','mood'].forEach(k=>$('jf').elements[k].addEventListener('input',()=>{ if(!$('jo-'+k).hidden) joDraw() }));
     $('j-file').onchange=async e=>{ const fl=e.target.files[0]; e.target.value=''; if(!fl) return;
       if(jShots.length>=2){jMsg('最多 2 張截圖');return} try{ jShots.push(await shrink(fl)); jShotsDraw() }catch(_){ jMsg('呢個檔案打唔開') } };
     $('jf').onsubmit=async e=>{ e.preventDefault(); jFillsDerive(); const F=e.target.elements;
@@ -3616,7 +3654,7 @@ DRAW.journal = () => {
         if(fills.length || t.close || t.sell!=null){ jMsg('交易計劃未成交，唔可以有平倉或者分批成交；成交之後撳「確認成交」'); return }
         if(!jEdit && TR.length>=J_MAX){ jMsg(`已經儲咗 ${J_MAX.toLocaleString('en-US')} 單（上限）。`); return }
         try{ await DB.put('trades', t) }catch(_){ jMsg('儲唔到，遲啲再試'); return }
-        await jReload(); jReset(); jMsg('已儲存交易計劃'); return }
+        await joAuto(t); await jReload(); jReset(); jMsg('已儲存交易計劃'); return }
       if(fills.length && !fills.some(x=>x.a==='in')){ jMsg('分批成交最少要有一筆入場'); return }
       const fq=a=>fills.filter(x=>x.a===a).reduce((s,x)=>s+x.q,0);
       if(fq('out')>fq('in')){ jMsg(`出場數量（${fq('out')}）多過入場（${fq('in')}），請檢查分批成交`); return }
@@ -3627,7 +3665,7 @@ DRAW.journal = () => {
       if(!t.open || t.qty==null || t.buy==null){ jMsg('要填開倉日期、數量同入場價'); return }
       if(!jEdit && TR.length>=J_MAX){ jMsg(`已經儲咗 ${J_MAX.toLocaleString('en-US')} 單（上限）。請先「下載完整備份」，再刪走啲舊紀錄。`); return }
       try{ await DB.put('trades', t) }catch(_){ jMsg(DB===LocalDB?'儲唔到：瀏覽器空間滿咗，試下刪走啲截圖':'儲唔到：網絡或者截圖太大，遲啲再試'); return }
-      await jReload(); jReset(); jMsg('已儲存') };
+      await joAuto(t); await jReload(); jReset(); jMsg('已儲存') };
     $('j-del').onclick=async()=>{ if(!jEdit) return; try{ await DB.del('trades', jEdit) }catch(_){ jMsg('刪唔到：網絡有問題，遲啲再試'); return }
       await jReload(); jReset(); jMsg('已刪除') };
     $('j-csv').onclick=()=>{ const r2=x=>x==null?null:Math.round(x*100)/100;
