@@ -233,6 +233,43 @@ def yahoo_next(f, y):
     return ny_day(ts), (ny_session(ts) if src.get("est") is False else None), src.get("est") is False, seen
 
 
+def enrich_earnings(row, fund, lookup):
+    for source in (fund, lookup):
+        reported = source.get("reported")
+        if reported and reported >= (row.get("erep") or ""):
+            if reported > (row.get("erep") or ""):
+                row.pop("lastSession", None)
+                row.pop("emonth", None)
+            row["erep"] = reported
+            if source.get("report_session"):
+                row["lastSession"] = source["report_session"]
+            if source.get("expected_month"):
+                row["emonth"] = source["expected_month"]
+            if reported == row.get("edate") and row.get("etime"):
+                row["lastSession"] = row.get("etime")
+            if row.get("edate") and reported <= row["edate"] and (
+                    reported == row["edate"] or not row.get("econf") and
+                    (pd.Timestamp(row["edate"]) - pd.Timestamp(reported)).days <= AFTER_REPORT_DAYS):
+                row["edate"], row["etime"] = None, None
+                row.pop("econf", None)
+    if lookup.get("error_at"):
+        row["ederr"] = ny_day(lookup["error_at"])
+    if lookup.get("_ts"):
+        row["edchecked"] = ny_day(lookup["_ts"])
+    if lookup.get("ts") and ny_day(lookup["ts"]) == row.get("edate"):
+        end = ny_day(lookup.get("end"))
+        if end and end > row["edate"] and not row.get("econf"):
+            row["edend"] = end
+    for ts, confirmed in ((lookup.get("ts"), lookup.get("est") is False),
+                          (fund.get("edate"), fund.get("eest") is False)):
+        if ts and confirmed and row.get("econf") and ny_day(ts) == row.get("edate") and ny_session(ts) == row.get("etime") and ny_session(ts):
+            row["edts"] = int(ts)
+            break
+    if fund.get("_attempt"):
+        row["fattempt"] = int(fund["_attempt"])
+        row["ffails"] = fund.get("_fails", 0)
+
+
 def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates=None):
     """px: dict of OHLCV DataFrames. meta: DataFrame indexed by ticker with n, gics, ndx, sp500...
     fund: {ticker: cached Yahoo record}."""
@@ -304,6 +341,8 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             row.update(fill=int(r.iloc[::-1].notna().cumsum().eq(0).sum()),
                        pxd=real.index[-1].strftime("%Y-%m-%d") if len(real) else None,
                        chg=None, vol=None, rvol=None, nh=False, nl=False)
+        elif r is not None and pd.isna(r.iloc[-2]):
+            row.update(chg=None, prevMissing=True)
         # yesterday's technical state: the page works out what changed today
         if not pd.isna(prev[t]) and not pd.isna(ma200p[t]):
             row.update(pd50=_f((prev[t] / ma50p[t] - 1) * 100, 1), pd200=_f((prev[t] / ma200p[t] - 1) * 100, 1),
@@ -329,7 +368,9 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             if ysure:
                 row["econf"] = True  # Yahoo says the company set this date
         if earn and t in earn:
-            e = list(earn[t]) + [None] * 3
+            e = list(earn[t]) + [None] * 5
+            if e[4]:
+                row.update(ederr=asof, edchecked=e[3])
             if e[2] and row.get("mcap") is None:
                 row["ecap"] = e[2]  # market cap from the calendar, for sorting stocks without fundamentals
             # Nasdaq's entries with a before/after-the-market time are the company's date. Without a time they can be
@@ -351,6 +392,7 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             # a guessed date a few weeks after a report: the quarter it was guessing is the one already reported
             # (TECH reported 4 Nov while the calendar still projected 11 Nov)
             row["edate"], row["etime"] = None, None
+        enrich_earnings(row, fund.get(t) or {}, (ydates or {}).get(t) or {})
         if fund_stale(row):
             row["fst"] = True  # 業績後待更新: the page shows this flag, the checks count the same rule
         if row.get("edate") and row["edate"] < asof:
