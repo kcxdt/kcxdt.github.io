@@ -3358,15 +3358,16 @@ function jShotsDraw(){ $('j-dz').hidden=jShots.length>=2; $('j-shots').innerHTML
   $('j-shots').querySelectorAll('img').forEach(im=>im.onclick=()=>jZoom(im.src));
   $('j-shots').querySelectorAll('button').forEach(b=>b.onclick=()=>{jShots.splice(+b.dataset.i,1); jShotsDraw()}); }
 // Screenshots ride inside the trade record (Firestore caps a record at 1 MB), so each is kept under ~420 KB of text.
-// Chart screenshots need detail (KC 11-18): start at up to 2400 px wide, high quality WebP (JPEG where the browser
+// Chart screenshots need detail (KC 11-18): keep the screenshot's own size (up to 3840 px wide; shrinking makes the
+// small chart text unreadable), high quality WebP (JPEG where the browser
 // can't make WebP), and only lower the quality, then the size, until it fits.
 const SHOT_MAX = 420000;
-function shrink(file, max=2400){ return new Promise((ok,bad)=>{ const img=new Image(); img.onload=()=>{ URL.revokeObjectURL(img.src);
+function shrink(file, max=3840){ return new Promise((ok,bad)=>{ const img=new Image(); img.onload=()=>{ URL.revokeObjectURL(img.src);
   const c=document.createElement('canvas'), x=c.getContext('2d'); let w=Math.min(max,img.width), out='';
   const enc=q=>{ const u=c.toDataURL('image/webp',q); return u.startsWith('data:image/webp')?u:c.toDataURL('image/jpeg',q) };
   for(let n=0;n<8;n++,w=Math.round(w*.85)){ c.width=w; c.height=Math.round(img.height*w/img.width);
     x.imageSmoothingQuality='high'; x.drawImage(img,0,0,c.width,c.height);
-    for(const q of [.92,.85,.75]){ out=enc(q); if(out.length<=SHOT_MAX) return ok(out) } }
+    for(const q of [.95,.9,.82,.72]){ out=enc(q); if(out.length<=SHOT_MAX) return ok(out) } }
   ok(out) }; img.onerror=bad; img.src=URL.createObjectURL(file) }) }
 function jMsg(t){$('j-msg').textContent=t; clearTimeout(jMsg.t); jMsg.t=setTimeout(()=>$('j-msg').textContent='',4000)}
 // Stock or futures: show the matching labels and fields
