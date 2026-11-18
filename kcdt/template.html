@@ -409,6 +409,8 @@ th .qi:hover{border-color:var(--selline);color:var(--ink)}
 /* journal */
 .jform form{display:grid;gap:12px}
 .jgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px 14px}
+/* futures only in the list: 手續費, 成本／名義值, 出場金額 (columns 8–10) are hidden (KC 11-18) */
+#jtable.allfut thead tr:first-child th:nth-child(n+8):nth-child(-n+10),#jtable.allfut tbody tr:not(.grp) td:nth-child(n+8):nth-child(-n+10){display:none}
 .jgrid label.jo.on{grid-column:1/-1}
 .jgrid .jol{display:flex;align-items:center;justify-content:space-between;gap:6px}
 .jgrid .jol .tog.sm{font-size:12px;padding:1px 8px}
@@ -3212,6 +3214,7 @@ function jRender(){
     $('jf-sum').innerHTML = `顯示 ${shown.length} / ${rows.length} 單${d.length?` · 已平倉 ${d.length} 單，淨盈虧 <b class="${cls(tot)}">${usd(tot)}</b>，勝率 ${f(w/d.length*100,0)}%`:''} <button class="tog sm" type="button" id="jf-clr">清除篩選</button>`;
     $('jf-clr').onclick=()=>{ JF={sym:'',mon:'',st:''}; $('jf-sym').value=''; jRender() } }
   else $('jf-sum').textContent = '';
+  $('jtable').classList.toggle('allfut', shown.length>0 && shown.every(t=>t.fut));
   // 累計盈虧 runs over the trades shown, so a filter (e.g. PLTR) shows that stock's own running total
   $('jbody').innerHTML = shown.map(t=>{ if(!t.isOpen && t.pl!=null) cum += t.pl;
     const m = t.open.slice(0,7), head = m!==month ? `<tr class="grp"><td colspan="21">${m.slice(0,4)} 年${MON[+m.slice(5)-1]}月</td></tr>` : ''; month = m;
