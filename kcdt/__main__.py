@@ -194,6 +194,8 @@ def say(msg, t0=time.time()):
 
 
 def main():
+    if os.name == "nt" and not sys.stdout.isatty() and hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     mode = os.environ.get("KCDT_MODE", "close")
     budget = BUDGET[mode]
     hist = os.environ.get("KCDT_HISTORY", ROOT / "hist")
