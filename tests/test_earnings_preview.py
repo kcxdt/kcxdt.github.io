@@ -27,9 +27,9 @@ def test_calendar_retains_successful_day_when_source_fails(tmp_path, monkeypatch
 
 
 def test_split_gap_is_corrected_once():
-    days = pd.to_datetime(["2026-11-13", "2026-11-16", "2026-11-17"])
-    px = {key: pd.DataFrame({"A": [80., None, 19.]}, index=days) for key in ("Open", "Close", "High", "Low", "Volume")}
-    bars = pd.DataFrame({"Stock Splits": [0, 4, 0]}, index=days)
+    days = pd.bdate_range("2026-11-13", periods=8)
+    px = {key: pd.DataFrame({"A": [80., None, 19.] + [20.] * 5}, index=days) for key in ("Open", "Close", "High", "Low", "Volume")}
+    bars = pd.DataFrame({"Stock Splits": [0, 4, 0] + [0] * 5}, index=days)
     for _ in range(2):
         repair_split_gaps(px, lambda symbol: bars)
     assert px["Close"]["A"].iloc[0] == 20 and px["Volume"]["A"].iloc[0] == 320

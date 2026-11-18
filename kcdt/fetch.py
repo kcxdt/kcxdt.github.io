@@ -899,25 +899,27 @@ def fill_last_day(px, quotes=None):
 
 
 def repair_split_gaps(px, history=None):
-    """Correct a recent jump across a missing bar only with a matching recorded split."""
-    c = px["Close"]
-    for t in c:
-        recent = c[t].tail(4).dropna()
-        if len(recent) < 2:
-            continue
-        before, after = recent.index[-2:]
-        ratio = recent.iloc[-2] / recent.iloc[-1] if recent.iloc[-1] > 0 else 1
-        if not (ratio >= 1.9 or ratio <= 0.53) or len(c.loc[before:after]) <= 2:
+    """Use recorded corporate actions to validate jumps across missing sessions throughout the input."""
+    close = px["Close"]
+    for t in close:
+        observations = close[t].dropna()
+        positions = pd.Series(close.index.get_indexer(observations.index), index=observations.index)
+        ratios = observations.shift() / observations.where(observations > 0)
+        jumps = ratios[(positions.diff() > 1) & ((ratios >= 1.9) | (ratios <= 0.53))]
+        if jumps.empty:
             continue
         try:
-            bars = (history or (lambda symbol: yf.Ticker(symbol).history(period="1mo", actions=True)))(t)
+            bars = (history or (lambda symbol: yf.Ticker(symbol).history(period="2y", actions=True)))(t)
             splits = bars["Stock Splits"]
-            factors = [float(v) for d, v in splits.items() if before.date() < d.date() <= after.date() and v > 0 and v != 1]
-            if len(factors) != 1 or abs(ratio / factors[0] - 1) > 0.10:
-                continue
-            for field in ("Open", "High", "Low", "Close"):
-                px[field].loc[:before, t] /= factors[0]
-            px["Volume"].loc[:before, t] *= factors[0]
+            for after, ratio in jumps.items():
+                before = observations.index[observations.index.get_loc(after) - 1]
+                factors = [float(v) for d, v in splits.items()
+                           if before.date() < d.date() <= after.date() and v > 0 and v != 1]
+                if len(factors) != 1 or abs(ratio / factors[0] - 1) > 0.10:
+                    continue
+                for field in ("Open", "High", "Low", "Close"):
+                    px[field].loc[:before, t] /= factors[0]
+                px["Volume"].loc[:before, t] *= factors[0]
         except Exception as exc:
             print("split check failed:", t, exc)
 
