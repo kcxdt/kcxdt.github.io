@@ -431,6 +431,8 @@ th .qi:hover{border-color:var(--selline);color:var(--ink)}
 .jmore[open]>summary{margin-bottom:12px}
 .jmore>*+*{margin-top:12px}
 .jshots{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+#j-drop{padding:8px;margin:-8px;border:2px dashed transparent;border-radius:10px}
+#j-drop.over{border-color:var(--accent,var(--ink));background:var(--soft)}
 .jshots #j-shots{display:flex;gap:8px}
 .thumb{position:relative}
 .thumb img,#jbody img{height:44px;border-radius:4px;border:1px solid var(--line);cursor:zoom-in;display:block}
@@ -999,7 +1001,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
           <label>賣出理由<textarea name="why_out" rows="3"></textarea></label>
           <label>復盤筆記（做對／做錯）<textarea name="review" rows="3"></textarea></label>
         </div>
-        <div class="jshots"><span class="muted small">交易截圖（最多 2 張，會自動壓細）</span><div id="j-shots"></div>
+        <div class="jshots" id="j-drop"><span class="muted small">交易截圖（最多 2 張，會自動壓細；可以直接拖相入嚟，或者 Ctrl+V／⌘V 貼上）</span><div id="j-shots"></div>
           <label class="tog" style="display:inline-block">加截圖<input type="file" id="j-file" accept="image/*" hidden></label></div>
         </details>
         <div class="cfbar"><button class="tog" type="submit" aria-pressed="true" id="j-save">儲存交易</button><button class="tog" type="button" id="j-del" hidden>刪除呢單交易</button><span class="muted small" id="j-msg"></span></div>
@@ -3657,6 +3659,18 @@ DRAW.journal = () => {
     document.querySelectorAll('[data-jo]').forEach(b=>b.onclick=e=>{ e.preventDefault(); const k=b.dataset.jo, box=$('jo-'+k), on=box.hidden;
       box.hidden=!on; b.closest('label').classList.toggle('on',on); b.setAttribute('aria-expanded',on); b.textContent=on?'收起':'選項'; if(on) joDraw() });
     ['strat','mood'].forEach(k=>$('jf').elements[k].addEventListener('input',()=>{ if(!$('jo-'+k).hidden) joDraw() }));
+    // Screenshots by drag and drop onto the form, or pasted from the clipboard while on 交易日誌 (KC 11-18)
+    const jAddShots=async files=>{ const imgs=[...files].filter(x=>/^image\//.test(x.type)); if(!imgs.length) return false;
+      $('j-more').open=true; for(const fl of imgs){ if(jShots.length>=2){ jMsg('最多 2 張截圖'); break }
+        try{ jShots.push(await shrink(fl)); jShotsDraw() }catch(_){ jMsg('呢個檔案打唔開') } } return true };
+    const jf=$('jf'), dz=$('j-drop'), hasImg=e=>[...(e.dataTransfer&&e.dataTransfer.items||[])].some(x=>x.kind==='file');
+    jf.addEventListener('dragover',e=>{ if(!hasImg(e)) return; e.preventDefault(); e.dataTransfer.dropEffect='copy'; dz.classList.add('over') });
+    jf.addEventListener('dragleave',e=>{ if(!jf.contains(e.relatedTarget)) dz.classList.remove('over') });
+    jf.addEventListener('drop',async e=>{ if(!hasImg(e)) return; e.preventDefault(); dz.classList.remove('over');
+      if(!await jAddShots(e.dataTransfer.files)) jMsg('只可以拖相（圖片檔）入嚟') });
+    document.addEventListener('paste',async e=>{ if(!location.hash.startsWith('#journal')||!e.clipboardData) return;
+      const fs=[...e.clipboardData.files].filter(x=>/^image\//.test(x.type)); if(!fs.length) return; e.preventDefault(); await jAddShots(fs);
+      dz.scrollIntoView({block:'center',behavior:'smooth'}) });
     $('j-file').onchange=async e=>{ const fl=e.target.files[0]; e.target.value=''; if(!fl) return;
       if(jShots.length>=2){jMsg('最多 2 張截圖');return} try{ jShots.push(await shrink(fl)); jShotsDraw() }catch(_){ jMsg('呢個檔案打唔開') } };
     $('jf').onsubmit=async e=>{ e.preventDefault(); jFillsDerive(); const F=e.target.elements;
