@@ -9,6 +9,7 @@ import math
 import numpy as np
 import pandas as pd
 
+from .verified import apply_issuer_report, security_directory
 from .checks import coverage, fund_stale
 
 DOW30 = ["AAPL", "AMGN", "AMZN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS",
@@ -289,7 +290,8 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
     ind = indicator_frame(close, high, close["^VIX"]).dropna().tail(HIST_DAYS)
 
     # ---- per-stock technicals over the whole universe ----
-    tick = [t for t in meta.index if t in close and close[t].dropna().shape[0] >= 253]
+    directory = security_directory(px["Close"].reindex(days), asof)
+    tick = [t for t in meta.index if t not in directory and t in close and close[t].dropna().shape[0] >= 253]
     c, h, l, v = close[tick], high[tick], low[tick], vol[tick]
     ma50, ma200 = c.rolling(50).mean(), c.rolling(200).mean()
     hi252, lo252 = h.rolling(252).max(), l.rolling(252).min()
@@ -393,6 +395,10 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             # (TECH reported 4 Nov while the calendar still projected 11 Nov)
             row["edate"], row["etime"] = None, None
         enrich_earnings(row, fund.get(t) or {}, (ydates or {}).get(t) or {})
+        bar_source = px["Close"].attrs.get("verified_bars", {}).get(t)
+        if bar_source and bar_source["day"] in {asof, days[-2].strftime("%Y-%m-%d")}:
+            row["barSource"] = bar_source
+        apply_issuer_report(row, asof)
         if fund_stale(row):
             row["fst"] = True  # 業績後待更新: the page shows this flag, the checks count the same rule
         if row.get("edate") and (row.get("edend") or row["edate"]) < asof:
@@ -462,7 +468,7 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
                           l=[_f(x) for x in low[t].tail(60)], c=[_f(x) for x in close[t].tail(60)]))
 
     return dict(
-        asof=asof,
+        asof=asof, special=directory,
         hist=hist, tech=tech(close, high, nd), panic=_panic(indicator_frame(close, high, close["^VIX"]).dropna()),
         rebound=_rebound(close["QQQ"].dropna()) if "QQQ" in close else None,
         stocks=stocks, idx=idx, sectors=sectors, minis=minis,

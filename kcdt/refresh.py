@@ -22,6 +22,9 @@ def apply_live_results(data):
     for row in data["stocks"]:
         report = reports.get(row["s"])
         if report and live["d"] >= (row.get("erep") or ""):
+            if row.get("issuer", {}).get("date", live["d"]) < live["d"]:
+                row.pop("issuer", None)
+            row.pop("issuerPending", None)
             enrich_earnings(row, {"reported": live["d"], "report_session": report.get("tm")}, {})
             row["fst"] = fund_stale(row)
 

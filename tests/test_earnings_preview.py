@@ -76,3 +76,34 @@ def test_cold_calendar_fallback_preserves_new_feed_rows(monkeypatch):
     assert seen == ["https://example.test/data.json"]
     assert [(r["d"],r["e"],r["a"]) for r in rows if not r.get("hol")] == [
         ("2026-11-17","Existing event","new"), ("2026-11-18","Missing day","1")]
+
+def test_supplement_quotes_checks_basis_and_preserves_primary():
+    from kcdt.verified import supplement_prices
+    days = pd.to_datetime(["2026-11-13", "2026-11-16", "2026-11-17"])
+    close = pd.DataFrame({"EMBJ": [19.6825, None, 18.90], "WLYB": [50.02, 50.02, None]}, index=days)
+    px = {k: close.copy() for k in ("Open","High","Low","Close","Volume")}
+    supplement_prices(px)
+    assert px["Close"].iloc[-1]["WLYB"] == 50.37
+    assert round(px["Close"]["EMBJ"].pct_change().iloc[-1]*100,2) == .69
+    px["Close"].loc[days[-1],"WLYB"] = 51.
+    supplement_prices(px)
+    assert px["Close"].iloc[-1]["WLYB"] == 51.
+    px["Close"] = close.copy()
+    px["Close"].loc[days[0],"EMBJ"] = 78.73
+    supplement_prices(px)
+    assert pd.isna(px["Close"].iloc[1]["EMBJ"])
+
+
+def test_verified_records_have_effective_dates_and_do_not_replace_later_results():
+    from kcdt.verified import security_directory, apply_issuer_report
+    panel = pd.DataFrame(index=pd.to_datetime(["2026-11-13"]))
+    assert "NWE" not in security_directory(panel,"2026-11-13")
+    assert security_directory(panel,"2026-11-17")["NWE"]["history"][-1][0]=="2026-11-13"
+    row={"s":"NVDA","qend":"2026-07-31"}
+    apply_issuer_report(row,"2026-11-16")
+    assert "issuer" not in row
+    apply_issuer_report(row,"2026-11-17")
+    assert row["issuer"]["quarter"]=="2026-10-25" and row["qend"]=="2026-07-31"
+    row={"s":"NVDA","erep":"2027-02-25"}
+    apply_issuer_report(row,"2027-02-26")
+    assert "issuer" not in row

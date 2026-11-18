@@ -10,6 +10,7 @@ import pandas as pd
 import requests
 import yfinance as yf
 
+from .verified import supplement_prices
 from .checks import QLAG
 from .compute import DOW30, INDICES, SECTORS
 
@@ -941,4 +942,5 @@ def fetch_prices(u):
     px = prices(sorted(set(list(u.index) + extra)))
     fill_last_day(px)
     repair_split_gaps(px)
+    supplement_prices(px)
     return px
