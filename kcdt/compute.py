@@ -545,12 +545,18 @@ def stock_pages(px, stocks, days=260):
     close = P["Close"]
     ma50, ma200 = close.rolling(50).mean(), close.rolling(200).mean()
     idx = close.index[-days:]
+    # Daily quotes used on the stock page must belong to that actual session.
+    bars = {k: px[k].reindex(idx) for k in ("Open", "High", "Low", "Close", "Volume")}
+    o, h, l, c = (bars[k] for k in ("Open", "High", "Low", "Close"))
+    valid_range = (l > 0) & (h >= l) & (o >= l) & (o <= h) & (c >= l) & (c <= h)
+    for k in ("Open", "High", "Low"):
+        bars[k] = bars[k].where(valid_range)
     dates = [d.strftime("%Y-%m-%d") for d in idx]
     out = {}
     for row in stocks:
         t = row["s"]
         col = lambda df, d=2: [_f(x, d) for x in df[t].loc[idx]]
-        out[t] = dict(row, d=dates, o=col(P["Open"]), h=col(P["High"]), l=col(P["Low"]), cl=col(close),
-                      v=[None if pd.isna(x) else int(x) for x in P["Volume"][t].loc[idx]],
+        out[t] = dict(row, d=dates, o=col(bars["Open"]), h=col(bars["High"]), l=col(bars["Low"]), cl=col(bars["Close"]),
+                      v=[None if pd.isna(x) else int(x) for x in bars["Volume"][t].loc[idx]],
                       m50=col(ma50), m200=col(ma200))
     return out

@@ -44,3 +44,15 @@ def test_live_zero_eps_reaches_watchlist_without_losing_next_quarter():
     apply_live_results(data)
     assert rows[0]["fst"] and rows[0]["edate"] is None and rows[0]["lastSession"] == "amc"
     assert rows[1]["edate"] == "2027-02-24" and "erep" not in rows[2]
+
+
+def test_chart_only_exports_observed_consistent_bars():
+    from kcdt.compute import stock_pages
+    days = pd.bdate_range("2026-11-10", periods=4)
+    prices = {k: pd.DataFrame({"^GSPC": [100.] * 4, "A": [20., None, 25., 22.]}, index=days)
+              for k in ("Open", "High", "Low", "Close", "Volume")}
+    prices["High"].loc[days[2], "A"] = 24
+    chart = stock_pages(prices, [{"s": "A"}])["A"]
+    assert chart["cl"] == [20., None, 25., 22.]
+    assert chart["o"] == chart["h"] == chart["l"] == [20., None, None, 22.]
+    assert chart["v"][1] is None
