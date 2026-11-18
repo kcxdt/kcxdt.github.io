@@ -709,7 +709,7 @@ def _econ_day(ask, tries=2):
     return None
 
 
-def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, now=None):
+def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, now=None, published_url=None):
     """US releases for this week and next: [{d, u (UTC time), e (event), a (actual), c (consensus), p (previous)}].
 
     Nasdaq files each day's releases under the next day's date (the 2026-10-28 FOMC decision comes back for
@@ -739,6 +739,18 @@ def economic_calendar(today=None, labels_file=None, days_file=None, prev=None, n
         got[day] = _econ_day((pd.Timestamp(day) + pd.Timedelta(days=1)).strftime("%Y-%m-%d"))
         time.sleep(0.5)
     sig = lambda rows: sorted((x.get("gmt"), x.get("eventName"), x.get("previous")) for x in rows) if rows else None
+    # A fresh runner may have no cache for a day the provider temporarily omits.
+    missing = {day for i, day in enumerate(days) if not kept.get(day) and
+               (not got[day] or (i+1 < len(days) and sig(got[day]) == sig(got[days[i+1]])))}
+    if missing and published_url:
+        try:
+            response = requests.get(published_url, timeout=15)
+            response.raise_for_status()
+            for row in response.json().get("econ", []):
+                if row.get("d") in missing and row.get("e") and not row.get("hol"):
+                    kept.setdefault(row["d"], []).append({k: row.get(k) for k in ("d","u","e","a","c","p")})
+        except (requests.RequestException, ValueError, TypeError, AttributeError) as exc:
+            print("previous economic calendar unavailable:", exc)
     out = []
     for i, day in enumerate(days):
         rows = got[day]

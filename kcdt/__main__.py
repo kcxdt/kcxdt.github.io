@@ -262,7 +262,7 @@ def main():
         return
     data = build(px, meta, fund, fear_greed(ROOT / "cache" / "fear_greed.json"), earn, done, prof, ydates)
     data["econ"], data["econ_t"] = economic_calendar(labels_file="cache/econ_labels.json",
-                                                         days_file="cache/econ_days.json"), now_utc()
+                                                         days_file="cache/econ_days.json", published_url=SITE + "data.json"), now_utc()
     data["news"], data["news_t"] = headlines(), now_utc()
     if len(data["stocks"]) < 1000:
         sys.exit(f"only {len(data['stocks'])} stocks computed, refusing to publish")
