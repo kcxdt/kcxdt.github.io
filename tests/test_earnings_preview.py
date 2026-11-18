@@ -56,3 +56,23 @@ def test_chart_only_exports_observed_consistent_bars():
     assert chart["cl"] == [20., None, 25., 22.]
     assert chart["o"] == chart["h"] == chart["l"] == [20., None, None, 22.]
     assert chart["v"][1] is None
+
+def test_cold_calendar_fallback_preserves_new_feed_rows(monkeypatch):
+    from types import SimpleNamespace
+    from kcdt import econ, fetch
+    seen = []
+    def published(url, **kwargs):
+        seen.append(url)
+        return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {"econ": [
+            {"d": "2026-11-17", "e": "Existing event", "a": "old"},
+            {"d": "2026-11-18", "e": "Missing day", "a": "1"},
+            {"d": "2026-10-01", "e": "Outside window"}]})
+    monkeypatch.setattr(fetch.requests, "get", published)
+    monkeypatch.setattr(fetch, "_econ_day", lambda day: [{"eventName": "Existing event", "actual": "new"}]
+                        if day == "2026-11-18" else [])
+    monkeypatch.setattr(fetch.time, "sleep", lambda _: None)
+    monkeypatch.setattr(econ, "forexfactory", lambda: [])
+    rows = fetch.economic_calendar(today="2026-11-18", published_url="https://example.test/data.json")
+    assert seen == ["https://example.test/data.json"]
+    assert [(r["d"],r["e"],r["a"]) for r in rows if not r.get("hol")] == [
+        ("2026-11-17","Existing event","new"), ("2026-11-18","Missing day","1")]
