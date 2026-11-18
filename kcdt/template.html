@@ -3075,14 +3075,14 @@ let earnSet='ndx';
 function earnings(){
   const today=ymd(nyNow()), end=new Date(nyNow()); end.setDate(end.getDate()+14); const endS=ymd(end);
   const pick = earnSet==='ndx'?(s=>s.ndx):earnSet==='scr'?passKC:(()=>true);
-  const rows=S.filter(s=>s.edate && s.edate>=today && s.edate<=endS && eNext(s) && pick(s));
+  const rows=S.filter(s=>s.edate && (s.edend||s.edate)>=today && s.edate<=endS && eNext(s) && pick(s));
   const since=new Date(nyNow()); since.setDate(since.getDate()-1);
   const recent=S.filter(s=>s.erep>=ymd(since) && s.erep<=today && pick(s)).sort((a,b)=>b.erep.localeCompare(a.erep)||cap(b)-cap(a));
   $('earn-recent').innerHTML=recent.length?`<details class="panel" open><summary>最近已公布 · 美東今日及昨日（${recent.length} 隻）</summary><p>${recent.map(s=>`${tk(s)} <span class="small muted">${s.erep.slice(5)}</span>`).join('　')}</p></details>`:'';
   const days={}; rows.forEach(s=>(days[s.edate]=days[s.edate]||[]).push(s));
   $('earnlist').innerHTML = Object.keys(days).sort().map(d=>{
     const dd=new Date(d+'T12:00:00'), list=days[d].sort((a,b)=>((ETORD[a.etime]??2)-(ETORD[b.etime]??2))||cap(b)-cap(a));
-    return `<div class="panel eday"><h3><span class="num">${d.slice(5)}</span><span class="muted small">星期${WD[dd.getDay()]} · ${list.length} 隻</span></h3><div class="tablewrap"><table class="cen" data-sort="earn"><thead><tr><th class="frz">代號</th><th data-first="1">時間</th><th>公司</th><th class="r">收市</th><th class="r">RS</th><th>趨勢</th><th class="r">營收增長 %</th><th class="r" title="GAAP，最近一季對去年同季">EPS 增長 %</th><th class="r">市值 (億)</th></tr></thead><tbody>${list.map(s=>`<tr><td class="frz">${tk(s)}</td><td class="small" style="white-space:nowrap" data-v="${ETORD[s.etime]??2}">${ETIME[s.etime]||'<span class="muted">未公佈</span>'}</td><td class="small cname" title="${esc(s.n||'')}">${esc(shortN(s.n))}</td><td class="r num">${f(s.c)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr}</span></td><td>${ttbar(s.tt)}</td>${pcell(s.sq)}${epsCell(s)}<td class="r num">${cap(s)?f(cap(s)*10,0):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
+    return `<div class="panel eday"><h3><span class="num">${d.slice(5)}</span><span class="muted small">星期${WD[dd.getDay()]} · ${list.length} 隻</span></h3><div class="tablewrap"><table class="cen" data-sort="earn"><thead><tr><th class="frz">代號</th><th data-first="1">時間</th><th>公司</th><th class="r">收市</th><th class="r">RS</th><th>趨勢</th><th class="r">營收增長 %</th><th class="r" title="GAAP，最近一季對去年同季">EPS 增長 %</th><th class="r">市值 (億)</th></tr></thead><tbody>${list.map(s=>`<tr><td class="frz">${tk(s)}</td><td class="small" style="white-space:nowrap" data-v="${ETORD[s.etime]??2}">${s.edend?`預計 ${s.edate.slice(5)} 至 ${s.edend.slice(5)}`:ETIME[s.etime]||'<span class="muted">未公佈</span>'}</td><td class="small cname" title="${esc(s.n||'')}">${esc(shortN(s.n))}</td><td class="r num">${f(s.c)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr}</span></td><td>${ttbar(s.tt)}</td>${pcell(s.sq)}${epsCell(s)}<td class="r num">${cap(s)?f(cap(s)*10,0):'—'}</td></tr>`).join('')}</tbody></table></div></div>`;
   }).join('') || '<div class="panel muted">未來兩星期冇呢組股票出業績。</div>';
   sortApply('earn');
 }

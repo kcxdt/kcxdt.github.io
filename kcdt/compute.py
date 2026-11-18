@@ -361,7 +361,7 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
         if yd and ysure and yd < asof:
             row["erep"] = max(row.get("erep") or "", yd)
             yd = None
-        elif yd and yseen and yd < yseen:
+        elif yd and yseen and yd < yseen and (ny_day(((ydates or {}).get(t) or {}).get("end")) or yd) < yseen:
             yd = None
         if yd:
             row["edate"], row["etime"] = yd, yt
@@ -395,7 +395,7 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
         enrich_earnings(row, fund.get(t) or {}, (ydates or {}).get(t) or {})
         if fund_stale(row):
             row["fst"] = True  # 業績後待更新: the page shows this flag, the checks count the same rule
-        if row.get("edate") and row["edate"] < asof:
+        if row.get("edate") and (row.get("edend") or row["edate"]) < asof:
             # an expected date that has passed: the next one is unknown; keep the old date only while no report
             # on or after it (within a few days' slip) is confirmed
             was = row["edate"]
