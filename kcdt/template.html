@@ -1585,7 +1585,7 @@ const DRAW = {};
 // New days arrive as a playbook-*.json file (from the Claude GEX thread) that KC imports here with 匯入. ----------
 let PB=null, pbFilt='all';
 const PBR={ok:'啱',part:'半啱',bad:'錯／冇做'}, PBC={ok:'p0',part:'p1',bad:'p2'};
-const PBTAGS=["核心 sweep","SMT","High delta absorption","Reclaim-flip","Reject-flip short","Broken-level retest short","S2","Breakout","TP 後反轉","Chop day"];
+const pbStrategies=["S1","S2","S3","No Trade"];
 const pbSigned=()=>DB!==LocalDB;
 const pbDate=d=>(+d.id.slice(8))+'/'+(+d.id.slice(5,7));
 const pbPts=n=>(n>0?'+':'')+n.toLocaleString('en-US',{maximumFractionDigits:2});
@@ -1602,7 +1602,7 @@ function pbCard(d){ return `<article class="pb-day" id="pb${d.id}">${pbHead(d)}
   <div class="pb-cols"><section class="pb-col"><h4>盤前 PRE-BIAS</h4>${pbShots(d,'pre',d.np)}<ul>${d.pre.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section>
   <section class="pb-col"><h4>結果 RESULT</h4>${pbShots(d,'res',d.nr)}<ul>${d.res.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></section></div>
   <div class="pb-les"><strong>學到</strong><p>${esc(d.les)}</p><div class="pb-tags">${d.tags.map(t=>`<span>${esc(t)}</span>`).join('')}</div></div></article>` }
-const pbMatch=d=>pbFilt==='all'||(pbFilt==='live'?d.mode==='live':pbFilt.startsWith('t:')?d.tags.includes(pbFilt.slice(2)):d.r===pbFilt);
+const pbMatch=d=>pbFilt==='all'||(d.tags||[]).includes(pbFilt);
 // screenshots: one Firestore read each, only when the card scrolls near the screen
 const PBIMG={}; let pbIO=null;
 const PBIMG_CLEAR=()=>{ for(const k in PBIMG) delete PBIMG[k] };
@@ -1618,12 +1618,11 @@ function pbDraw(){ const v=$('v-playbook');
   if(!PB){ v.innerHTML='<div class="panel muted" role="status">載入緊 NQ Playbook…</div>';
     DB.all('playbook').then(a=>{PB=a.sort((x,y)=>y.id.localeCompare(x.id)); pbDraw()}).catch(()=>{v.innerHTML='<div class="panel">NQ Playbook 載入唔到，遲啲再試。</div>'}); return }
   const D=PB, L=D.filter(pbMatch);
-  const opts=[['all','全部'],['live','Live'],['ok','啱'],['part','半啱'],['bad','錯／冇做'],...PBTAGS.map(t=>['t:'+t,t])];
   v.innerHTML=`<header class="pb-head"><div><h2>NQ Gamma Playbook</h2><p class="muted small">每日盤前 bias 同結果。撳圖睇大。${D.length?`最新 ${pbDate(D[0])}`:''} · 只有你睇到 ${pbImport}</p><p class="small" id="pb-msg" role="status"></p></div>${pbStats(D)}</header>
-    ${D.length?`<div class="pb-rail"><div class="controls">${opts.map(([k,l])=>`<button class="tog" data-pbf="${k}" aria-pressed="${k===pbFilt}">${l}</button>`).join('')}</div>
+    ${D.length?`<div class="pb-rail"><div class="controls">${pbStrategies.map(k=>`<button class="tog" data-pbf="${k}" aria-pressed="${k===pbFilt}">${k}</button>`).join('')}</div>
       <nav class="pb-dates" aria-label="日子">${L.map(d=>`<a class="${d.r}${d.mode==='live'?' live':''} num" href="#playbook" data-pbj="${d.id}">${pbDate(d)}</a>`).join('')}</nav></div>
     ${L.length?L.map(pbCard).join(''):'<p class="muted">呢個篩選冇日子。</p>'}`:'<div class="panel muted">未有日子。撳「匯入新日子」揀 Claude 俾你嘅 playbook 檔案。</div>'}`;
-  v.querySelectorAll('[data-pbf]').forEach(b=>b.onclick=()=>{pbFilt=b.dataset.pbf; pbDraw()});
+  v.querySelectorAll('[data-pbf]').forEach(b=>b.onclick=()=>{pbFilt=pbFilt===b.dataset.pbf?'all':b.dataset.pbf; pbDraw()});
   v.querySelectorAll('[data-pbj]').forEach(a=>a.onclick=e=>{e.preventDefault(); $('pb'+a.dataset.pbj).scrollIntoView({behavior:'smooth'})});
   $('pb-file').onchange=async e=>{ const f=e.target.files[0]; if(!f) return; const m=$('pb-msg');
     try{ const j=JSON.parse(await f.text()); let n=0;
