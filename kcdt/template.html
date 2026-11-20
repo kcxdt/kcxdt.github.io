@@ -1178,7 +1178,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
     <div class="shead">
       <div style="display:grid;gap:4px">
         <span class="muted small" id="e-kind"></span>
-        <h2><span class="num" id="e-tk"></span> <span class="muted" style="font-size:16px;font-family:var(--f-body);font-weight:500" id="e-name"></span></h2>
+        <h2><span id="e-actions"></span> <span class="num" id="e-tk"></span> <span class="muted" style="font-size:16px;font-family:var(--f-body);font-weight:500" id="e-name"></span></h2>
         <div class="tags" id="e-tags"></div>
       </div>
       <div style="display:grid;gap:4px;justify-items:end">
@@ -1232,7 +1232,7 @@ const ZH = D.sector_zh || {};
 const NS='http://www.w3.org/2000/svg';
 function el(tag, attrs, parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
 function setPressed(ids, on){ids.forEach(id=>$(id).setAttribute('aria-pressed', id===on?'true':'false'))}
-const tk = s => `<a class="tk" href="#s/${encodeURIComponent(s.s)}">${s.s}</a>`;
+const tk = s => `<a class="tk" href="#${s.isEtf?'e':'s'}/${encodeURIComponent(s.s)}">${s.s}</a>`;
 // EPS growth = GAAP (company accounts) latest quarter vs the same quarter a year earlier; ⚠ when the % can mislead
 const EW={turn:'轉虧為盈：去年同季蝕錢，百分比冇意義',loss:'而家蝕緊錢，百分比冇意義，改為寫轉虧／虧損擴大／虧損收窄',base:'基數接近零：去年同季 EPS 好細，百分比會被放大',gap:'GAAP 同經調整 EPS 相差大，可能有一次性項目'};
 const ewTitle = s => (s.ew||[]).map(k=>EW[k]).join('；');
@@ -1336,6 +1336,7 @@ function lBase(q, t){ const s=typeof BY!=='undefined'&&BY[t], d=lDay(q.at), asof
 const lChg=(q,t)=>{ const b=q&&lBase(q,t); return b?(q.p/b-1)*100:null };
 function liveCell(t, journal){ const T=String(t).toUpperCase(), q=LQ[T]; if(!q) return '—';
   const when=`${LSESS[q.sess]?LSESS[q.sess]+' ':''}${lHM(q.at)}`;
+  if(listingRow(T)) return `${f(q.p)}<div class="muted small">美東 ${lDay(q.at)} · ${when}</div>`;
   return journal ? `<span class="muted small" title="未平倉，呢個係延遲 15 分鐘嘅現價，唔計入盈虧">現價 ${f(q.p)} · ${when}</span>`
     : `${f(q.p)} <span class="${cls(lChg(q,T))} small">${sgn(lChg(q,T),2)}%</span><div class="muted small" style="line-height:1.2">${when}</div>` }
 function livePaint(){
@@ -1380,17 +1381,37 @@ function intraPaint(t){ const box=$('s-intra'); if(!box) return;
     :'盤前高低、開市裂口、VWAP 同相對成交量要 Cloudflare 計時器（kcdt-timer）更新咗新版先會顯示。';
 }
 // Ask for whatever is on screen now: watchlist rows, open journal rows, the stock page. Groups of 25 (the Worker's limit).
+let etfQuoteAttempt=0;
 async function liveLoad(){ if(!LIVE_URL||document.hidden) return;
   const want=new Set([...document.querySelectorAll('.view:not([hidden]) [data-live]')].map(e=>e.dataset.live.toUpperCase()));
   // the stock page's own symbol is asked for separately with &x=1: it also gets the day figures (日內交易資訊)
   const page=pageSym(); if(page) want.delete(page);
-  if(pageEtf()) want.add(pageEtf());
+  const etf=pageEtf(), attempt=etf?++etfQuoteAttempt:0;
+  if(etf) want.add(etf);
   const ok=x=>/^[A-Z0-9.^=-]{1,12}$/.test(x), syms=[...want].filter(ok);
   const parts=[]; for(let i=0;i<syms.length;i+=25) parts.push(syms.slice(i,i+25).map(encodeURIComponent).join(','));
   if(page&&ok(page)){ parts.push(encodeURIComponent(page)+'&x=1'); LXS.add(page) }
   if(!parts.length) return;
-  await Promise.all(parts.map(p=>fetch(`${LIVE_URL}/quotes?s=${p}`).then(r=>r.ok?r.json():null).then(d=>{ if(d&&d.q) Object.entries(d.q).forEach(([k,v])=>{ if(v) LQ[k]=v }) }).catch(()=>{})));
+  let quoteError='';
+  await Promise.all(parts.map(async part=>{
+    const includesEtf=etf && part.split(',').includes(etf);
+    try{
+      const response=await fetch(`${LIVE_URL}/quotes?s=${part}`,{signal:AbortSignal.timeout(15000)});
+      if(!response.ok) throw Error(response.status);
+      const {q}=await response.json();
+      for(const [symbol,quote] of Object.entries(q||{})){
+        if(quote?.p>0 && (!LQ[symbol] || quote.at>=LQ[symbol].at)) LQ[symbol]=quote;
+      }
+      if(includesEtf && !(q?.[etf]?.p>0)) quoteError='暫時未有報價';
+    }catch{
+      if(includesEtf) quoteError='連線失敗，未能更新報價';
+    }
+  }));
   livePaint();
+  if(quoteError && pageEtf()===etf && attempt===etfQuoteAttempt){
+    const cached=LQ[etf];
+    loadErr('e-live',true,quoteError+(cached?` · 上次報價美東 ${lDay(cached.at)} ${lHM(cached.at)}`:''),liveLoad);
+  }
 }
 function liveSoon(){ clearTimeout(liveSoon.t); liveSoon.t=setTimeout(liveLoad, 300) }
 // Every minute while New York is between 04:00 and 20:15 on a weekday (pre-market to after-hours); otherwise once per page.
@@ -1477,6 +1498,7 @@ function etfIndex(){ if(ETFBY) return ETFBY; ETFBY={};
   ETFBY.QQQ=ETFBY.QQQ||{s:'QQQ',n:'Invesco QQQ（追蹤 Nasdaq-100）',k:'X'};
   for(const [t,n] of [['SPY','SPDR S&P 500 ETF（追蹤標普 500）'],['IWM','iShares Russell 2000 ETF（追蹤羅素 2000）'],['DIA','SPDR Dow Jones ETF（追蹤道指）']]) ETFBY[t]=ETFBY[t]||{s:t,n,k:'X'};
   for(const [s,n,k,x,b,ix] of IDX_ETF) ETFBY[s]={s,n,k,x,b,ix};
+  for(const [s,n] of Object.entries(D.etfNames||{})) ETFBY[s] ||= {s,n,k:'X'};
   return ETFBY }
 // Index leveraged / inverse ETFs (KC 11-16: SQQQ / TQQQ were missing; Nasdaq's list files them as index funds, not single-stock ones).
 // [ticker, name, L/S, factor, base ETF (searching QQQ lists them), index]
@@ -1498,31 +1520,60 @@ const SEC_ETF={'Technology':'XLK','Communication Services':'XLC','Consumer Cycli
 function relatedEtfs(s){ const E=etfIndex(), out=(D.etfs||{})[s.s]?D.etfs[s.s].map(e=>E[e[0]]):[];
   const broad=[/semiconductor/i.test(s.ind||'')?'SMH':null, SEC_ETF[s.sec], s.ndx?'QQQ':null].filter((t,i,a)=>t&&E[t]&&a.indexOf(t)===i);
   return {one:out, broad:broad.map(t=>E[t])} }
+function listingRow(t){
+  const record=(D.listings||{})[t];
+  return record && Object.hasOwn(D.listings,t) ? {s:t,...record} : null;
+}
+function watchStock(t){
+  const e=etfIndex()[t];
+  if(e) return {s:t,n:e.n,isEtf:true};
+  return BY[t] || listingRow(t) || (Object.hasOwn(D.special||{},t)?{s:t,n:D.special[t].name}:null);
+}
+let searchCatalog;
 function qMatches(raw){
-  const q=raw.trim().toUpperCase(), q1=q.split(/\s+/)[0].replace('.','-'); if(!q) return null;
-  const st=[], seen=new Set(), add=s=>{ if(s&&!seen.has(s.s)&&st.length<8){ seen.add(s.s); st.push(s) } };
-  add(BY[q1]);
-  for(const [symbol, info] of Object.entries(D.special||{})){
-    if(symbol.startsWith(q1)||info.name.toUpperCase().includes(q)) add({s:symbol,n:info.name});
+  const q=raw.trim().toUpperCase(), ticker=q.replace(/[./]/g,'-');
+  if(!q) return null;
+  if(!searchCatalog){
+    const catalog=new Map();
+    const add=(row,etf=false)=>catalog.set(row.s,{row,etf,name:(row.n||'').toUpperCase()});
+    for(const [s,r] of Object.entries(D.listings||{})) add({s,...r});
+    for(const [s,r] of Object.entries(D.special||{})) add({s,n:r.name});
+    S.forEach(row=>add(row));
+    Object.values(etfIndex()).forEach(row=>add(row,true));
+    searchCatalog=[...catalog.values()];
   }
-  S.filter(s=>s.s.startsWith(q1)).sort((a,b)=>a.s.length-b.s.length||(b.mcap||0)-(a.mcap||0)).forEach(add);
-  if(q.length>=2) S.filter(s=>(s.n||'').toUpperCase().includes(q)).sort((a,b)=>(b.mcap||0)-(a.mcap||0)).forEach(add);
-  const E=etfIndex(), direct=Object.values(E).filter(e=>e.s===q1||(q1.length>=3&&e.s.startsWith(q1))||(q1.length>=2&&e.b===q1)).slice(0,8);
-  const top=st[0], rel=top?relatedEtfs(top):{one:[],broad:[]};
-  return {q, st, direct:direct.filter(e=>!rel.one.includes(e)&&!rel.broad.includes(e)), top, rel} }
+  const matches=[];
+  for(const item of searchCatalog){
+    const {row,name}=item;
+    const rank=row.s===ticker?0:name===q?1:row.s.startsWith(ticker)?2:q.length>=2 && name.includes(q)?3:4;
+    if(rank<4) matches.push({...item,rank});
+  }
+  matches.sort((a,b)=>a.rank-b.rank || (a.rank===2?a.row.s.length-b.row.s.length:0) ||
+    (b.row.mcap||0)-(a.row.mcap||0) || a.row.s.localeCompare(b.row.s));
+  const shown=matches.slice(0,8), top=shown[0];
+  const related=top?.rank===0 ? (top.etf?Object.values(etfIndex()).filter(e=>e.b===ticker):
+    Object.values(relatedEtfs(top.row)).flat()) : [];
+  const symbols=new Set(shown.map(i=>i.row.s));
+  return {q,shown,related:related.filter(e=>!symbols.has(e.s)),choose:top && top.rank>=2 && /^[A-Z]{1,6}(?:-[A-Z])?$/.test(ticker)};
+}
 const qRow=(href,t,name,tag,tc)=>`<a class="qi" role="option" href="${href}"><b>${esc(t)}</b><span>${esc(name||'')}</span>${tag?`<i class="${tc||''}">${tag}</i>`:'<i style="border:0"></i>'}</a>`;
-const etfRow=e=>qRow('#e/'+encodeURIComponent(e.s), e.s, e.k==='X'?e.n:e.n.replace(/^(Tidal (ETF )?Trust II|ETF Opportunities Trust|Exchange Listed Funds Trust|Investment Managers Series Trust II|Inside Ownership 100 ETF|Corgi ETF Trust I)\s+/i,''), e.k==='X'?'板塊／指數':etfTag([e.s,e.n,e.k,e.x]), e.k);
-let QSEL=0;
+const etfRow=e=>qRow('#e/'+encodeURIComponent(e.s), e.s, e.k==='X'?e.n:e.n.replace(/^(Tidal (ETF )?Trust II|ETF Opportunities Trust|Exchange Listed Funds Trust|Investment Managers Series Trust II|Inside Ownership 100 ETF|Corgi ETF Trust I)\s+/i,''), e.k==='X'?'ETF':etfTag([e.s,e.n,e.k,e.x]), e.k);
+let QSEL=null;
 function qDraw(){
   const box=$('qsug'), m=READY?qMatches($('q').value):null;
   if(!m){ box.hidden=true; $('q').setAttribute('aria-expanded','false'); return }
   let h='';
-  if(m.st.length) h+=`<div class="qh">股票</div>`+m.st.map(s=>qRow('#s/'+encodeURIComponent(s.s), s.s, s.n, s.ndx?'Nasdaq-100':'', '')).join('');
-  if(m.top&&(m.rel.one.length||m.rel.broad.length)){
-    h+=`<div class="qh">${esc(m.top.s)} 相關 ETF${m.rel.one.length?` · ${m.rel.one.length} 隻追蹤 ${esc(m.top.s)}`:''}</div>`+m.rel.one.map(etfRow).join('')+m.rel.broad.map(etfRow).join('') }
-  if(m.direct.length) h+=`<div class="qh">ETF</div>`+m.direct.map(etfRow).join('');
-  if(!h) h=`<div class="qn">搵唔到「${esc(m.q)}」。可能未納入股票池（市值 3 億美元以上、股價 12 美元以上、上市滿一年），或者代號打錯。</div>`;
-  else if(m.rel.one.length||m.direct.some(e=>e.ix)) h+=`<div class="qf">槓桿／反向 ETF 每日重設倍數，持有超過一日嘅回報唔等於股價升跌乘倍數。</div>`;
+  for(const {row,etf,rank} of m.shown){
+    const tag=rank===3?'名稱部分吻合':rank===2?'代號開頭吻合':row.expected?'待上市':'';
+    h+=qRow('#'+(etf?'e/':'s/')+encodeURIComponent(row.s),row.s,row.n,
+      [etf?'ETF':row.ndx?'Nasdaq-100':'',tag].filter(Boolean).join(' · '),'');
+  }
+  if(m.related.length) h+='<div class="qh">相關 ETF</div>'+m.related.map(etfRow).join('');
+  if(!h) h=`<div class="qn">搵唔到「${esc(m.q)}」。請核對公司名或代號。交易所名冊會喺每日收市更新時同步。</div>`;
+  else if(m.choose) h+='<div class="qf">未有完全吻合嘅代號。撳結果或者用方向鍵揀，再按 Enter。</div>';
+  if([...m.shown.filter(i=>i.etf).map(i=>i.row),...m.related].some(e=>e.k==='L'||e.k==='S'))
+    h+='<div class="qf">槓桿／反向 ETF 每日重設倍數。</div>';
+  if(QSEL===null) QSEL=m.choose?-1:0;
   box.innerHTML=h; box.hidden=false; $('q').setAttribute('aria-expanded','true');
   const items=[...box.querySelectorAll('.qi')]; QSEL=Math.min(QSEL,Math.max(0,items.length-1)); items.forEach((x,i)=>x.setAttribute('aria-selected',i===QSEL));
   items.forEach(x=>x.addEventListener('mousedown',e=>e.preventDefault()));  // keep focus so the click lands
@@ -1535,14 +1586,14 @@ $('searchform').onsubmit = e => {
   const it=[...$('qsug').querySelectorAll('.qi')][QSEL];
   if(it){ location.hash=it.getAttribute('href'); qClose(true) }
 };
-$('q').oninput = () => { QSEL=0; qDraw() };
+$('q').oninput = () => { QSEL=null; qDraw() };
 $('q').onfocus = () => { if($('q').value.trim()) qDraw() };
 $('q').onblur = () => setTimeout(()=>qClose(false), 150);
 $('q').onkeydown = e => {
   const items=[...$('qsug').querySelectorAll('.qi')];
   if(e.key==='Escape'){ qClose(false); return }
   if(!items.length || !['ArrowDown','ArrowUp'].includes(e.key)) return;
-  e.preventDefault(); QSEL=(QSEL+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
+  e.preventDefault(); QSEL=QSEL<0?(e.key==='ArrowDown'?0:items.length-1):(QSEL+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
   items.forEach((x,i)=>x.setAttribute('aria-selected',i===QSEL)); items[QSEL].scrollIntoView({block:'nearest'});
 };
 
@@ -1554,6 +1605,16 @@ function route(){
   if(!READY && v!=='market' && v!=='overview' && v!=='close' && v!=='playbook') v='wait';  // needs the stock rows: stocksReady() calls route() again
   // #s/CLMB@2026-10-29 = opened from the 歷史 page's 10-29 snapshot: the stock page says it shows the latest data
   const sT=v==='stock'?h.slice(2).split('@')[0]:null, sFrom=v==='stock'?h.split('@')[1]||null:null;
+  if(v==='stock' && listingRow(sT)){
+    v='security';
+    const r=listingRow(sT);
+    const status=r.expected?'待上市 · 預計定價日（美東） '+r.expected:r.listed?'上市日期（美東） '+r.listed:r.first?'首個有報價交易日 '+r.first:'已列入交易所名冊';
+    $('security-info').innerHTML=`<h2>${star(sT)} ${esc(sT)} · ${esc(r.n)}</h2><p>${esc(status)} ${r.source?`<a href="${esc(r.source)}" target="_blank" rel="noopener">交易所公告 ↗</a>`:''}</p>
+      ${r.expected?'':`<p>延遲報價 <span data-live="${esc(sT)}">${liveCell(sT)}</span></p>
+        <p>最近收市 ${r.c==null?'等待收市價':f(r.c)+' USD · '+esc(r.day)} · 單日升跌 ${r.chg==null?'—':sgn(r.chg,2)+'%'}</p>
+        <p>50 日線 ${r.ma50==null?'資料不足':f(r.ma50)+' USD'} · RS 暫未納入排名</p>`}`;
+    if(!r.expected) liveSoon();
+  }
   if(v==='stock' && Object.hasOwn(D.special||{},sT)){
     v='security';
     const item=D.special[sT], history=item.history.slice().reverse();
@@ -1800,11 +1861,11 @@ DRAW.overview = () => {
   const M=D.minis||[], m=M[ovIdx]||M[0], k=m?m.c.length:0, mp=m?(m.c[k-1]/m.c[k-2]-1)*100:null;
   const mnote = !m ? '' : m.n==='Nasdaq-100' ? '<p class="ov-note">Nasdaq-100 指數（點數）。QQQ 係追蹤佢嘅 ETF（美元價），NQ 係期貨（有到期月同升貼水，差唔多 24 小時交易），三樣價位同升跌時段都唔同，唔好直接對數。</p>'
     : m.n==='Nasdaq 綜合' ? '<p class="ov-note">Nasdaq 綜合指數包 Nasdaq 全部 3,000 幾隻股，唔係 NQ 跟嘅 Nasdaq-100。</p>' : '';
-  const mine=READY?[...WL.values()].filter(r=>BY[r.id]||Object.hasOwn(D.special||{},r.id)).sort((a,b)=>(a.added||'').localeCompare(b.added||'')||a.id.localeCompare(b.id)).map(r=>BY[r.id]):[];
+  const mine=READY?[...WL.values()].filter(r=>watchStock(r.id)).sort((a,b)=>(a.added||'').localeCompare(b.added||'')||a.id.localeCompare(b.id)).map(r=>watchStock(r.id)):[];
   const wl = !READY ? '<div class="ov-empty">載入緊股票數據…</div>'
     : !mine.length ? '<div class="ov-empty">未有自選股票。喺選股器、機會頁或者個股頁撳 ☆ 加入，就會喺呢度集中顯示。<br><a href="#screener">去選股器 →</a></div>'
     : `<div class="tablewrap"><table><thead><tr><th>代號／公司</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">RS</th><th class="r">距 50 日線 %</th><th>下次業績（美東）</th></tr></thead><tbody>${mine.slice(0,8).map(s=>
-        `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${sgn(s.chg,2)}%</td><td class="r num">${s.rsr??'—'}</td><td class="r num ${cls(s.d50)}">${sgn(s.d50,1)}</td><td class="num">${earningsCell(s)}</td></tr>`).join('')}</tbody></table></div><p class="explain" style="margin-top:8px">${EXP_RS()}</p>${mine.length>8?`<p style="margin-top:10px">顯示頭 8 隻，共 ${mine.length} 隻。</p>`:''}`;
+        `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${s.chg==null?'—':sgn(s.chg,2)+'%'}</td><td class="r num">${s.rsr??'—'}</td><td class="r num ${cls(s.d50)}">${sgn(s.d50,1)}</td><td class="num">${earningsCell(s)}</td></tr>`).join('')}</tbody></table></div><p class="explain" style="margin-top:8px">${EXP_RS()}</p>${mine.length>8?`<p style="margin-top:10px">顯示頭 8 隻，共 ${mine.length} 隻。</p>`:''}`;
   $('v-overview').innerHTML = `
     <header class="ov-head"><div><h2>睇清市況，<span>再聚焦機會。</span></h2></div><a class="ov-go" href="#screener">開始選股 →</a></header>
     ${Store.get('guide1',0)?'':`<div class="ov-guide" role="note"><div class="ov-gh"><b>第一次用？3 步：</b><button class="tog" type="button" id="guide-x">知道喇，唔再顯示</button></div><ol>
@@ -1855,7 +1916,7 @@ DRAW.close = () => {
   const F=D.fng, vix=(D.idx||[]).find(x=>x.n==='VIX');
   const N=READY?S.filter(s=>s.ndx&&s.chg!=null).sort((a,b)=>b.chg-a.chg):[];
   const mv=(L,ttl)=>`<article class="panel"><h3 style="margin-bottom:8px">${ttl}</h3>${!READY?'<p class="muted small">載入緊股票數據…</p>':`<div class="tablewrap"><table><thead><tr><th>代號／公司</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">相對成交</th><th class="r">RS</th></tr></thead><tbody>${L.map(s=>
-    `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${sgn(s.chg,2)}%</td><td class="r num">${s.rvol==null?'—':f(s.rvol,1)+' 倍'}</td><td class="r num">${s.rsr??'—'}</td></tr>`).join('')}</tbody></table></div><p class="explain">相對成交 = 今日成交量 ÷ 50 日平均（2 倍即平時兩倍）。${EXP_RS()}</p>`}</article>`;
+    `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${s.chg==null?'—':sgn(s.chg,2)+'%'}</td><td class="r num">${s.rvol==null?'—':f(s.rvol,1)+' 倍'}</td><td class="r num">${s.rsr??'—'}</td></tr>`).join('')}</tbody></table></div><p class="explain">相對成交 = 今日成交量 ÷ 50 日平均（2 倍即平時兩倍）。${EXP_RS()}</p>`}</article>`;
   $('v-close').innerHTML = `
     <header class="cl-head"><h2>收市後分析</h2><span class="muted small">${D.asof}${wdZh(D.asof)} 美股收市 · 網站更新 ${hkFmt(D.built)}（香港時間） · 由收市數據自動整理，唔係建議</span></header>
     <div class="ov-3">
@@ -2196,7 +2257,7 @@ DRAW.ideas = () => {
   heat();
   svgHeatInit();
   const topN=(arr,k,dir=-1,n=6)=>[...arr].sort((a,b)=>((a[k]??-1e9)-(b[k]??-1e9))*dir).slice(0,n);
-  const sigRows=(title,rows,tag)=>`<tr class="grp"><td colspan="5">${title}</td></tr>`+(rows.length?rows.map(s=>`<tr><td style="white-space:nowrap">${star(s.s)}${tk(s)}${s.ndx?' <span class="muted small">N100</span>':''}</td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${sgn(s.chg,2)}%</td><td class="r num muted">${kvol(s.vol)}</td><td class="tag">${tag(s)}</td></tr>`).join(''):'<tr><td colspan="5" class="muted small">今日冇</td></tr>');
+  const sigRows=(title,rows,tag)=>`<tr class="grp"><td colspan="5">${title}</td></tr>`+(rows.length?rows.map(s=>`<tr><td style="white-space:nowrap">${star(s.s)}${tk(s)}${s.ndx?' <span class="muted small">N100</span>':''}</td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${s.chg==null?'—':sgn(s.chg,2)+'%'}</td><td class="r num muted">${kvol(s.vol)}</td><td class="tag">${tag(s)}</td></tr>`).join(''):'<tr><td colspan="5" class="muted small">今日冇</td></tr>');
   $('sigL').innerHTML =
     sigRows('升幅最大', topN(S,'chg'), ()=> '升幅榜') +
     sigRows('創 52 週新高（按升幅）', topN(S.filter(s=>s.nh),'chg'), ()=>'新高') +
@@ -2734,24 +2795,24 @@ function drawLists(all){
 function drawWatch(){
   $('wl-where').textContent=AUTH_WAIT?'讀取緊紀錄…':DB.where.replace(/（.*$/,''); $('wl-where').classList.toggle('warnb', DB===LocalDB&&!AUTH_WAIT);
   loadErr('wl-err', WL_ERR, '自選清單讀取唔到（可能係網絡問題）。你嘅清單仲喺雲端，冇唔見；撳重試再讀一次。', wlReload);
-  const every=[...WL.values()].filter(r=>BY[r.id]||Object.hasOwn(D.special||{},r.id)).sort((a,b)=>(a.added||'').localeCompare(b.added||'')||a.id.localeCompare(b.id));
+  const every=[...WL.values()].filter(r=>watchStock(r.id)).sort((a,b)=>(a.added||'').localeCompare(b.added||'')||a.id.localeCompare(b.id));
   drawLists(every);
   const all=wlList==='all'?every:every.filter(r=>wlLs(r).includes(wlList)), many=WLISTS.length>1;
   $('wl-lh').hidden=!many;
   $('wl-filter').innerHTML='<span class="muted small">狀態</span>'+[['all','全部'],...Object.entries(WST)].map(([k,l])=>`<button class="tog" data-f="${k}" aria-pressed="${k===wlFilter}">${l} <span class="muted">${k==='all'?all.length:all.filter(r=>r.st===k).length}</span></button>`).join('');
   $('wl-filter').querySelectorAll('button').forEach(b=>b.onclick=()=>{wlFilter=b.dataset.f;drawWatch()});
   const rows=all.filter(r=>wlFilter==='all'||r.st===wlFilter);
-  const gone=[...WL.keys()].filter(t=>!BY[t] && !Object.hasOwn(D.special||{},t));
+  const gone=[...WL.keys()].filter(t=>!watchStock(t));
   wlSummary(all.map(r=>BY[r.id]).filter(Boolean));
   $('wlbody').innerHTML = rows.map(r=>{
     const special=(D.special||{})[r.id];
     if(special) return `<tr><td>${star(r.id)}${tk({s:r.id})}</td><td colspan="13">${esc(special.label)} · ${esc(r.note||'')}</td></tr>`;
-    const s=BY[r.id], ch=stockChanges(s);
+    const s=watchStock(r.id), ch=BY[r.id]?stockChanges(s):[];
     return `<tr><td class="frz wltk"><span style="white-space:nowrap">${star(s.s)}${tk(s)}${staleTag(s)}${fillTag(s)}</span><div class="muted small" style="line-height:1.25" title="${esc(s.n||'')}">${esc(shortN(s.n))}</div></td>
       ${many?`<td>${wlLs(r).map(id=>`<span class="wltag">${esc(WLISTS.find(l=>l.id===id).n)}</span>`).join('')}</td>`:''}
       <td><select data-st="${s.s}" aria-label="${s.s} 狀態">${Object.entries(WST).map(([k,l])=>`<option value="${k}"${k===r.st?' selected':''}>${l}</option>`).join('')}</select></td>
-      <td class="r num">${f(s.c)}</td>${pcell(s.chg,2)}<td class="r num lv" data-live="${s.s}">${liveCell(s.s)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr}</span>${s.prsr!=null&&s.prsr!==s.rsr?` <span class="muted small">${s.rsr>s.prsr?'▲':'▼'}${Math.abs(s.rsr-s.prsr)}</span>`:''}</td>
-      ${pcell(s.d50)}<td>${ttbar(s.tt)}</td><td>${passKC(s)?'<span class="yes">✓ 符合</span>':'<span class="muted">—</span>'}</td>
+      <td class="r num">${f(s.c)}</td>${pcell(s.chg,2)}<td class="r num lv" ${s.expected?'':`data-live="${s.s}"`}>${s.expected?'待上市':liveCell(s.s)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr??'—'}</span>${s.prsr!=null&&s.prsr!==s.rsr?` <span class="muted small">${s.rsr>s.prsr?'▲':'▼'}${Math.abs(s.rsr-s.prsr)}</span>`:''}</td>
+      ${pcell(s.d50)}<td>${s.tt==null?'—':ttbar(s.tt)}</td><td>${BY[s.s]&&passKC(s)?'<span class="yes">✓ 符合</span>':'<span class="muted">—</span>'}</td>
       <td class="num small" style="white-space:nowrap">${earningsCell(s)}</td>
       <td class="small">${ch.map(c=>c.txt).join('<br>')||'<span class="muted">—</span>'}</td>
       <td><input data-note="${s.s}" value="${esc(r.note||'')}" placeholder="例如：等突破 150 先睇" aria-label="${s.s} 筆記"></td>
@@ -2890,11 +2951,38 @@ function pmEcon(b){
   <p class="muted small">只列重要數據（★）。之後有冇更新數字，睇 <a href="#news">經濟及新聞</a>（數據公布後會再擷取）。</p>`;
 }
 const pmClosed=d=>{const n=nyNow(), t=ymd(n); return t>d||(t===d&&n.getHours()>=16)};
+const reportRequest={pm:0,hx:0};
+async function reportJSON(path){
+  const response=await fetch(path,{cache:'no-cache'});
+  if(!response.ok) throw Error(response.status);
+  return response.json();
+}
+async function reportDates(id,view,path){
+  const ticket=++reportRequest[id];
+  try{
+    const dates=await reportJSON(path);
+    if(ticket!==reportRequest[id]) return null;
+    if(!Array.isArray(dates)) throw Error('invalid date list');
+    for(const suffix of ['prev','next','day']) $(id+'-'+suffix).hidden=!dates.length;
+    return dates;
+  }catch{
+    if(ticket!==reportRequest[id]) return null;
+    for(const suffix of ['prev','next','day']) $(id+'-'+suffix).hidden=true;
+    drawn[view]=false;
+    loadErr(id,true,'讀唔到日期清單，請重試。',()=>{ drawn[view]=true; return DRAW[view]() });
+    return null;
+  }
+}
 async function pmShow(d){
+  const ticket=++reportRequest.pm;
   const sel=$('pm-day'); sel.value=d; const i=PM.indexOf(d);
   $('pm-prev').disabled=i<=0; $('pm-next').disabled=i>=PM.length-1;
-  let b; try{ b=await (await fetch(`pm/${d}.json`)).json() }catch(e){ $('pm').innerHTML='<div class="panel muted">讀唔到呢日嘅盤前報告，遲啲再試。</div>'; return }
-  if(sel.value!==d) return;
+  let b;
+  try{ b=await reportJSON(`pm/${d}.json`) }catch{
+    if(ticket===reportRequest.pm) loadErr('pm',true,`讀唔到 ${esc(d)} 嘅盤前報告。`,()=>pmShow(d));
+    return;
+  }
+  if(ticket!==reportRequest.pm) return;
   const L=pmLines(b), got=[...(b.idx||[]),...(b.etf||[]),...(b.mkt||[]),...(b.world||[])].filter(x=>x&&x.v!=null).length;
   const draw=()=>{
     const want=pmWant(), cur=d>=want, latest=pmLatest();
@@ -2915,7 +3003,9 @@ async function pmShow(d){
   draw();
 }
 DRAW.pm = async () => {
-  try{ PM=await (await fetch('pm/index.json',{cache:'no-cache'})).json() }catch(e){ PM=[] }
+  const dates=await reportDates('pm','pm','pm/index.json');
+  if(!dates) return;
+  PM=dates;
   if(!PM.length){ $('pm').innerHTML='<div class="panel muted">第一份盤前需知會喺下一個美股交易日紐約時間約 05:50（香港時間夏令 17:50、冬令 18:50）出現。</div>'; ['pm-prev','pm-next','pm-day'].forEach(i=>$(i).hidden=true); return }
   $('pm-day').innerHTML=[...PM].reverse().map(d=>`<option value="${d}">${d}</option>`).join('');
   $('pm-day').onchange=()=>pmShow($('pm-day').value);
@@ -2939,10 +3029,14 @@ function hxRisk(n, hist, rules){
     <div class="tablewrap"><table class="ind"><thead><tr><th>指標</th><th class="r">數值</th><th>狀態</th></tr></thead><tbody>${rules.map(r=>`<tr><td>${r.n}</td><td class="r num">${f(b.v[r.k])}${r.u}</td><td>${pill(b.p[r.k])}${a&&a.p[r.k]!==b.p[r.k]?` <span class="muted small">前一日${LIGHT[a.p[r.k]]}</span>`:''}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
 async function hxShow(d){
+  const ticket=++reportRequest.hx;
   const sel=$('hx-day'); sel.value=d; const i=HX.indexOf(d);
   $('hx-prev').disabled=i<=0; $('hx-next').disabled=i>=HX.length-1;
-  let x; try{ x=await hxGet(d) }catch(e){ $('hx').innerHTML='<div class="panel muted">讀唔到呢日嘅紀錄，遲啲再試。</div>'; return }
-  if(sel.value!==d) return;
+  let x; try{ x=await hxGet(d) }catch{
+    if(ticket===reportRequest.hx) loadErr('hx',true,`讀唔到 ${esc(d)} 嘅歷史快照。`,()=>hxShow(d));
+    return;
+  }
+  if(ticket!==reportRequest.hx) return;
   const B=x.breadth.usa||x.breadth.all, n=B.n||1, pc=v=>`${(v/n*100).toFixed(1)}%`;
   const SE=[...x.sectors].sort((a,b)=>(b.d5??-1e9)-(a.d5??-1e9));
   const other=[x.rebound&&`反彈確認（QQQ）：${x.rebound.on?`已確認（第 ${x.rebound.day} 日）`:'未確認'}`, x.panic&&`恐慌提示：${x.panic.on?`有（第 ${x.panic.day} 日）`:'冇'}`,
@@ -2964,7 +3058,9 @@ async function hxShow(d){
   if($('hx-more')) $('hx-more').onclick=()=>{rs.forEach(r=>r.hidden=false); $('hx-more').remove()};
 }
 DRAW.history = async () => {
-  try{ HX=await (await fetch('h/index.json',{cache:'no-cache'})).json() }catch(e){ HX=[] }
+  const dates=await reportDates('hx','history','h/index.json');
+  if(!dates) return;
+  HX=dates;
   if(!HX.length){ $('hx').innerHTML='<div class="panel muted">未有保存紀錄。第一份會喺下一次收市更新之後出現。</div>'; ['hx-prev','hx-next','hx-day'].forEach(i=>$(i).hidden=true); return }
   // trading days with no snapshot (11-02 to 11-05 were never saved). Old days are never rebuilt
   // with later data, so they stay missing; ◀ ▶ step to the previous / next saved day, not the previous trading day.
@@ -3346,6 +3442,11 @@ function jPlanUI(){ const F=$('jf').elements, on=F.plan.checked;
   document.querySelectorAll('#jf .j-pl').forEach(e=>e.hidden=!on); F.qty.required=!on;
   if(!jEdit) $('h-jf').textContent=on?'新增交易計劃':'新增交易' }
 // From a stock page's「＋ 交易計劃」: open the form with the ticker, Long, today and the latest price filled in
+function openTradePlan(sym,close){
+  const quote=LQ[sym];
+  window.JPLAN={sym,p:quote?.p??close,src:quote?`延遲價（美東 ${lDay(quote.at)} ${lHM(quote.at)}）`:`${D.asof} 收市價`};
+  location.hash='#journal';
+}
 function jPlanFill(){ const P=window.JPLAN; if(!P) return; window.JPLAN=null; jReset(); const F=$('jf').elements;
   F.sym.value=P.sym; F.side.value='L'; F.plan.checked=true; if(P.p!=null) F.buy.value=P.p; jPlanUI();
   $('h-jf').textContent=`新增交易計劃：${P.sym}`; jMsg(`已帶入 ${P.sym}${P.p!=null?`，入場價先填 ${P.src} ${f(P.p)}，改做你計劃嘅價`:''}`);
@@ -3784,7 +3885,7 @@ DRAW.journal = () => {
 };
 
 // ---------- 個股 ----------
-let SD=null;
+let SD=null, stockRequest=0;
 // One-line explanations shown right beside the numbers (KC 11-11): what high means, what RS compares against
 const EXP_RISK='0–100：分數越高，8 個風險條件觸發得越多，即風險越高（唔係跌市機率）。';
 const EXP_RS=()=>`RS 1–99：同股票池 ${nfmt(D.nuniv||S.length)} 隻比較最近 1、3、6、12 個月回報（3 個月佔 40%）嘅排名；90 即強過約 90% 股票。`;
@@ -3813,7 +3914,7 @@ function showStock(t, from){
   stockHx(s, from); stockEtfs(s);
   $('s-tk').textContent=s.s; $('s-name').textContent=s.n||'';
   $('s-star').innerHTML=`<button class="tog" id="s-wl" data-w="${s.s}" style="font-size:13px;vertical-align:middle"></button> <button class="tog" id="s-plan" type="button" style="font-size:13px;vertical-align:middle" title="喺交易日誌開一單交易計劃，帶入代號同最新價；成交之後再確認實際成交價、數量同時間">＋ 交易計劃</button>`; wlStars();
-  $('s-plan').onclick=()=>{ const q=LQ[s.s]; window.JPLAN={sym:s.s, p:q?q.p:s.c, src:q?`延遲價（美東 ${lHM(q.at)}）`:`${D.asof} 收市價`}; location.hash='#journal' };
+  $('s-plan').onclick=()=>openTradePlan(s.s,s.c);
   $('s-foot').innerHTML=`最近有報價日期 ${esc(s.pxd||D.asof)}（美東）。計回報、50／200 日線同 52 週高位用嘅舊日價格已按拆股同派息調整，所以同券商紀錄嘅歷史成交價可能唔同，交易日誌請記自己實際成交價。<br>基本面最後更新：${s.fts||'未有'} · RS、MVP、趨勢模板點計：<a href="#about">說明及數據狀態</a>`;
   $('s-sec').innerHTML=`板塊 ${esc(secZh(s))} · 細分行業 ${s.ind?`<a href="#s-peers" id="s-indl">${esc(s.ind)}</a>`:'未知'}`;
   if($('s-indl')) $('s-indl').onclick=e=>{e.preventDefault(); $('s-peers').scrollIntoView({behavior:'smooth',block:'start'})};
@@ -3827,7 +3928,7 @@ function showStock(t, from){
   const issuer=s.issuer;
   $('s-stats').innerHTML=[
     ...(issuer?[stat('公司公告 · '+issuer.quarter+' 季度',`${esc(issuer.revenue)}<br>${esc(issuer.eps)}<br><a href="${esc(issuer.url)}" target="_blank" rel="noopener">${esc(issuer.date)} 公告 ↗</a>${fStale(s)?'<div class="muted small">下方增長率仍用上一季數列</div>':''}`,'wide')]:[]),
-    stat('RS 排名', `<span style="color:${rsColor(s.rsr)}">${s.rsr}</span>${s.prsr!=null&&s.prsr!==s.rsr?` <span class="muted small">昨日 ${s.prsr}</span>`:''}<span class="explain">${EXP_RS()}</span>`,'wide'), stat('距 52 週高', f(s.dh,1)+'%'),
+    stat('RS 排名', `<span style="color:${rsColor(s.rsr)}">${s.rsr??'—'}</span>${s.prsr!=null&&s.prsr!==s.rsr?` <span class="muted small">昨日 ${s.prsr}</span>`:''}<span class="explain">${EXP_RS()}</span>`,'wide'), stat('距 52 週高', f(s.dh,1)+'%'),
     stat('距 50 日線', `<span class="${cls(s.d50)}">${sgn(s.d50)}%</span>`), stat('距 200 日線', `<span class="${cls(s.d200)}">${sgn(s.d200)}%</span>`),
     stat('1 個月', `<span class="${cls(s.r21)}">${sgn(s.r21)}%</span>`), stat('3 個月', `<span class="${cls(s.r63)}">${sgn(s.r63)}%</span>`),
     stat('6 個月', `<span class="${cls(s.r126)}">${sgn(s.r126)}%</span>`), stat('1 年', `<span class="${cls(s.r252)}">${sgn(s.r252)}%</span>`),
@@ -3855,8 +3956,9 @@ function showStock(t, from){
   ].map(([b,l])=>`<li>${ok(b)}<span>${l}</span></li>`).join('');
   SD=null; window.SDX=null;
   tvPaint();
+  const ticket=++stockRequest;
   fetch(`s/${encodeURIComponent(t)}.json`).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{
-    if(pageSym()!==t) return;
+    if(pageSym()!==t || ticket!==stockRequest) return;
     SD=d; window.SDX=d; intraPaint(t);
     const n=d.cl.length, m200b=d.m200[n-22];
     $('s-tt').innerHTML=[
@@ -3866,7 +3968,12 @@ function showStock(t, from){
       [m200b!=null&&d.m200[n-1]>m200b, `200 日線比一個月前向上（${f(m200b)} → ${f(d.m200[n-1])}）`],
       [s.dh>=-25, `收市喺 52 週高位 25% 以內（${f(s.dh,1)}%）`],
     ].map(([b,l])=>`<li>${ok(b)}<span>${l}</span></li>`).join('');
-  }).catch(()=>{$('s-tt').innerHTML='<li class="muted small">載入唔到</li>'});
+  }).catch(()=>{
+    if(pageSym()===t && ticket===stockRequest){
+      $('s-tt').innerHTML='<li id="s-tt-error"></li>';
+      loadErr('s-tt-error',true,`讀唔到 ${esc(t)} 嘅日線。`,()=>showStock(t,from));
+    }
+  });
 }
 // Opened from a 歷史 snapshot (#s/T@day): everything on the page is the latest data, so say so, give that day's close when
 // the snapshot has it (only stocks passing KC's conditions are saved per stock), and offer the way back to that day.
@@ -3878,7 +3985,7 @@ function stockHx(s, from){ const box=$('s-hx'); box.hidden=!from; if(!from) retu
     $('s-hx-px').textContent=r?`${from} 當日收市 ${f(r[2])}（${sgn(r[3],2)}%）· 今日 ${f(s.c)}`:`${from} 快照只保存符合 KC 條件嘅股票，${s.s} 嗰日唔喺名單入面`; }).catch(()=>{});
 }
 // 相關 ETF: single-stock ETFs (D.etfs, matched from Nasdaq's ETF list by name every close) and the sector / Nasdaq-100 ETF
-function etfRows(L){ return L.map(e=>`<tr><td><a class="tk" href="#e/${encodeURIComponent(e.s)}">${e.s}</a></td><td><i class="${e.k}">${e.k==='X'?'板塊／指數':etfTag([e.s,e.n,e.k,e.x])}</i></td><td class="small">${esc(e.n)}</td><td class="r num" data-live="${e.s}">—</td></tr>`).join('') }
+function etfRows(L){ return L.map(e=>`<tr><td><a class="tk" href="#e/${encodeURIComponent(e.s)}">${e.s}</a></td><td><i class="${e.k}">${e.k==='X'?'ETF':etfTag([e.s,e.n,e.k,e.x])}</i></td><td class="small">${esc(e.n)}</td><td class="r num" data-live="${e.s}">—</td></tr>`).join('') }
 function stockEtfs(s){ const r=relatedEtfs(s), L=[...r.one,...r.broad];
   $('s-etf').hidden=!L.length; if(!L.length) return;
   $('s-etf-n').textContent=r.one.length?`${r.one.length} 隻追蹤 ${s.s} 嘅 ETF，加板塊／指數 ETF`:'板塊／指數 ETF';
@@ -3887,6 +3994,8 @@ function stockEtfs(s){ const r=relatedEtfs(s), L=[...r.one,...r.broad];
 }
 // ETF page (#e/NVDL): ETFs are not in the stock pool, so only the delayed price, the chart and what it tracks
 function showEtf(t){ const E=etfIndex(), e=E[t]||{s:t,n:'',k:'X'};
+  $('e-actions').innerHTML=E[t]?`${star(t)} <button class="tog" id="e-plan" type="button">＋ 交易計劃</button>`:'';
+  if(E[t]) $('e-plan').onclick=()=>openTradePlan(t);
   $('e-tk').textContent=t; $('e-name').textContent=e.n||'';
   const u=e.u&&BY[e.u];
   $('e-kind').innerHTML=e.ix?`指數槓桿／反向 ETF · 追蹤 ${esc(e.ix)}${e.b?`（<a href="#e/${e.b}">${e.b}</a>）`:''}`:e.u?`單一股票 ETF · 追蹤 <a href="#s/${encodeURIComponent(e.u)}">${e.u}</a>${u?` ${esc(u.n||'')}`:''}`:e.sec?'板塊 ETF':'ETF';
@@ -3894,10 +4003,10 @@ function showEtf(t){ const E=etfIndex(), e=E[t]||{s:t,n:'',k:'X'};
   $('e-note').innerHTML=e.k==='L'||e.k==='S'?`<b>${etfTag([e.s,e.n,e.k,e.x])}：</b>目標係每日回報等於 ${esc(etfOf(e))} 當日升跌嘅 ${e.k==='S'?'負 ':''}${+e.x} 倍，倍數每日重設。持有超過一日，回報會同「${esc(etfOf(e))} 期間升跌 × ${e.k==='S'?'-':''}${+e.x}」有出入：上落反覆嘅日子會慢慢蝕（波動耗損），單邊走勢時可能多過倍數。${e.k==='S'?`<br><b>交易日誌點記：</b>買入 ${e.s} 係「Long 做多」（${e.s} 升你就賺），雖然佢本身係睇淡 ${esc(etfOf(e))} 嘅產品；只有沽空（借貨賣出）${e.s} 先係「Short 做空」。`:''}只供了解產品，唔係買賣建議。`
     :e.k==='I'?`<b>期權收息 ETF：</b>持有（或模擬持有）${e.u} 再賣出認購期權收期權金，分派較高，但 ${e.u} 大升時升幅有上限，大跌時照跌。只供了解產品，唔係買賣建議。`
     :e.sec?`板塊 ETF，網站每日收市計佢嘅升跌（大市頁「板塊」）：當日 ${sgn(e.sec.d1,2)}%、5 日 ${sgn(e.sec.d5,2)}%、10 日 ${sgn(e.sec.d10,2)}%、1 個月 ${sgn(e.sec.m1,2)}%。`
-    :t==='QQQ'?'追蹤 Nasdaq-100 指數嘅 ETF。':'呢隻 ETF 唔喺網站嘅名單入面，下面只有延遲價同圖表。';
+    :t==='QQQ'?'追蹤 Nasdaq-100 指數嘅 ETF。':E[t]?'已收錄 ETF，可查看延遲報價同圖表。':'呢隻 ETF 唔喺網站嘅名單入面，下面只有延遲價同圖表。';
   const sib=e.ix?Object.values(E).filter(x=>x.ix===e.ix&&x.s!==t):e.u?(D.etfs[e.u]||[]).map(x=>E[x[0]]).filter(x=>x.s!==t):[];
   $('e-sib').hidden=!sib.length; if(sib.length){ $('h-esib').textContent=`其他追蹤 ${esc(etfOf(e))} 嘅 ETF`; $('e-sib-b').innerHTML=etfRows(sib) }
-  $('e-px').textContent='—'; $('e-live').textContent=LIVE_URL?'延遲價載入緊…':'';
+  $('e-px').textContent='—'; $('e-live').textContent=LIVE_URL?'延遲價載入緊…':'報價服務未啟用';
   tvPaint(); etfLive(); liveSoon();
 }
 function etfLive(){ const t=pageEtf(), q=t&&LQ[t]; if(!t) return;
@@ -3941,6 +4050,7 @@ function stocksReady(){
   fcovTxt=`${nfmt(FCOV[0])} 隻有部分基本面資料，${nfmt(FCOV[1])} 隻齊備篩選所需資料`;
   drawStamps();
   $('tickers').innerHTML = S.map(s=>`<option value="${s.s}">${s.n||''}</option>`).join('')
+    + Object.entries(D.listings||{}).map(([t,r])=>`<option value="${esc(t)}">${esc(r.n)}</option>`).join('')
     + Object.values(etfIndex()).map(e=>`<option value="${e.s}">${e.k==='X'?'ETF':etfTag([e.s,e.n,e.k,e.x])+' '+esc(etfOf(e))+' · ETF'}</option>`).join('');
   if(!$('v-wait').hidden) route();
   wlStars(); if(drawn.market && brief.T) brief(brief.T);

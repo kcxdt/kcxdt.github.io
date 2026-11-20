@@ -8,6 +8,7 @@ import time
 import pandas as pd
 from datetime import datetime, timezone
 
+from .ipo import load_listings, searchable
 from .checks import run as run_checks
 from .compute import build, kc_technical, stock_pages, wants_fundamentals
 from .mkt import HOLIDAYS, NY, close_due
@@ -70,7 +71,7 @@ def write_page(data):
 def render(data):
     tpl = (pathlib.Path(__file__).parent / "template.html").read_text(encoding="utf-8")
     light = {k: v for k, v in data.items() if k != "stocks"}
-    body = tpl.replace("/*DATA*/", json.dumps(light, ensure_ascii=False, separators=(",", ":")))
+    body = tpl.replace("/*DATA*/", json.dumps(light, ensure_ascii=False, separators=(",", ":")).replace("<", r"\u003c"))
     # fetched while the page itself is still arriving; ?v= so a new build never pairs with yesterday's cached rows
     ver = "".join(c for c in str(data.get("built") or data.get("asof") or "") if c.isalnum())
     stocks = (f'<script async src="stocks.js?v={ver}" onerror="window.KCDT_STOCKS_ERR=1;'
@@ -261,6 +262,24 @@ def main():
         print("warm run: caches refreshed, nothing published")
         return
     data = build(px, meta, fund, fear_greed(ROOT / "cache" / "fear_greed.json"), earn, done, prof, ydates)
+    try:
+        listings, data["etfNames"] = load_listings(ROOT / "cache", pd.Timestamp.now(tz=NY).date())
+        data["listings"] = searchable(px, data["stocks"], data["special"], listings)
+    except RuntimeError as exc:
+        # A cold-cache directory outage must not block the market close.
+        say(f"IPO directory unavailable: {exc}; trying last published names")
+        from urllib.request import urlopen
+        try:
+            with urlopen(SITE + "data.json", timeout=20) as response:
+                published = json.load(response)
+                prior = published.get("listings", {})
+                data["etfNames"] = published.get("etfNames", {})
+            occupied = {s["s"] for s in data["stocks"]} | set(data["special"])
+            data["listings"] = {t: {k: v for k, v in row.items() if k not in ("chg", "d50", "ma50")}
+                                for t, row in prior.items() if t not in occupied and
+                                (not row.get("expected") or row["expected"] >= data["asof"])}
+        except (OSError, ValueError) as fallback_error:
+            say(f"Last published IPO names unavailable: {fallback_error}")
     data["econ"], data["econ_t"] = economic_calendar(labels_file="cache/econ_labels.json",
                                                          days_file="cache/econ_days.json", published_url=SITE + "data.json"), now_utc()
     data["news"], data["news_t"] = headlines(), now_utc()
