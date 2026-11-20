@@ -1336,6 +1336,7 @@ function lBase(q, t){ const s=typeof BY!=='undefined'&&BY[t], d=lDay(q.at), asof
 const lChg=(q,t)=>{ const b=q&&lBase(q,t); return b?(q.p/b-1)*100:null };
 function liveCell(t, journal){ const T=String(t).toUpperCase(), q=LQ[T]; if(!q) return '—';
   const when=`${LSESS[q.sess]?LSESS[q.sess]+' ':''}${lHM(q.at)}`;
+  if(listingRow(T)) return `${f(q.p)}<div class="muted small">美東 ${lDay(q.at)} · ${when}</div>`;
   return journal ? `<span class="muted small" title="未平倉，呢個係延遲 15 分鐘嘅現價，唔計入盈虧">現價 ${f(q.p)} · ${when}</span>`
     : `${f(q.p)} <span class="${cls(lChg(q,T))} small">${sgn(lChg(q,T),2)}%</span><div class="muted small" style="line-height:1.2">${when}</div>` }
 function livePaint(){
@@ -1498,15 +1499,25 @@ const SEC_ETF={'Technology':'XLK','Communication Services':'XLC','Consumer Cycli
 function relatedEtfs(s){ const E=etfIndex(), out=(D.etfs||{})[s.s]?D.etfs[s.s].map(e=>E[e[0]]):[];
   const broad=[/semiconductor/i.test(s.ind||'')?'SMH':null, SEC_ETF[s.sec], s.ndx?'QQQ':null].filter((t,i,a)=>t&&E[t]&&a.indexOf(t)===i);
   return {one:out, broad:broad.map(t=>E[t])} }
+function listingRow(t){
+  const record=(D.listings||{})[t];
+  return record && Object.hasOwn(D.listings,t) ? {s:t,...record} : null;
+}
+function watchStock(t){
+  return BY[t] || listingRow(t) || (Object.hasOwn(D.special||{},t)?{s:t,n:D.special[t].name}:null);
+}
 function qMatches(raw){
   const q=raw.trim().toUpperCase(), q1=q.split(/\s+/)[0].replace('.','-'); if(!q) return null;
   const st=[], seen=new Set(), add=s=>{ if(s&&!seen.has(s.s)&&st.length<8){ seen.add(s.s); st.push(s) } };
-  add(BY[q1]);
+  add(BY[q1]||listingRow(q1));
   for(const [symbol, info] of Object.entries(D.special||{})){
     if(symbol.startsWith(q1)||info.name.toUpperCase().includes(q)) add({s:symbol,n:info.name});
   }
   S.filter(s=>s.s.startsWith(q1)).sort((a,b)=>a.s.length-b.s.length||(b.mcap||0)-(a.mcap||0)).forEach(add);
   if(q.length>=2) S.filter(s=>(s.n||'').toUpperCase().includes(q)).sort((a,b)=>(b.mcap||0)-(a.mcap||0)).forEach(add);
+  const entries=Object.entries(D.listings||{});
+  for(const [s,r] of entries) if(s.startsWith(q1)) add({s,...r});
+  if(q.length>=2) for(const [s,r] of entries) if(r.n.toUpperCase().includes(q)) add({s,...r});
   const E=etfIndex(), direct=Object.values(E).filter(e=>e.s===q1||(q1.length>=3&&e.s.startsWith(q1))||(q1.length>=2&&e.b===q1)).slice(0,8);
   const top=st[0], rel=top?relatedEtfs(top):{one:[],broad:[]};
   return {q, st, direct:direct.filter(e=>!rel.one.includes(e)&&!rel.broad.includes(e)), top, rel} }
@@ -1517,11 +1528,11 @@ function qDraw(){
   const box=$('qsug'), m=READY?qMatches($('q').value):null;
   if(!m){ box.hidden=true; $('q').setAttribute('aria-expanded','false'); return }
   let h='';
-  if(m.st.length) h+=`<div class="qh">股票</div>`+m.st.map(s=>qRow('#s/'+encodeURIComponent(s.s), s.s, s.n, s.ndx?'Nasdaq-100':'', '')).join('');
+  if(m.st.length) h+=`<div class="qh">股票</div>`+m.st.map(s=>qRow('#s/'+encodeURIComponent(s.s), s.s, s.n, s.ndx?'Nasdaq-100':s.expected?'待上市':'', '')).join('');
   if(m.top&&(m.rel.one.length||m.rel.broad.length)){
     h+=`<div class="qh">${esc(m.top.s)} 相關 ETF${m.rel.one.length?` · ${m.rel.one.length} 隻追蹤 ${esc(m.top.s)}`:''}</div>`+m.rel.one.map(etfRow).join('')+m.rel.broad.map(etfRow).join('') }
   if(m.direct.length) h+=`<div class="qh">ETF</div>`+m.direct.map(etfRow).join('');
-  if(!h) h=`<div class="qn">搵唔到「${esc(m.q)}」。可能未納入股票池（市值 3 億美元以上、股價 12 美元以上、上市滿一年），或者代號打錯。</div>`;
+  if(!h) h=`<div class="qn">搵唔到「${esc(m.q)}」。請核對公司名或代號。交易所新股名單會喺每日收市更新時同步。</div>`;
   else if(m.rel.one.length||m.direct.some(e=>e.ix)) h+=`<div class="qf">槓桿／反向 ETF 每日重設倍數，持有超過一日嘅回報唔等於股價升跌乘倍數。</div>`;
   box.innerHTML=h; box.hidden=false; $('q').setAttribute('aria-expanded','true');
   const items=[...box.querySelectorAll('.qi')]; QSEL=Math.min(QSEL,Math.max(0,items.length-1)); items.forEach((x,i)=>x.setAttribute('aria-selected',i===QSEL));
@@ -1554,6 +1565,16 @@ function route(){
   if(!READY && v!=='market' && v!=='overview' && v!=='close' && v!=='playbook') v='wait';  // needs the stock rows: stocksReady() calls route() again
   // #s/CLMB@2026-10-29 = opened from the 歷史 page's 10-29 snapshot: the stock page says it shows the latest data
   const sT=v==='stock'?h.slice(2).split('@')[0]:null, sFrom=v==='stock'?h.split('@')[1]||null:null;
+  if(v==='stock' && listingRow(sT)){
+    v='security';
+    const r=listingRow(sT);
+    const status=r.expected?'待上市 · 預計定價日（美東） '+r.expected:r.listed?'上市日期（美東） '+r.listed:r.first?'首個有報價交易日 '+r.first:'已列入交易所名冊';
+    $('security-info').innerHTML=`<h2>${star(sT)} ${esc(sT)} · ${esc(r.n)}</h2><p>${esc(status)} ${r.source?`<a href="${esc(r.source)}" target="_blank" rel="noopener">交易所公告 ↗</a>`:''}</p>
+      ${r.expected?'':`<p>延遲報價 <span data-live="${esc(sT)}">${liveCell(sT)}</span></p>
+        <p>最近收市 ${r.c==null?'等待收市價':f(r.c)+' USD · '+esc(r.day)} · 單日升跌 ${r.chg==null?'—':sgn(r.chg,2)+'%'}</p>
+        <p>50 日線 ${r.ma50==null?'資料不足':f(r.ma50)+' USD'} · RS 暫未納入排名</p>`}`;
+    if(!r.expected) liveSoon();
+  }
   if(v==='stock' && Object.hasOwn(D.special||{},sT)){
     v='security';
     const item=D.special[sT], history=item.history.slice().reverse();
@@ -1800,11 +1821,11 @@ DRAW.overview = () => {
   const M=D.minis||[], m=M[ovIdx]||M[0], k=m?m.c.length:0, mp=m?(m.c[k-1]/m.c[k-2]-1)*100:null;
   const mnote = !m ? '' : m.n==='Nasdaq-100' ? '<p class="ov-note">Nasdaq-100 指數（點數）。QQQ 係追蹤佢嘅 ETF（美元價），NQ 係期貨（有到期月同升貼水，差唔多 24 小時交易），三樣價位同升跌時段都唔同，唔好直接對數。</p>'
     : m.n==='Nasdaq 綜合' ? '<p class="ov-note">Nasdaq 綜合指數包 Nasdaq 全部 3,000 幾隻股，唔係 NQ 跟嘅 Nasdaq-100。</p>' : '';
-  const mine=READY?[...WL.values()].filter(r=>BY[r.id]||Object.hasOwn(D.special||{},r.id)).sort((a,b)=>(a.added||'').localeCompare(b.added||'')||a.id.localeCompare(b.id)).map(r=>BY[r.id]):[];
+  const mine=READY?[...WL.values()].filter(r=>watchStock(r.id)).sort((a,b)=>(a.added||'').localeCompare(b.added||'')||a.id.localeCompare(b.id)).map(r=>watchStock(r.id)):[];
   const wl = !READY ? '<div class="ov-empty">載入緊股票數據…</div>'
     : !mine.length ? '<div class="ov-empty">未有自選股票。喺選股器、機會頁或者個股頁撳 ☆ 加入，就會喺呢度集中顯示。<br><a href="#screener">去選股器 →</a></div>'
     : `<div class="tablewrap"><table><thead><tr><th>代號／公司</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">RS</th><th class="r">距 50 日線 %</th><th>下次業績（美東）</th></tr></thead><tbody>${mine.slice(0,8).map(s=>
-        `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${sgn(s.chg,2)}%</td><td class="r num">${s.rsr??'—'}</td><td class="r num ${cls(s.d50)}">${sgn(s.d50,1)}</td><td class="num">${earningsCell(s)}</td></tr>`).join('')}</tbody></table></div><p class="explain" style="margin-top:8px">${EXP_RS()}</p>${mine.length>8?`<p style="margin-top:10px">顯示頭 8 隻，共 ${mine.length} 隻。</p>`:''}`;
+        `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${s.chg==null?'—':sgn(s.chg,2)+'%'}</td><td class="r num">${s.rsr??'—'}</td><td class="r num ${cls(s.d50)}">${sgn(s.d50,1)}</td><td class="num">${earningsCell(s)}</td></tr>`).join('')}</tbody></table></div><p class="explain" style="margin-top:8px">${EXP_RS()}</p>${mine.length>8?`<p style="margin-top:10px">顯示頭 8 隻，共 ${mine.length} 隻。</p>`:''}`;
   $('v-overview').innerHTML = `
     <header class="ov-head"><div><h2>睇清市況，<span>再聚焦機會。</span></h2></div><a class="ov-go" href="#screener">開始選股 →</a></header>
     ${Store.get('guide1',0)?'':`<div class="ov-guide" role="note"><div class="ov-gh"><b>第一次用？3 步：</b><button class="tog" type="button" id="guide-x">知道喇，唔再顯示</button></div><ol>
@@ -1855,7 +1876,7 @@ DRAW.close = () => {
   const F=D.fng, vix=(D.idx||[]).find(x=>x.n==='VIX');
   const N=READY?S.filter(s=>s.ndx&&s.chg!=null).sort((a,b)=>b.chg-a.chg):[];
   const mv=(L,ttl)=>`<article class="panel"><h3 style="margin-bottom:8px">${ttl}</h3>${!READY?'<p class="muted small">載入緊股票數據…</p>':`<div class="tablewrap"><table><thead><tr><th>代號／公司</th><th class="r">收市</th><th class="r">今日 %</th><th class="r">相對成交</th><th class="r">RS</th></tr></thead><tbody>${L.map(s=>
-    `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${sgn(s.chg,2)}%</td><td class="r num">${s.rvol==null?'—':f(s.rvol,1)+' 倍'}</td><td class="r num">${s.rsr??'—'}</td></tr>`).join('')}</tbody></table></div><p class="explain">相對成交 = 今日成交量 ÷ 50 日平均（2 倍即平時兩倍）。${EXP_RS()}</p>`}</article>`;
+    `<tr><td>${tk(s)}<span class="ov-co">${esc(shortN(s.n))}</span></td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${s.chg==null?'—':sgn(s.chg,2)+'%'}</td><td class="r num">${s.rvol==null?'—':f(s.rvol,1)+' 倍'}</td><td class="r num">${s.rsr??'—'}</td></tr>`).join('')}</tbody></table></div><p class="explain">相對成交 = 今日成交量 ÷ 50 日平均（2 倍即平時兩倍）。${EXP_RS()}</p>`}</article>`;
   $('v-close').innerHTML = `
     <header class="cl-head"><h2>收市後分析</h2><span class="muted small">${D.asof}${wdZh(D.asof)} 美股收市 · 網站更新 ${hkFmt(D.built)}（香港時間） · 由收市數據自動整理，唔係建議</span></header>
     <div class="ov-3">
@@ -2196,7 +2217,7 @@ DRAW.ideas = () => {
   heat();
   svgHeatInit();
   const topN=(arr,k,dir=-1,n=6)=>[...arr].sort((a,b)=>((a[k]??-1e9)-(b[k]??-1e9))*dir).slice(0,n);
-  const sigRows=(title,rows,tag)=>`<tr class="grp"><td colspan="5">${title}</td></tr>`+(rows.length?rows.map(s=>`<tr><td style="white-space:nowrap">${star(s.s)}${tk(s)}${s.ndx?' <span class="muted small">N100</span>':''}</td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${sgn(s.chg,2)}%</td><td class="r num muted">${kvol(s.vol)}</td><td class="tag">${tag(s)}</td></tr>`).join(''):'<tr><td colspan="5" class="muted small">今日冇</td></tr>');
+  const sigRows=(title,rows,tag)=>`<tr class="grp"><td colspan="5">${title}</td></tr>`+(rows.length?rows.map(s=>`<tr><td style="white-space:nowrap">${star(s.s)}${tk(s)}${s.ndx?' <span class="muted small">N100</span>':''}</td><td class="r num">${f(s.c)}</td><td class="r num ${cls(s.chg)}">${s.chg==null?'—':sgn(s.chg,2)+'%'}</td><td class="r num muted">${kvol(s.vol)}</td><td class="tag">${tag(s)}</td></tr>`).join(''):'<tr><td colspan="5" class="muted small">今日冇</td></tr>');
   $('sigL').innerHTML =
     sigRows('升幅最大', topN(S,'chg'), ()=> '升幅榜') +
     sigRows('創 52 週新高（按升幅）', topN(S.filter(s=>s.nh),'chg'), ()=>'新高') +
@@ -2734,24 +2755,24 @@ function drawLists(all){
 function drawWatch(){
   $('wl-where').textContent=AUTH_WAIT?'讀取緊紀錄…':DB.where.replace(/（.*$/,''); $('wl-where').classList.toggle('warnb', DB===LocalDB&&!AUTH_WAIT);
   loadErr('wl-err', WL_ERR, '自選清單讀取唔到（可能係網絡問題）。你嘅清單仲喺雲端，冇唔見；撳重試再讀一次。', wlReload);
-  const every=[...WL.values()].filter(r=>BY[r.id]||Object.hasOwn(D.special||{},r.id)).sort((a,b)=>(a.added||'').localeCompare(b.added||'')||a.id.localeCompare(b.id));
+  const every=[...WL.values()].filter(r=>watchStock(r.id)).sort((a,b)=>(a.added||'').localeCompare(b.added||'')||a.id.localeCompare(b.id));
   drawLists(every);
   const all=wlList==='all'?every:every.filter(r=>wlLs(r).includes(wlList)), many=WLISTS.length>1;
   $('wl-lh').hidden=!many;
   $('wl-filter').innerHTML='<span class="muted small">狀態</span>'+[['all','全部'],...Object.entries(WST)].map(([k,l])=>`<button class="tog" data-f="${k}" aria-pressed="${k===wlFilter}">${l} <span class="muted">${k==='all'?all.length:all.filter(r=>r.st===k).length}</span></button>`).join('');
   $('wl-filter').querySelectorAll('button').forEach(b=>b.onclick=()=>{wlFilter=b.dataset.f;drawWatch()});
   const rows=all.filter(r=>wlFilter==='all'||r.st===wlFilter);
-  const gone=[...WL.keys()].filter(t=>!BY[t] && !Object.hasOwn(D.special||{},t));
+  const gone=[...WL.keys()].filter(t=>!watchStock(t));
   wlSummary(all.map(r=>BY[r.id]).filter(Boolean));
   $('wlbody').innerHTML = rows.map(r=>{
     const special=(D.special||{})[r.id];
     if(special) return `<tr><td>${star(r.id)}${tk({s:r.id})}</td><td colspan="13">${esc(special.label)} · ${esc(r.note||'')}</td></tr>`;
-    const s=BY[r.id], ch=stockChanges(s);
+    const s=watchStock(r.id), ch=BY[r.id]?stockChanges(s):[];
     return `<tr><td class="frz wltk"><span style="white-space:nowrap">${star(s.s)}${tk(s)}${staleTag(s)}${fillTag(s)}</span><div class="muted small" style="line-height:1.25" title="${esc(s.n||'')}">${esc(shortN(s.n))}</div></td>
       ${many?`<td>${wlLs(r).map(id=>`<span class="wltag">${esc(WLISTS.find(l=>l.id===id).n)}</span>`).join('')}</td>`:''}
       <td><select data-st="${s.s}" aria-label="${s.s} 狀態">${Object.entries(WST).map(([k,l])=>`<option value="${k}"${k===r.st?' selected':''}>${l}</option>`).join('')}</select></td>
-      <td class="r num">${f(s.c)}</td>${pcell(s.chg,2)}<td class="r num lv" data-live="${s.s}">${liveCell(s.s)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr}</span>${s.prsr!=null&&s.prsr!==s.rsr?` <span class="muted small">${s.rsr>s.prsr?'▲':'▼'}${Math.abs(s.rsr-s.prsr)}</span>`:''}</td>
-      ${pcell(s.d50)}<td>${ttbar(s.tt)}</td><td>${passKC(s)?'<span class="yes">✓ 符合</span>':'<span class="muted">—</span>'}</td>
+      <td class="r num">${f(s.c)}</td>${pcell(s.chg,2)}<td class="r num lv" ${s.expected?'':`data-live="${s.s}"`}>${s.expected?'待上市':liveCell(s.s)}</td><td class="r"><span class="rs" style="color:${rsColor(s.rsr)}">${s.rsr??'—'}</span>${s.prsr!=null&&s.prsr!==s.rsr?` <span class="muted small">${s.rsr>s.prsr?'▲':'▼'}${Math.abs(s.rsr-s.prsr)}</span>`:''}</td>
+      ${pcell(s.d50)}<td>${s.tt==null?'—':ttbar(s.tt)}</td><td>${BY[s.s]&&passKC(s)?'<span class="yes">✓ 符合</span>':'<span class="muted">—</span>'}</td>
       <td class="num small" style="white-space:nowrap">${earningsCell(s)}</td>
       <td class="small">${ch.map(c=>c.txt).join('<br>')||'<span class="muted">—</span>'}</td>
       <td><input data-note="${s.s}" value="${esc(r.note||'')}" placeholder="例如：等突破 150 先睇" aria-label="${s.s} 筆記"></td>
@@ -3827,7 +3848,7 @@ function showStock(t, from){
   const issuer=s.issuer;
   $('s-stats').innerHTML=[
     ...(issuer?[stat('公司公告 · '+issuer.quarter+' 季度',`${esc(issuer.revenue)}<br>${esc(issuer.eps)}<br><a href="${esc(issuer.url)}" target="_blank" rel="noopener">${esc(issuer.date)} 公告 ↗</a>${fStale(s)?'<div class="muted small">下方增長率仍用上一季數列</div>':''}`,'wide')]:[]),
-    stat('RS 排名', `<span style="color:${rsColor(s.rsr)}">${s.rsr}</span>${s.prsr!=null&&s.prsr!==s.rsr?` <span class="muted small">昨日 ${s.prsr}</span>`:''}<span class="explain">${EXP_RS()}</span>`,'wide'), stat('距 52 週高', f(s.dh,1)+'%'),
+    stat('RS 排名', `<span style="color:${rsColor(s.rsr)}">${s.rsr??'—'}</span>${s.prsr!=null&&s.prsr!==s.rsr?` <span class="muted small">昨日 ${s.prsr}</span>`:''}<span class="explain">${EXP_RS()}</span>`,'wide'), stat('距 52 週高', f(s.dh,1)+'%'),
     stat('距 50 日線', `<span class="${cls(s.d50)}">${sgn(s.d50)}%</span>`), stat('距 200 日線', `<span class="${cls(s.d200)}">${sgn(s.d200)}%</span>`),
     stat('1 個月', `<span class="${cls(s.r21)}">${sgn(s.r21)}%</span>`), stat('3 個月', `<span class="${cls(s.r63)}">${sgn(s.r63)}%</span>`),
     stat('6 個月', `<span class="${cls(s.r126)}">${sgn(s.r126)}%</span>`), stat('1 年', `<span class="${cls(s.r252)}">${sgn(s.r252)}%</span>`),
