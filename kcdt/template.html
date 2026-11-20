@@ -1381,17 +1381,37 @@ function intraPaint(t){ const box=$('s-intra'); if(!box) return;
     :'盤前高低、開市裂口、VWAP 同相對成交量要 Cloudflare 計時器（kcdt-timer）更新咗新版先會顯示。';
 }
 // Ask for whatever is on screen now: watchlist rows, open journal rows, the stock page. Groups of 25 (the Worker's limit).
+let etfQuoteAttempt=0;
 async function liveLoad(){ if(!LIVE_URL||document.hidden) return;
   const want=new Set([...document.querySelectorAll('.view:not([hidden]) [data-live]')].map(e=>e.dataset.live.toUpperCase()));
   // the stock page's own symbol is asked for separately with &x=1: it also gets the day figures (日內交易資訊)
   const page=pageSym(); if(page) want.delete(page);
-  if(pageEtf()) want.add(pageEtf());
+  const etf=pageEtf(), attempt=etf?++etfQuoteAttempt:0;
+  if(etf) want.add(etf);
   const ok=x=>/^[A-Z0-9.^=-]{1,12}$/.test(x), syms=[...want].filter(ok);
   const parts=[]; for(let i=0;i<syms.length;i+=25) parts.push(syms.slice(i,i+25).map(encodeURIComponent).join(','));
   if(page&&ok(page)){ parts.push(encodeURIComponent(page)+'&x=1'); LXS.add(page) }
   if(!parts.length) return;
-  await Promise.all(parts.map(p=>fetch(`${LIVE_URL}/quotes?s=${p}`).then(r=>r.ok?r.json():null).then(d=>{ if(d&&d.q) Object.entries(d.q).forEach(([k,v])=>{ if(v) LQ[k]=v }) }).catch(()=>{})));
+  let quoteError='';
+  await Promise.all(parts.map(async part=>{
+    const includesEtf=etf && part.split(',').includes(etf);
+    try{
+      const response=await fetch(`${LIVE_URL}/quotes?s=${part}`,{signal:AbortSignal.timeout(15000)});
+      if(!response.ok) throw Error(response.status);
+      const {q}=await response.json();
+      for(const [symbol,quote] of Object.entries(q||{})){
+        if(quote?.p>0 && (!LQ[symbol] || quote.at>=LQ[symbol].at)) LQ[symbol]=quote;
+      }
+      if(includesEtf && !(q?.[etf]?.p>0)) quoteError='暫時未有報價';
+    }catch{
+      if(includesEtf) quoteError='連線失敗，未能更新報價';
+    }
+  }));
   livePaint();
+  if(quoteError && pageEtf()===etf && attempt===etfQuoteAttempt){
+    const cached=LQ[etf];
+    loadErr('e-live',true,quoteError+(cached?` · 上次報價美東 ${lDay(cached.at)} ${lHM(cached.at)}`:''),liveLoad);
+  }
 }
 function liveSoon(){ clearTimeout(liveSoon.t); liveSoon.t=setTimeout(liveLoad, 300) }
 // Every minute while New York is between 04:00 and 20:15 on a weekday (pre-market to after-hours); otherwise once per page.
@@ -2931,11 +2951,38 @@ function pmEcon(b){
   <p class="muted small">只列重要數據（★）。之後有冇更新數字，睇 <a href="#news">經濟及新聞</a>（數據公布後會再擷取）。</p>`;
 }
 const pmClosed=d=>{const n=nyNow(), t=ymd(n); return t>d||(t===d&&n.getHours()>=16)};
+const reportRequest={pm:0,hx:0};
+async function reportJSON(path){
+  const response=await fetch(path,{cache:'no-cache'});
+  if(!response.ok) throw Error(response.status);
+  return response.json();
+}
+async function reportDates(id,view,path){
+  const ticket=++reportRequest[id];
+  try{
+    const dates=await reportJSON(path);
+    if(ticket!==reportRequest[id]) return null;
+    if(!Array.isArray(dates)) throw Error('invalid date list');
+    for(const suffix of ['prev','next','day']) $(id+'-'+suffix).hidden=!dates.length;
+    return dates;
+  }catch{
+    if(ticket!==reportRequest[id]) return null;
+    for(const suffix of ['prev','next','day']) $(id+'-'+suffix).hidden=true;
+    drawn[view]=false;
+    loadErr(id,true,'讀唔到日期清單，請重試。',()=>{ drawn[view]=true; return DRAW[view]() });
+    return null;
+  }
+}
 async function pmShow(d){
+  const ticket=++reportRequest.pm;
   const sel=$('pm-day'); sel.value=d; const i=PM.indexOf(d);
   $('pm-prev').disabled=i<=0; $('pm-next').disabled=i>=PM.length-1;
-  let b; try{ b=await (await fetch(`pm/${d}.json`)).json() }catch(e){ $('pm').innerHTML='<div class="panel muted">讀唔到呢日嘅盤前報告，遲啲再試。</div>'; return }
-  if(sel.value!==d) return;
+  let b;
+  try{ b=await reportJSON(`pm/${d}.json`) }catch{
+    if(ticket===reportRequest.pm) loadErr('pm',true,`讀唔到 ${esc(d)} 嘅盤前報告。`,()=>pmShow(d));
+    return;
+  }
+  if(ticket!==reportRequest.pm) return;
   const L=pmLines(b), got=[...(b.idx||[]),...(b.etf||[]),...(b.mkt||[]),...(b.world||[])].filter(x=>x&&x.v!=null).length;
   const draw=()=>{
     const want=pmWant(), cur=d>=want, latest=pmLatest();
@@ -2956,7 +3003,9 @@ async function pmShow(d){
   draw();
 }
 DRAW.pm = async () => {
-  try{ PM=await (await fetch('pm/index.json',{cache:'no-cache'})).json() }catch(e){ PM=[] }
+  const dates=await reportDates('pm','pm','pm/index.json');
+  if(!dates) return;
+  PM=dates;
   if(!PM.length){ $('pm').innerHTML='<div class="panel muted">第一份盤前需知會喺下一個美股交易日紐約時間約 05:50（香港時間夏令 17:50、冬令 18:50）出現。</div>'; ['pm-prev','pm-next','pm-day'].forEach(i=>$(i).hidden=true); return }
   $('pm-day').innerHTML=[...PM].reverse().map(d=>`<option value="${d}">${d}</option>`).join('');
   $('pm-day').onchange=()=>pmShow($('pm-day').value);
@@ -2980,10 +3029,14 @@ function hxRisk(n, hist, rules){
     <div class="tablewrap"><table class="ind"><thead><tr><th>指標</th><th class="r">數值</th><th>狀態</th></tr></thead><tbody>${rules.map(r=>`<tr><td>${r.n}</td><td class="r num">${f(b.v[r.k])}${r.u}</td><td>${pill(b.p[r.k])}${a&&a.p[r.k]!==b.p[r.k]?` <span class="muted small">前一日${LIGHT[a.p[r.k]]}</span>`:''}</td></tr>`).join('')}</tbody></table></div></div>`;
 }
 async function hxShow(d){
+  const ticket=++reportRequest.hx;
   const sel=$('hx-day'); sel.value=d; const i=HX.indexOf(d);
   $('hx-prev').disabled=i<=0; $('hx-next').disabled=i>=HX.length-1;
-  let x; try{ x=await hxGet(d) }catch(e){ $('hx').innerHTML='<div class="panel muted">讀唔到呢日嘅紀錄，遲啲再試。</div>'; return }
-  if(sel.value!==d) return;
+  let x; try{ x=await hxGet(d) }catch{
+    if(ticket===reportRequest.hx) loadErr('hx',true,`讀唔到 ${esc(d)} 嘅歷史快照。`,()=>hxShow(d));
+    return;
+  }
+  if(ticket!==reportRequest.hx) return;
   const B=x.breadth.usa||x.breadth.all, n=B.n||1, pc=v=>`${(v/n*100).toFixed(1)}%`;
   const SE=[...x.sectors].sort((a,b)=>(b.d5??-1e9)-(a.d5??-1e9));
   const other=[x.rebound&&`反彈確認（QQQ）：${x.rebound.on?`已確認（第 ${x.rebound.day} 日）`:'未確認'}`, x.panic&&`恐慌提示：${x.panic.on?`有（第 ${x.panic.day} 日）`:'冇'}`,
@@ -3005,7 +3058,9 @@ async function hxShow(d){
   if($('hx-more')) $('hx-more').onclick=()=>{rs.forEach(r=>r.hidden=false); $('hx-more').remove()};
 }
 DRAW.history = async () => {
-  try{ HX=await (await fetch('h/index.json',{cache:'no-cache'})).json() }catch(e){ HX=[] }
+  const dates=await reportDates('hx','history','h/index.json');
+  if(!dates) return;
+  HX=dates;
   if(!HX.length){ $('hx').innerHTML='<div class="panel muted">未有保存紀錄。第一份會喺下一次收市更新之後出現。</div>'; ['hx-prev','hx-next','hx-day'].forEach(i=>$(i).hidden=true); return }
   // trading days with no snapshot (11-02 to 11-05 were never saved). Old days are never rebuilt
   // with later data, so they stay missing; ◀ ▶ step to the previous / next saved day, not the previous trading day.
@@ -3830,7 +3885,7 @@ DRAW.journal = () => {
 };
 
 // ---------- 個股 ----------
-let SD=null;
+let SD=null, stockRequest=0;
 // One-line explanations shown right beside the numbers (KC 11-11): what high means, what RS compares against
 const EXP_RISK='0–100：分數越高，8 個風險條件觸發得越多，即風險越高（唔係跌市機率）。';
 const EXP_RS=()=>`RS 1–99：同股票池 ${nfmt(D.nuniv||S.length)} 隻比較最近 1、3、6、12 個月回報（3 個月佔 40%）嘅排名；90 即強過約 90% 股票。`;
@@ -3901,8 +3956,9 @@ function showStock(t, from){
   ].map(([b,l])=>`<li>${ok(b)}<span>${l}</span></li>`).join('');
   SD=null; window.SDX=null;
   tvPaint();
+  const ticket=++stockRequest;
   fetch(`s/${encodeURIComponent(t)}.json`).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(d=>{
-    if(pageSym()!==t) return;
+    if(pageSym()!==t || ticket!==stockRequest) return;
     SD=d; window.SDX=d; intraPaint(t);
     const n=d.cl.length, m200b=d.m200[n-22];
     $('s-tt').innerHTML=[
@@ -3912,7 +3968,12 @@ function showStock(t, from){
       [m200b!=null&&d.m200[n-1]>m200b, `200 日線比一個月前向上（${f(m200b)} → ${f(d.m200[n-1])}）`],
       [s.dh>=-25, `收市喺 52 週高位 25% 以內（${f(s.dh,1)}%）`],
     ].map(([b,l])=>`<li>${ok(b)}<span>${l}</span></li>`).join('');
-  }).catch(()=>{$('s-tt').innerHTML='<li class="muted small">載入唔到</li>'});
+  }).catch(()=>{
+    if(pageSym()===t && ticket===stockRequest){
+      $('s-tt').innerHTML='<li id="s-tt-error"></li>';
+      loadErr('s-tt-error',true,`讀唔到 ${esc(t)} 嘅日線。`,()=>showStock(t,from));
+    }
+  });
 }
 // Opened from a 歷史 snapshot (#s/T@day): everything on the page is the latest data, so say so, give that day's close when
 // the snapshot has it (only stocks passing KC's conditions are saved per stock), and offer the way back to that day.
@@ -3945,7 +4006,7 @@ function showEtf(t){ const E=etfIndex(), e=E[t]||{s:t,n:'',k:'X'};
     :t==='QQQ'?'追蹤 Nasdaq-100 指數嘅 ETF。':E[t]?'已收錄 ETF，可查看延遲報價同圖表。':'呢隻 ETF 唔喺網站嘅名單入面，下面只有延遲價同圖表。';
   const sib=e.ix?Object.values(E).filter(x=>x.ix===e.ix&&x.s!==t):e.u?(D.etfs[e.u]||[]).map(x=>E[x[0]]).filter(x=>x.s!==t):[];
   $('e-sib').hidden=!sib.length; if(sib.length){ $('h-esib').textContent=`其他追蹤 ${esc(etfOf(e))} 嘅 ETF`; $('e-sib-b').innerHTML=etfRows(sib) }
-  $('e-px').textContent='—'; $('e-live').textContent=LIVE_URL?'延遲價載入緊…':'';
+  $('e-px').textContent='—'; $('e-live').textContent=LIVE_URL?'延遲價載入緊…':'報價服務未啟用';
   tvPaint(); etfLive(); liveSoon();
 }
 function etfLive(){ const t=pageEtf(), q=t&&LQ[t]; if(!t) return;
