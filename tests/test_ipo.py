@@ -11,7 +11,7 @@ FAKE|Fake Common Stock|Y|N
 ETF|ETF Common Shares|N|Y
 File Creation Time: 20261119|||
 """
-    assert directory(text, "Symbol") == {"NEW": "NewCo Class A Common Stock"}
+    assert directory(text, "Symbol") == ({"NEW": "NewCo Class A Common Stock"}, {"ETF": "ETF Common Shares"})
 
 
 def test_search_before_sufficient_history_and_promotion():

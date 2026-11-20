@@ -1178,7 +1178,7 @@ button.tog[aria-pressed="true"],label.tog[aria-pressed="true"]{color:var(--accen
     <div class="shead">
       <div style="display:grid;gap:4px">
         <span class="muted small" id="e-kind"></span>
-        <h2><span class="num" id="e-tk"></span> <span class="muted" style="font-size:16px;font-family:var(--f-body);font-weight:500" id="e-name"></span></h2>
+        <h2><span id="e-actions"></span> <span class="num" id="e-tk"></span> <span class="muted" style="font-size:16px;font-family:var(--f-body);font-weight:500" id="e-name"></span></h2>
         <div class="tags" id="e-tags"></div>
       </div>
       <div style="display:grid;gap:4px;justify-items:end">
@@ -1232,7 +1232,7 @@ const ZH = D.sector_zh || {};
 const NS='http://www.w3.org/2000/svg';
 function el(tag, attrs, parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
 function setPressed(ids, on){ids.forEach(id=>$(id).setAttribute('aria-pressed', id===on?'true':'false'))}
-const tk = s => `<a class="tk" href="#s/${encodeURIComponent(s.s)}">${s.s}</a>`;
+const tk = s => `<a class="tk" href="#${s.isEtf?'e':'s'}/${encodeURIComponent(s.s)}">${s.s}</a>`;
 // EPS growth = GAAP (company accounts) latest quarter vs the same quarter a year earlier; ⚠ when the % can mislead
 const EW={turn:'轉虧為盈：去年同季蝕錢，百分比冇意義',loss:'而家蝕緊錢，百分比冇意義，改為寫轉虧／虧損擴大／虧損收窄',base:'基數接近零：去年同季 EPS 好細，百分比會被放大',gap:'GAAP 同經調整 EPS 相差大，可能有一次性項目'};
 const ewTitle = s => (s.ew||[]).map(k=>EW[k]).join('；');
@@ -1478,6 +1478,7 @@ function etfIndex(){ if(ETFBY) return ETFBY; ETFBY={};
   ETFBY.QQQ=ETFBY.QQQ||{s:'QQQ',n:'Invesco QQQ（追蹤 Nasdaq-100）',k:'X'};
   for(const [t,n] of [['SPY','SPDR S&P 500 ETF（追蹤標普 500）'],['IWM','iShares Russell 2000 ETF（追蹤羅素 2000）'],['DIA','SPDR Dow Jones ETF（追蹤道指）']]) ETFBY[t]=ETFBY[t]||{s:t,n,k:'X'};
   for(const [s,n,k,x,b,ix] of IDX_ETF) ETFBY[s]={s,n,k,x,b,ix};
+  for(const [s,n] of Object.entries(D.etfNames||{})) ETFBY[s] ||= {s,n,k:'X'};
   return ETFBY }
 // Index leveraged / inverse ETFs (KC 11-16: SQQQ / TQQQ were missing; Nasdaq's list files them as index funds, not single-stock ones).
 // [ticker, name, L/S, factor, base ETF (searching QQQ lists them), index]
@@ -1504,36 +1505,55 @@ function listingRow(t){
   return record && Object.hasOwn(D.listings,t) ? {s:t,...record} : null;
 }
 function watchStock(t){
+  const e=etfIndex()[t];
+  if(e) return {s:t,n:e.n,isEtf:true};
   return BY[t] || listingRow(t) || (Object.hasOwn(D.special||{},t)?{s:t,n:D.special[t].name}:null);
 }
+let searchCatalog;
 function qMatches(raw){
-  const q=raw.trim().toUpperCase(), q1=q.split(/\s+/)[0].replace('.','-'); if(!q) return null;
-  const st=[], seen=new Set(), add=s=>{ if(s&&!seen.has(s.s)&&st.length<8){ seen.add(s.s); st.push(s) } };
-  add(BY[q1]||listingRow(q1));
-  for(const [symbol, info] of Object.entries(D.special||{})){
-    if(symbol.startsWith(q1)||info.name.toUpperCase().includes(q)) add({s:symbol,n:info.name});
+  const q=raw.trim().toUpperCase(), ticker=q.replace(/[./]/g,'-');
+  if(!q) return null;
+  if(!searchCatalog){
+    const catalog=new Map();
+    const add=(row,etf=false)=>catalog.set(row.s,{row,etf,name:(row.n||'').toUpperCase()});
+    for(const [s,r] of Object.entries(D.listings||{})) add({s,...r});
+    for(const [s,r] of Object.entries(D.special||{})) add({s,n:r.name});
+    S.forEach(row=>add(row));
+    Object.values(etfIndex()).forEach(row=>add(row,true));
+    searchCatalog=[...catalog.values()];
   }
-  S.filter(s=>s.s.startsWith(q1)).sort((a,b)=>a.s.length-b.s.length||(b.mcap||0)-(a.mcap||0)).forEach(add);
-  if(q.length>=2) S.filter(s=>(s.n||'').toUpperCase().includes(q)).sort((a,b)=>(b.mcap||0)-(a.mcap||0)).forEach(add);
-  const entries=Object.entries(D.listings||{});
-  for(const [s,r] of entries) if(s.startsWith(q1)) add({s,...r});
-  if(q.length>=2) for(const [s,r] of entries) if(r.n.toUpperCase().includes(q)) add({s,...r});
-  const E=etfIndex(), direct=Object.values(E).filter(e=>e.s===q1||(q1.length>=3&&e.s.startsWith(q1))||(q1.length>=2&&e.b===q1)).slice(0,8);
-  const top=st[0], rel=top?relatedEtfs(top):{one:[],broad:[]};
-  return {q, st, direct:direct.filter(e=>!rel.one.includes(e)&&!rel.broad.includes(e)), top, rel} }
+  const matches=[];
+  for(const item of searchCatalog){
+    const {row,name}=item;
+    const rank=row.s===ticker?0:name===q?1:row.s.startsWith(ticker)?2:q.length>=2 && name.includes(q)?3:4;
+    if(rank<4) matches.push({...item,rank});
+  }
+  matches.sort((a,b)=>a.rank-b.rank || (a.rank===2?a.row.s.length-b.row.s.length:0) ||
+    (b.row.mcap||0)-(a.row.mcap||0) || a.row.s.localeCompare(b.row.s));
+  const shown=matches.slice(0,8), top=shown[0];
+  const related=top?.rank===0 ? (top.etf?Object.values(etfIndex()).filter(e=>e.b===ticker):
+    Object.values(relatedEtfs(top.row)).flat()) : [];
+  const symbols=new Set(shown.map(i=>i.row.s));
+  return {q,shown,related:related.filter(e=>!symbols.has(e.s)),choose:top && top.rank>=2 && /^[A-Z]{1,6}(?:-[A-Z])?$/.test(ticker)};
+}
 const qRow=(href,t,name,tag,tc)=>`<a class="qi" role="option" href="${href}"><b>${esc(t)}</b><span>${esc(name||'')}</span>${tag?`<i class="${tc||''}">${tag}</i>`:'<i style="border:0"></i>'}</a>`;
-const etfRow=e=>qRow('#e/'+encodeURIComponent(e.s), e.s, e.k==='X'?e.n:e.n.replace(/^(Tidal (ETF )?Trust II|ETF Opportunities Trust|Exchange Listed Funds Trust|Investment Managers Series Trust II|Inside Ownership 100 ETF|Corgi ETF Trust I)\s+/i,''), e.k==='X'?'板塊／指數':etfTag([e.s,e.n,e.k,e.x]), e.k);
-let QSEL=0;
+const etfRow=e=>qRow('#e/'+encodeURIComponent(e.s), e.s, e.k==='X'?e.n:e.n.replace(/^(Tidal (ETF )?Trust II|ETF Opportunities Trust|Exchange Listed Funds Trust|Investment Managers Series Trust II|Inside Ownership 100 ETF|Corgi ETF Trust I)\s+/i,''), e.k==='X'?'ETF':etfTag([e.s,e.n,e.k,e.x]), e.k);
+let QSEL=null;
 function qDraw(){
   const box=$('qsug'), m=READY?qMatches($('q').value):null;
   if(!m){ box.hidden=true; $('q').setAttribute('aria-expanded','false'); return }
   let h='';
-  if(m.st.length) h+=`<div class="qh">股票</div>`+m.st.map(s=>qRow('#s/'+encodeURIComponent(s.s), s.s, s.n, s.ndx?'Nasdaq-100':s.expected?'待上市':'', '')).join('');
-  if(m.top&&(m.rel.one.length||m.rel.broad.length)){
-    h+=`<div class="qh">${esc(m.top.s)} 相關 ETF${m.rel.one.length?` · ${m.rel.one.length} 隻追蹤 ${esc(m.top.s)}`:''}</div>`+m.rel.one.map(etfRow).join('')+m.rel.broad.map(etfRow).join('') }
-  if(m.direct.length) h+=`<div class="qh">ETF</div>`+m.direct.map(etfRow).join('');
-  if(!h) h=`<div class="qn">搵唔到「${esc(m.q)}」。請核對公司名或代號。交易所新股名單會喺每日收市更新時同步。</div>`;
-  else if(m.rel.one.length||m.direct.some(e=>e.ix)) h+=`<div class="qf">槓桿／反向 ETF 每日重設倍數，持有超過一日嘅回報唔等於股價升跌乘倍數。</div>`;
+  for(const {row,etf,rank} of m.shown){
+    const tag=rank===3?'名稱部分吻合':rank===2?'代號開頭吻合':row.expected?'待上市':'';
+    h+=qRow('#'+(etf?'e/':'s/')+encodeURIComponent(row.s),row.s,row.n,
+      [etf?'ETF':row.ndx?'Nasdaq-100':'',tag].filter(Boolean).join(' · '),'');
+  }
+  if(m.related.length) h+='<div class="qh">相關 ETF</div>'+m.related.map(etfRow).join('');
+  if(!h) h=`<div class="qn">搵唔到「${esc(m.q)}」。請核對公司名或代號。交易所名冊會喺每日收市更新時同步。</div>`;
+  else if(m.choose) h+='<div class="qf">未有完全吻合嘅代號。撳結果或者用方向鍵揀，再按 Enter。</div>';
+  if([...m.shown.filter(i=>i.etf).map(i=>i.row),...m.related].some(e=>e.k==='L'||e.k==='S'))
+    h+='<div class="qf">槓桿／反向 ETF 每日重設倍數。</div>';
+  if(QSEL===null) QSEL=m.choose?-1:0;
   box.innerHTML=h; box.hidden=false; $('q').setAttribute('aria-expanded','true');
   const items=[...box.querySelectorAll('.qi')]; QSEL=Math.min(QSEL,Math.max(0,items.length-1)); items.forEach((x,i)=>x.setAttribute('aria-selected',i===QSEL));
   items.forEach(x=>x.addEventListener('mousedown',e=>e.preventDefault()));  // keep focus so the click lands
@@ -1546,14 +1566,14 @@ $('searchform').onsubmit = e => {
   const it=[...$('qsug').querySelectorAll('.qi')][QSEL];
   if(it){ location.hash=it.getAttribute('href'); qClose(true) }
 };
-$('q').oninput = () => { QSEL=0; qDraw() };
+$('q').oninput = () => { QSEL=null; qDraw() };
 $('q').onfocus = () => { if($('q').value.trim()) qDraw() };
 $('q').onblur = () => setTimeout(()=>qClose(false), 150);
 $('q').onkeydown = e => {
   const items=[...$('qsug').querySelectorAll('.qi')];
   if(e.key==='Escape'){ qClose(false); return }
   if(!items.length || !['ArrowDown','ArrowUp'].includes(e.key)) return;
-  e.preventDefault(); QSEL=(QSEL+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
+  e.preventDefault(); QSEL=QSEL<0?(e.key==='ArrowDown'?0:items.length-1):(QSEL+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;
   items.forEach((x,i)=>x.setAttribute('aria-selected',i===QSEL)); items[QSEL].scrollIntoView({block:'nearest'});
 };
 
@@ -3367,6 +3387,11 @@ function jPlanUI(){ const F=$('jf').elements, on=F.plan.checked;
   document.querySelectorAll('#jf .j-pl').forEach(e=>e.hidden=!on); F.qty.required=!on;
   if(!jEdit) $('h-jf').textContent=on?'新增交易計劃':'新增交易' }
 // From a stock page's「＋ 交易計劃」: open the form with the ticker, Long, today and the latest price filled in
+function openTradePlan(sym,close){
+  const quote=LQ[sym];
+  window.JPLAN={sym,p:quote?.p??close,src:quote?`延遲價（美東 ${lDay(quote.at)} ${lHM(quote.at)}）`:`${D.asof} 收市價`};
+  location.hash='#journal';
+}
 function jPlanFill(){ const P=window.JPLAN; if(!P) return; window.JPLAN=null; jReset(); const F=$('jf').elements;
   F.sym.value=P.sym; F.side.value='L'; F.plan.checked=true; if(P.p!=null) F.buy.value=P.p; jPlanUI();
   $('h-jf').textContent=`新增交易計劃：${P.sym}`; jMsg(`已帶入 ${P.sym}${P.p!=null?`，入場價先填 ${P.src} ${f(P.p)}，改做你計劃嘅價`:''}`);
@@ -3834,7 +3859,7 @@ function showStock(t, from){
   stockHx(s, from); stockEtfs(s);
   $('s-tk').textContent=s.s; $('s-name').textContent=s.n||'';
   $('s-star').innerHTML=`<button class="tog" id="s-wl" data-w="${s.s}" style="font-size:13px;vertical-align:middle"></button> <button class="tog" id="s-plan" type="button" style="font-size:13px;vertical-align:middle" title="喺交易日誌開一單交易計劃，帶入代號同最新價；成交之後再確認實際成交價、數量同時間">＋ 交易計劃</button>`; wlStars();
-  $('s-plan').onclick=()=>{ const q=LQ[s.s]; window.JPLAN={sym:s.s, p:q?q.p:s.c, src:q?`延遲價（美東 ${lHM(q.at)}）`:`${D.asof} 收市價`}; location.hash='#journal' };
+  $('s-plan').onclick=()=>openTradePlan(s.s,s.c);
   $('s-foot').innerHTML=`最近有報價日期 ${esc(s.pxd||D.asof)}（美東）。計回報、50／200 日線同 52 週高位用嘅舊日價格已按拆股同派息調整，所以同券商紀錄嘅歷史成交價可能唔同，交易日誌請記自己實際成交價。<br>基本面最後更新：${s.fts||'未有'} · RS、MVP、趨勢模板點計：<a href="#about">說明及數據狀態</a>`;
   $('s-sec').innerHTML=`板塊 ${esc(secZh(s))} · 細分行業 ${s.ind?`<a href="#s-peers" id="s-indl">${esc(s.ind)}</a>`:'未知'}`;
   if($('s-indl')) $('s-indl').onclick=e=>{e.preventDefault(); $('s-peers').scrollIntoView({behavior:'smooth',block:'start'})};
@@ -3899,7 +3924,7 @@ function stockHx(s, from){ const box=$('s-hx'); box.hidden=!from; if(!from) retu
     $('s-hx-px').textContent=r?`${from} 當日收市 ${f(r[2])}（${sgn(r[3],2)}%）· 今日 ${f(s.c)}`:`${from} 快照只保存符合 KC 條件嘅股票，${s.s} 嗰日唔喺名單入面`; }).catch(()=>{});
 }
 // 相關 ETF: single-stock ETFs (D.etfs, matched from Nasdaq's ETF list by name every close) and the sector / Nasdaq-100 ETF
-function etfRows(L){ return L.map(e=>`<tr><td><a class="tk" href="#e/${encodeURIComponent(e.s)}">${e.s}</a></td><td><i class="${e.k}">${e.k==='X'?'板塊／指數':etfTag([e.s,e.n,e.k,e.x])}</i></td><td class="small">${esc(e.n)}</td><td class="r num" data-live="${e.s}">—</td></tr>`).join('') }
+function etfRows(L){ return L.map(e=>`<tr><td><a class="tk" href="#e/${encodeURIComponent(e.s)}">${e.s}</a></td><td><i class="${e.k}">${e.k==='X'?'ETF':etfTag([e.s,e.n,e.k,e.x])}</i></td><td class="small">${esc(e.n)}</td><td class="r num" data-live="${e.s}">—</td></tr>`).join('') }
 function stockEtfs(s){ const r=relatedEtfs(s), L=[...r.one,...r.broad];
   $('s-etf').hidden=!L.length; if(!L.length) return;
   $('s-etf-n').textContent=r.one.length?`${r.one.length} 隻追蹤 ${s.s} 嘅 ETF，加板塊／指數 ETF`:'板塊／指數 ETF';
@@ -3908,6 +3933,8 @@ function stockEtfs(s){ const r=relatedEtfs(s), L=[...r.one,...r.broad];
 }
 // ETF page (#e/NVDL): ETFs are not in the stock pool, so only the delayed price, the chart and what it tracks
 function showEtf(t){ const E=etfIndex(), e=E[t]||{s:t,n:'',k:'X'};
+  $('e-actions').innerHTML=E[t]?`${star(t)} <button class="tog" id="e-plan" type="button">＋ 交易計劃</button>`:'';
+  if(E[t]) $('e-plan').onclick=()=>openTradePlan(t);
   $('e-tk').textContent=t; $('e-name').textContent=e.n||'';
   const u=e.u&&BY[e.u];
   $('e-kind').innerHTML=e.ix?`指數槓桿／反向 ETF · 追蹤 ${esc(e.ix)}${e.b?`（<a href="#e/${e.b}">${e.b}</a>）`:''}`:e.u?`單一股票 ETF · 追蹤 <a href="#s/${encodeURIComponent(e.u)}">${e.u}</a>${u?` ${esc(u.n||'')}`:''}`:e.sec?'板塊 ETF':'ETF';
@@ -3915,7 +3942,7 @@ function showEtf(t){ const E=etfIndex(), e=E[t]||{s:t,n:'',k:'X'};
   $('e-note').innerHTML=e.k==='L'||e.k==='S'?`<b>${etfTag([e.s,e.n,e.k,e.x])}：</b>目標係每日回報等於 ${esc(etfOf(e))} 當日升跌嘅 ${e.k==='S'?'負 ':''}${+e.x} 倍，倍數每日重設。持有超過一日，回報會同「${esc(etfOf(e))} 期間升跌 × ${e.k==='S'?'-':''}${+e.x}」有出入：上落反覆嘅日子會慢慢蝕（波動耗損），單邊走勢時可能多過倍數。${e.k==='S'?`<br><b>交易日誌點記：</b>買入 ${e.s} 係「Long 做多」（${e.s} 升你就賺），雖然佢本身係睇淡 ${esc(etfOf(e))} 嘅產品；只有沽空（借貨賣出）${e.s} 先係「Short 做空」。`:''}只供了解產品，唔係買賣建議。`
     :e.k==='I'?`<b>期權收息 ETF：</b>持有（或模擬持有）${e.u} 再賣出認購期權收期權金，分派較高，但 ${e.u} 大升時升幅有上限，大跌時照跌。只供了解產品，唔係買賣建議。`
     :e.sec?`板塊 ETF，網站每日收市計佢嘅升跌（大市頁「板塊」）：當日 ${sgn(e.sec.d1,2)}%、5 日 ${sgn(e.sec.d5,2)}%、10 日 ${sgn(e.sec.d10,2)}%、1 個月 ${sgn(e.sec.m1,2)}%。`
-    :t==='QQQ'?'追蹤 Nasdaq-100 指數嘅 ETF。':'呢隻 ETF 唔喺網站嘅名單入面，下面只有延遲價同圖表。';
+    :t==='QQQ'?'追蹤 Nasdaq-100 指數嘅 ETF。':E[t]?'已收錄 ETF，可查看延遲報價同圖表。':'呢隻 ETF 唔喺網站嘅名單入面，下面只有延遲價同圖表。';
   const sib=e.ix?Object.values(E).filter(x=>x.ix===e.ix&&x.s!==t):e.u?(D.etfs[e.u]||[]).map(x=>E[x[0]]).filter(x=>x.s!==t):[];
   $('e-sib').hidden=!sib.length; if(sib.length){ $('h-esib').textContent=`其他追蹤 ${esc(etfOf(e))} 嘅 ETF`; $('e-sib-b').innerHTML=etfRows(sib) }
   $('e-px').textContent='—'; $('e-live').textContent=LIVE_URL?'延遲價載入緊…':'';
@@ -3962,6 +3989,7 @@ function stocksReady(){
   fcovTxt=`${nfmt(FCOV[0])} 隻有部分基本面資料，${nfmt(FCOV[1])} 隻齊備篩選所需資料`;
   drawStamps();
   $('tickers').innerHTML = S.map(s=>`<option value="${s.s}">${s.n||''}</option>`).join('')
+    + Object.entries(D.listings||{}).map(([t,r])=>`<option value="${esc(t)}">${esc(r.n)}</option>`).join('')
     + Object.values(etfIndex()).map(e=>`<option value="${e.s}">${e.k==='X'?'ETF':etfTag([e.s,e.n,e.k,e.x])+' '+esc(etfOf(e))+' · ETF'}</option>`).join('');
   if(!$('v-wait').hidden) route();
   wlStars(); if(drawn.market && brief.T) brief(brief.T);

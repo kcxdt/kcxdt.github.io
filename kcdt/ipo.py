@@ -29,15 +29,19 @@ def symbol(value):
 def directory(text, key):
     if "File Creation Time:" not in text or key not in text.partition("\n")[0].split("|"):
         raise ValueError("incomplete listing file")
-    out = {}
+    out, etfs = {}, {}
     for row in csv.DictReader(io.StringIO(text), delimiter="|"):
         name = row.get("Security Name", "")
         ticker = symbol(row.get(key))
-        if ticker and row["Test Issue"] == row["ETF"] == "N" and COMMON.search(name) and not OTHER.search(name):
+        if not ticker or row["Test Issue"] != "N" or not name:
+            continue
+        if row["ETF"] == "Y":
+            etfs[ticker] = name
+        elif COMMON.search(name) and not OTHER.search(name):
             out[ticker] = name
     if not out:
         raise ValueError("empty listing file")
-    return out
+    return out, etfs
 
 
 def load_listings(cache, today):
@@ -45,18 +49,20 @@ def load_listings(cache, today):
     path = cache / "ipo-directory.json"
     old = json.loads(path.read_text(encoding="utf8")) if path.exists() else {}
     state = {}
-    names = {}
+    names, etfs = {}, {}
     for file, key in [("nasdaqlisted", "Symbol"), ("otherlisted", "ACT Symbol")]:
         try:
             r = requests.get(DIRECTORY + file + ".txt", headers={**NASDAQ_UA, "Accept": "text/plain"}, timeout=20)
             r.raise_for_status()
-            state[file] = directory(r.text, key)
+            state[file], state[file + "_etfs"] = directory(r.text, key)
         except (requests.RequestException, ValueError) as exc:
             print(f"IPO directory {file}: {exc}")
             if not old.get(file):
                 raise RuntimeError(f"No usable current or cached {file} directory") from exc
             state[file] = old[file]
+            state[file + "_etfs"] = old.get(file + "_etfs", {})
         names.update(state[file])
+        etfs.update(state[file + "_etfs"])
 
     recent = {s: d for s, d in old.get("recent", {}).items() if d >= (today - timedelta(days=400)).isoformat()}
     for ticker, (issuer, day, _) in CONFIRMED.items():
@@ -93,7 +99,7 @@ def load_listings(cache, today):
     temp = path.with_suffix(".tmp")
     temp.write_text(json.dumps(dict(state, recent=recent, upcoming=upcoming)), encoding="utf8")
     temp.replace(path)
-    return names, recent, upcoming
+    return (names, recent, upcoming), etfs
 
 
 def searchable(px, stocks, special, sources):

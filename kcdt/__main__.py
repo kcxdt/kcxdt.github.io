@@ -263,7 +263,7 @@ def main():
         return
     data = build(px, meta, fund, fear_greed(ROOT / "cache" / "fear_greed.json"), earn, done, prof, ydates)
     try:
-        listings = load_listings(ROOT / "cache", pd.Timestamp.now(tz=NY).date())
+        listings, data["etfNames"] = load_listings(ROOT / "cache", pd.Timestamp.now(tz=NY).date())
         data["listings"] = searchable(px, data["stocks"], data["special"], listings)
     except RuntimeError as exc:
         # A cold-cache directory outage must not block the market close.
@@ -271,7 +271,9 @@ def main():
         from urllib.request import urlopen
         try:
             with urlopen(SITE + "data.json", timeout=20) as response:
-                prior = json.load(response).get("listings", {})
+                published = json.load(response)
+                prior = published.get("listings", {})
+                data["etfNames"] = published.get("etfNames", {})
             occupied = {s["s"] for s in data["stocks"]} | set(data["special"])
             data["listings"] = {t: {k: v for k, v in row.items() if k not in ("chg", "d50", "ma50")}
                                 for t, row in prior.items() if t not in occupied and
