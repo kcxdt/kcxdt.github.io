@@ -1650,8 +1650,9 @@ const pbStrategies=["S1","S2","S3","No Trade"];
 const pbSigned=()=>DB!==LocalDB;
 const pbDate=d=>(+d.id.slice(8))+'/'+(+d.id.slice(5,7));
 const pbPts=n=>(n>0?'+':'')+n.toLocaleString('en-US',{maximumFractionDigits:2});
-function pbStats(D){ const bt=D.filter(d=>d.mode==='bt'), lv=D.filter(d=>d.mode==='live');
-  return `<div class="pb-stats num"><div><b>${bt.length}</b><span>Backtest 日數</span></div><div><b>${bt.filter(d=>d.r!=='bad').length}/${bt.length}</b><span>啱或半啱</span></div><div><b class="up">${pbPts(bt.reduce((a,d)=>a+d.pnl,0))}</b><span>Backtest 點數</span></div><div><b class="up">${pbPts(lv.reduce((a,d)=>a+d.pnl,0))}</b><span>Live 點數（${lv.length} 日）</span></div></div>` }
+// stats follow the strategy filter (S1/S2/S3/No Trade): a day tagged with two strategies counts under each
+function pbStats(D,f){ const bt=D.filter(d=>d.mode==='bt'), lv=D.filter(d=>d.mode==='live'), p=f&&f!=='all'?esc(f)+' ':'';
+  return `<div class="pb-stats num"><div><b>${bt.length}</b><span>${p}Backtest 日數</span></div><div><b>${bt.filter(d=>d.r!=='bad').length}/${bt.length}</b><span>啱或半啱</span></div><div><b class="up">${pbPts(bt.reduce((a,d)=>a+d.pnl,0))}</b><span>${p}Backtest 點數</span></div><div><b class="up">${pbPts(lv.reduce((a,d)=>a+d.pnl,0))}</b><span>${p}Live 點數（${lv.length} 日）</span></div></div>` }
 function pbShots(d,k,n){ let h=`<div class="pb-shots${n>=2?' n2':''}">`;
   for(let i=1;i<=n;i++) h+=`<button type="button" data-pbimg="${d.id}-${k}${i}" aria-label="放大 ${pbDate(d)} ${k==='pre'?'盤前':'結果'}圖 ${i}"><img alt=""></button>`;
   return h+'</div>' }
@@ -1679,7 +1680,7 @@ function pbDraw(){ const v=$('v-playbook');
   if(!PB){ v.innerHTML='<div class="panel muted" role="status">載入緊 NQ Playbook…</div>';
     DB.all('playbook').then(a=>{PB=a.sort((x,y)=>y.id.localeCompare(x.id)); pbDraw()}).catch(()=>{v.innerHTML='<div class="panel">NQ Playbook 載入唔到，遲啲再試。</div>'}); return }
   const D=PB, L=D.filter(pbMatch);
-  v.innerHTML=`<header class="pb-head"><div><h2>NQ Gamma Playbook</h2><p class="muted small">每日盤前 bias 同結果。撳圖睇大。${D.length?`最新 ${pbDate(D[0])}`:''} · 只有你睇到 ${pbImport}</p><p class="small" id="pb-msg" role="status"></p></div>${pbStats(D)}</header>
+  v.innerHTML=`<header class="pb-head"><div><h2>NQ Gamma Playbook</h2><p class="muted small">每日盤前 bias 同結果。撳圖睇大。${D.length?`最新 ${pbDate(D[0])}`:''} · 只有你睇到 ${pbImport}</p><p class="small" id="pb-msg" role="status"></p></div>${pbStats(L,pbFilt)}</header>
     ${D.length?`<div class="pb-rail"><div class="controls">${pbStrategies.map(k=>`<button class="tog" data-pbf="${k}" aria-pressed="${k===pbFilt}">${k}</button>`).join('')}</div>
       <nav class="pb-dates" aria-label="日子">${L.map(d=>`<a class="${d.r}${d.mode==='live'?' live':''} num" href="#playbook" data-pbj="${d.id}">${pbDate(d)}</a>`).join('')}</nav></div>
     ${L.length?L.map(pbCard).join(''):'<p class="muted">呢個篩選冇日子。</p>'}`:'<div class="panel muted">未有日子。撳「匯入新日子」揀 Claude 俾你嘅 playbook 檔案。</div>'}`;
