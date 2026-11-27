@@ -88,7 +88,9 @@ def _all_us(min_cap=3e8, min_price=12):
     keep = [x for x in rows
             if num(x.get("marketCap")) >= min_cap and num(x.get("lastsale")) >= min_price
             and x["symbol"].isalpha() and not any(w in x["name"] for w in SKIP_NAMES)]
-    return pd.DataFrame({"s": [x["symbol"].strip() for x in keep], "n": [x["name"].strip() for x in keep],
+    return pd.DataFrame({"nasdaqCap": [num(x["marketCap"]) for x in keep],
+                         "nasdaqIndustry": [(x.get("industry") or "").strip() for x in keep],
+                         "s": [x["symbol"].strip() for x in keep], "n": [x["name"].strip() for x in keep],
                          "gics": [NASDAQ_SECTOR.get(x.get("sector")) for x in keep],
                          "us": [x.get("country") == "United States" for x in keep]})
 
@@ -133,7 +135,8 @@ def universe(cache="cache"):
     if "us" not in u:
         u["us"] = None
     # index lists come first, so their names and GICS sectors win over the screener's
-    u = u.groupby("s").agg({"n": "first", "gics": "first", "us": "first", **{k: any_ for k in LISTS}})
+    supplemental = {k: "first" for k in ("nasdaqCap", "nasdaqIndustry") if k in u}
+    u = u.groupby("s").agg({"n": "first", "gics": "first", "us": "first", **supplemental, **{k: any_ for k in LISTS}})
     for k in LISTS:
         u[k] = u[k].fillna(False).astype(bool)
     u["idx"] = u[list(LISTS)].any(axis=1)
@@ -485,15 +488,18 @@ def _nasdaq_quarters(t):
     return {"nrev": [x[0] for x in out], "neps": [x[1] for x in out]}
 
 
-def nasdaq_quarters(tickers, cache_file, max_age_days=7, max_calls=400, workers=4, reports=None):
+def nasdaq_quarters(tickers, cache_file, max_age_days=7, max_calls=400, workers=4, reports=None, pending=()):
     """reports: {ticker: last report time}; anything that reported after its cached copy is refreshed first."""
     path = pathlib.Path(cache_file)
     cache = json.loads(path.read_text()) if path.exists() else {}
     now = time.time()
     reports = reports or {}
     just = {t for t in tickers if reports.get(t) and cache.get(t, {}).get("_ts", 0) < reports[t] + AFTER_REPORT <= now}
-    stale = sorted((t for t in tickers if t in just or now - cache.get(t, {}).get("_ts", 0) > max_age_days * 86400),
-                   key=lambda t: (t not in just, cache.get(t, {}).get("_ts", 0)))[:max_calls]
+    pending = set(pending)
+    last_try = lambda t: max(cache.get(t, {}).get("_try", 0), cache.get(t, {}).get("_ts", 0))
+    stale = sorted((t for t in tickers if now - last_try(t) >= RETRY_AFTER and
+                    (t in just or t in pending or now - cache.get(t, {}).get("_ts", 0) > max_age_days * 86400)),
+                   key=lambda t: (t not in just and t not in pending, last_try(t)))[:max_calls]
 
     def one(t):
         try:
@@ -506,6 +512,8 @@ def nasdaq_quarters(tickers, cache_file, max_age_days=7, max_calls=400, workers=
 
     with ThreadPoolExecutor(workers) as ex:
         got = [(t, rec) for t, rec in ex.map(one, stale) if rec is not None]
+    for t in stale:
+        cache.setdefault(t, {})["_try"] = now
     for t, rec in got:
         if rec.get("nrev") or not cache.get(t, {}).get("nrev"):
             cache[t] = rec
@@ -935,6 +943,70 @@ def repair_split_gaps(px, history=None):
                 px["Volume"].loc[:before, t] *= factors[0]
         except Exception as exc:
             print("split check failed:", t, exc)
+
+
+def nasdaq_recent_gaps(px, candidates):
+    """Check recent missing sessions against Nasdaq, keeping unconfirmed trades missing."""
+    close = px["Close"]
+    sessions = close["^GSPC"].dropna().index[-5:]
+    if len(sessions) < 3:
+        return
+    recent = close.reindex(sessions)
+    targets = [t for t in candidates if t in recent and recent[t].notna().any()
+               and recent[t].iloc[-2:].isna().any()]
+    def get_rows(ticker):
+        try:
+            response = requests.get(f"https://api.nasdaq.com/api/quote/{ticker}/historical",
+                                    params={"assetclass": "stocks", "fromdate": sessions[0].date().isoformat(),
+                                            "todate": sessions[-1].date().isoformat(), "limit": 10},
+                                    headers=NASDAQ_UA, timeout=5)
+            response.raise_for_status()
+            return response.json()["data"]["tradesTable"]["rows"] or []
+        except (requests.RequestException, KeyError, TypeError, ValueError):
+            return []
+
+    # Limit upstream load; apply the results to the shared frames on the main thread.
+    targets = targets[:40]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for ticker, rows in zip(targets, pool.map(get_rows, targets)):
+            reconcile_rows(px, ticker, sessions, rows)
+
+
+def reconcile_rows(px, ticker, sessions, rows):
+    def number(value):
+        return pd.to_numeric(str(value).replace("$", "").replace(",", ""), errors="coerce")
+
+    close = px["Close"]
+    dates = {day.strftime("%m/%d/%Y"): day for day in sessions}
+    bars = {dates[r["date"]]: r for r in rows if r.get("date") in dates}
+    for day in sessions[-2:]:
+        row = bars.get(day)
+        if not row or pd.notna(close.at[day, ticker]):
+            continue
+        volume = number(row.get("volume"))
+        if pd.isna(volume) or volume <= 0:
+            close.attrs.setdefault("unconfirmed_trade", {})[ticker] = day.date().isoformat()
+            continue
+        op, hi, lo, last = (number(row.get(key)) for key in ("open", "high", "low", "close"))
+        if not (0 < lo <= min(op,last) <= max(op,last) <= hi) or pd.isna(op) or pd.isna(last):
+            continue
+        # Match the same security and price basis on a neighbouring trading session.
+        factors = []
+        position = sessions.get_loc(day)
+        for pos in (position - 1, position + 1):
+            if 0 <= pos < len(sessions):
+                other = sessions[pos]
+                anchor = number(bars.get(other, {}).get("close"))
+                if anchor > 0 and pd.notna(close.at[other, ticker]):
+                    if not .67 < last/anchor < 1.5:
+                        break
+                    factors.append(close.at[other, ticker] / anchor)
+        else:
+            if factors and all(abs(factor-1) < .001 for factor in factors):
+                for field, value in zip(("Open","High","Low","Close","Volume"), (op,hi,lo,last,volume)):
+                    px[field].at[day, ticker] = value if field == "Volume" else value * factors[0]
+                close.attrs.setdefault("verified_bars", {})[ticker] = {
+                    "day": day.date().isoformat(), "url": f"https://www.nasdaq.com/market-activity/stocks/{ticker.lower()}/historical"}
 
 
 def fetch_prices(u):

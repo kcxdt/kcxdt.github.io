@@ -290,7 +290,7 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
     ind = indicator_frame(close, high, close["^VIX"]).dropna().tail(HIST_DAYS)
 
     # ---- per-stock technicals over the whole universe ----
-    directory = security_directory(px["Close"].reindex(days), asof)
+    directory = security_directory(px["Close"].reindex(days), asof, meta["n"])
     tick = [t for t in meta.index if t not in directory and t in close and close[t].dropna().shape[0] >= 253]
     c, h, l, v = close[tick], high[tick], low[tick], vol[tick]
     ma50, ma200 = c.rolling(50).mean(), c.rolling(200).mean()
@@ -353,6 +353,14 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
         row.update(fundamentals_row(fund.get(t)))
         if not row.get("ind") and p.get("ind"):
             row["ind"] = p["ind"]
+        if t == "SNDK" and asof == "2026-11-19" and abs(lc * 8 - 755.16) < .08:
+            row["sessionClose"] = 755.16  # Nasdaq regular close before the Nov 20 split
+        secondary = meta.loc[t]
+        if row.get("mcap") is None and pd.notna(secondary.get("nasdaqCap")) and secondary.nasdaqCap > 0:
+            row["mcap"] = _f(secondary.nasdaqCap / 1e9, 2)
+        industry = secondary.get("nasdaqIndustry")
+        if not row.get("ind") and isinstance(industry, str) and industry not in ("", "N/A"):
+            row["ind"] = industry
         if fund.get(t, {}).get("_ts"):
             row["fts"] = pd.Timestamp(fund[t]["_ts"], unit="s").strftime("%Y-%m-%d")
         yd, yt, ysure, yseen = yahoo_next(fund.get(t), (ydates or {}).get(t))
@@ -395,6 +403,8 @@ def build(px, meta, fund=None, fng=None, earn=None, done=None, prof=None, ydates
             # (TECH reported 4 Nov while the calendar still projected 11 Nov)
             row["edate"], row["etime"] = None, None
         enrich_earnings(row, fund.get(t) or {}, (ydates or {}).get(t) or {})
+        if row.get("fill") and px["Close"].attrs.get("unconfirmed_trade", {}).get(t) == asof:
+            row["volumeUnconfirmed"] = True
         bar_source = px["Close"].attrs.get("verified_bars", {}).get(t)
         if bar_source and bar_source["day"] in {asof, days[-2].strftime("%Y-%m-%d")}:
             row["barSource"] = bar_source

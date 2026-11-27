@@ -1,5 +1,6 @@
 """Checks run on every build; the results are shown on 說明及數據狀態 (nothing here stops a publish)."""
 import pandas as pd
+from .mkt import adjacent_session, is_trading_day
 
 KC_FIELDS = ("mcap", "sq", "sa", "inst", "beta")  # fundamentals KC's default screener reads
 
@@ -53,8 +54,8 @@ def pm_expected(now):
     (the brief runs 05:50 with backups until 09:30), else the weekday before."""
     now = pd.Timestamp(now)
     d = now.normalize()
-    if now.weekday() >= 5 or now.hour * 60 + now.minute < 570:
-        d -= pd.offsets.BDay(1)
+    if not is_trading_day(now) or now.hour * 60 + now.minute < 570:
+        return adjacent_session(d, -1)
     return d.strftime("%Y-%m-%d")
 
 
@@ -102,8 +103,9 @@ def run(data, today=None, now=None):
         "past", old)
     now = pd.Timestamp(now) if now is not None else pd.Timestamp.now(tz="America/New_York")
     want, pm = pm_expected(now), data.get("pm_d")
-    add(0 if pm and pm >= want else 1,
-        f"盤前需知：最新報告 {pm or '未有'}，" + ("係應有嘅最新一份" if pm and pm >= want else f"應該有 {want} 嘅報告"), "pm")
+    current = bool(pm and is_trading_day(pm) and pm >= want)
+    add(0 if current else 1,
+        f"盤前需知：最新報告 {pm or '未有'}，" + ("係應有嘅最新一份" if current else f"應該有 {want} 嘅報告"), "pm")
     for key, name in (("econ", "經濟數據"), ("news", "市場新聞")):
         if key in data:
             add(0 if data.get(key) else 1, f"{name}：{len(data.get(key) or [])} 項")
