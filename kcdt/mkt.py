@@ -18,6 +18,14 @@ def is_trading_day(day):
     return d.weekday() < 5 and d.strftime("%Y-%m-%d") not in HOLIDAYS
 
 
+def adjacent_session(day, step):
+    d = pd.Timestamp(day)
+    while True:
+        d += pd.Timedelta(days=step)
+        if is_trading_day(d):
+            return d.strftime("%Y-%m-%d")
+
+
 def close_due(now):
     """The New York date whose close should be on the site at `now` (New York time): today once it is 16:30 on a
     trading day, else the trading day before."""

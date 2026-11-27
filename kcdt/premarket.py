@@ -19,7 +19,8 @@ import requests
 from .__main__ import OUT, ROOT, now_utc, pass_kc, write_page
 from .fetch import NASDAQ_UA, EARN_TIME, economic_calendar
 
-NY = "America/New_York"
+from .mkt import NY, adjacent_session, is_trading_day
+
 IDX = [("NDX", "^NDX", "Nasdaq-100 指數"), ("SPX", "^GSPC", "標普 500 指數")]
 ETF = [("QQQ", "Nasdaq-100 ETF"), ("SPY", "標普 500 ETF")]
 MKT = [("VIX", "^VIX", "VIX 恐慌指數"), ("DXY", "DX-Y.NYB", "美元指數"), ("CL", "CL=F", "紐約原油期貨"), ("GC", "GC=F", "黃金期貨")]
@@ -112,12 +113,11 @@ def reported_eps(t, day):
 
 
 def prev_bday(day):
-    d = pd.Timestamp(day) - pd.offsets.BDay(1)
-    return d.strftime("%Y-%m-%d")
+    return adjacent_session(day, -1)
 
 
 def next_bday(day):
-    return (pd.Timestamp(day) + pd.offsets.BDay(1)).strftime("%Y-%m-%d")
+    return adjacent_session(day, 1)
 
 
 def earnings(today, stocks):
@@ -297,7 +297,7 @@ def publish(brief, folder=None):
         for f in keep.glob("20*.json"):
             if not (out / f.name).exists():
                 (out / f.name).write_bytes(f.read_bytes())
-    days = sorted(f.stem for f in out.glob("20*.json"))
+    days = sorted(f.stem for f in out.glob("20*.json") if is_trading_day(f.stem))
     (out / "index.json").write_text(json.dumps(days), encoding="utf-8")
 
 
@@ -307,13 +307,13 @@ def due(now, history=None):
     m = now.hour * 60 + now.minute
     name = f"{now.strftime('%Y-%m-%d')}.json"
     have = (OUT / "pm" / name).exists() or bool(history and (pathlib.Path(history) / "pm" / name).exists())
-    return now.weekday() < 5 and 330 <= m < 960 and not have
+    return is_trading_day(now) and 330 <= m < 960 and not have
 
 
 def main():
     now = pd.Timestamp.now(tz=NY)
     flag = os.environ.get("GITHUB_OUTPUT")
-    if "--if-due" in sys.argv and not due(now, os.environ.get("KCDT_HISTORY")):
+    if not is_trading_day(now) or ("--if-due" in sys.argv and not due(now, os.environ.get("KCDT_HISTORY"))):
         print(f"not due ({now:%Y-%m-%d %H:%M} New York)")
         if flag:
             open(flag, "a").write("run=false\n")

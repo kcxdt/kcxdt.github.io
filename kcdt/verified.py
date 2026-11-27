@@ -1,5 +1,6 @@
 """Dated source records for gaps in the daily feeds. Dates are New York session dates."""
 import json
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -12,7 +13,17 @@ SPECIAL = {
 }
 
 
-def security_directory(close, asof):
+def instrument_type(ticker, name):
+    if re.search(r"\b(debentures?|mortgage bonds?)\b", name, re.I) or (ticker == "CCZ" and "ZONES" in name):
+        return "上市債務證券"
+    if ticker == "GJS" and "STRATS" in name:
+        return "結構性信託證券"
+    if ticker == "FRMEP" and "Depository Shares" in name:
+        return "優先股存託股份"
+    return None
+
+
+def security_directory(close, asof, names=None):
     archive = json.loads(Path(__file__).with_name("retired_closes.json").read_text())
     directory = {}
     for ticker, (date, name, label, url) in SPECIAL.items():
@@ -22,6 +33,13 @@ def security_directory(close, asof):
         if ticker == "RZC" and ticker in close:
             history = [[d.strftime("%Y-%m-%d"), round(float(v), 2)] for d, v in close[ticker].dropna().tail(260).items()]
         directory[ticker] = dict(date=date, name=name, label=label, url=url, history=history)
+    for ticker, name in (names.items() if names is not None else []):
+        kind = instrument_type(ticker, name)
+        if kind and ticker not in directory:
+            quotes = close[ticker].dropna().tail(260) if ticker in close else {}
+            directory[ticker] = dict(name=name, label=kind+"，普通股 EPS 不適用", date=None,
+                                     url=f"https://www.nasdaq.com/market-activity/stocks/{ticker.lower()}",
+                                     history=[[d.date().isoformat(), round(float(v), 2)] for d, v in quotes.items()])
     return directory
 
 
@@ -42,6 +60,13 @@ def apply_issuer_report(row, asof):
     if ticker == "BRC" and asof >= "2026-11-16" and row.get("erep") == "2026-11-16" and (row.get("qend") or "") <= "2026-07-31":
         row.update(erep="2026-09-03", eold="2026-11-16", issuerPending="https://investors.bradycorp.com/")
         row.pop("lastSession", None)
+    # Brady announced its Q1 release date on Nov 18. The 08:30 ET time is the call.
+    if ticker == "BRC" and "2026-11-18" <= asof <= "2026-12-08" and (row.get("erep") or "") < "2026-12-08":
+        if not row.get("econf") or (row.get("edate") or "") <= "2026-12-08":
+            row.update(edate="2026-12-08", econf=True, etime=None,
+                       scheduleSource="https://investors.bradycorp.com/news-releases/news-release-details/brady-corporation-announces-first-quarter-2027-earnings")
+            for key in ("edend", "emonth", "issuerPending", "eold"):
+                row.pop(key, None)
     record = REPORTS.get(ticker)
     if not record:
         return
@@ -54,6 +79,7 @@ def apply_issuer_report(row, asof):
 # Confirmed Nasdaq regular-session OHLCV. Apply only to a missing day, and only
 # with an overlapping close to reconcile the adjusted basis of the price panel.
 BARS = {
+    "SNDK": ("2026-11-24", (82.715, 83.82, 74.83, 77.95, 97538190), "2026-11-25", 73.61),
     "EMBJ": ("2026-11-16", (19.39, 19.80, 18.66, 18.77, 4330378), "2026-11-17", 18.90),
     "WLYB": ("2026-11-17", (49.87, 50.53, 49.87, 50.37, 2028), "2026-11-16", 50.02),
 }

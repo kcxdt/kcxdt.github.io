@@ -9,11 +9,12 @@ import pandas as pd
 from datetime import datetime, timezone
 
 from .ipo import load_listings, searchable
+from .verified import instrument_type
 from .checks import run as run_checks
 from .compute import build, kc_technical, stock_pages, wants_fundamentals
-from .mkt import HOLIDAYS, NY, close_due
+from .mkt import HOLIDAYS, NY, close_due, is_trading_day
 from .fetch import (earnings_calendar, earnings_dates, economic_calendar, fear_greed, fetch_prices, fundamentals,
-                    headlines, nasdaq_quarters, profiles, reported_after_fetch, report_times, retry_due, universe)
+                    headlines, nasdaq_recent_gaps, nasdaq_quarters, profiles, quarter_behind, reported_after_fetch, report_times, retry_due, universe)
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 OUT = ROOT / "site"
@@ -131,7 +132,7 @@ def keep_history(data, folder):
         pm_out.mkdir(parents=True, exist_ok=True)
         for f in pm.glob("20*.json"):
             (pm_out / f.name).write_bytes(f.read_bytes())
-        days = sorted(f.stem for f in pm_out.glob("20*.json"))
+        days = sorted(f.stem for f in pm_out.glob("20*.json") if is_trading_day(f.stem))
         (pm_out / "index.json").write_text(json.dumps(days), encoding="utf-8")
         if days:
             return json.loads((pm_out / f"{days[-1]}.json").read_text(encoding="utf-8")).get("t"), days[-1]
@@ -223,6 +224,10 @@ def main():
     earn, done = earnings_calendar(cache_file=ROOT / "cache" / "earnings_done.json")
     reports = report_times(done)
     say("earnings calendar")
+    all_meta = meta
+    meta = meta.loc[[not instrument_type(t, name) for t, name in meta["n"].items()]]
+    if mode != "warm":
+        nasdaq_recent_gaps(px, meta.index)
     want = wants_fundamentals(px, meta)
     # Stocks outside the screener's pool keep the fundamentals fetched while they were in it; when such a company
     # reports, refresh it too, so it doesn't sit under 「業績後待更新」 for weeks (10 Nov 2026: 156 stocks, 78 of them
@@ -245,7 +250,9 @@ def main():
     nq_rep = {t: r["erep"] for t, r in fund.items() if r.get("erep")}
     for t, ts in reports.items():
         nq_rep[t] = max(nq_rep.get(t, 0), ts)
-    nq = nasdaq_quarters(want, ROOT / "cache" / "nasdaq_quarters.json", max_calls=budget["nq"], reports=nq_rep)
+    pending = {t for t in want if quarter_behind(fund.get(t, {}), nq_rep.get(t))
+               and now - max(nq_rep.get(t) or 0, reports.get(t) or 0) <= 45 * 86400}
+    nq = nasdaq_quarters(want, ROOT / "cache" / "nasdaq_quarters.json", max_calls=budget["nq"], reports=nq_rep, pending=pending)
     fund = {t: {**rec, **nq.get(t, {}), "_ts": max(rec.get("_ts", 0), nq.get(t, {}).get("_ts", 0))}
             for t, rec in fund.items()}
     prof = profiles(list(meta.index), ROOT / "cache" / "profiles.json", have={t for t, r in fund.items() if r.get("ind")},
@@ -261,7 +268,7 @@ def main():
     if mode == "warm":
         print("warm run: caches refreshed, nothing published")
         return
-    data = build(px, meta, fund, fear_greed(ROOT / "cache" / "fear_greed.json"), earn, done, prof, ydates)
+    data = build(px, all_meta, fund, fear_greed(ROOT / "cache" / "fear_greed.json"), earn, done, prof, ydates)
     try:
         listings, data["etfNames"] = load_listings(ROOT / "cache", pd.Timestamp.now(tz=NY).date())
         data["listings"] = searchable(px, data["stocks"], data["special"], listings)
