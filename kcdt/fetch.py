@@ -330,7 +330,7 @@ def retry_due(rec, report, now):
     """Fetched after the report, but Yahoo did not have the new quarter yet: try again (at most every RETRY_AFTER)."""
     rep = max(rec.get("erep") or 0, report or 0, _reported_time(rec))
     return (quarter_behind(rec, report) and rep + AFTER_REPORT <= now < rep + RETRY_DAYS * 86400
-            and now - rec.get("_ts", 0) >= RETRY_AFTER)
+            and now - max(rec.get("_ts", 0), rec.get("_attempt", 0)) >= RETRY_AFTER)
 
 
 def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, reports=None, first=None, hot=None,
@@ -378,6 +378,13 @@ def fundamentals(tickers, cache_file, max_age_days=7, max_calls=250, pause=0.6, 
                 streak.append((t, cache.get(t)))
             else:
                 streak = []
+            # A partial or older vendor response must not erase a newer quarterly series.
+            if old.get("qend") and old["qend"] > (rec.get("qend") or ""):
+                for field in ("qend", "revq", "epsq"):
+                    if field in old:
+                        rec[field] = old[field]
+                    else:
+                        rec.pop(field, None)
             rec["_ts"] = now
             # remember the last report date (Yahoo moves earningsTimestamp on to the next report)
             past = old.get("edate") if old.get("edate") and old["edate"] <= now else None

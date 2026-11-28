@@ -1,6 +1,6 @@
 """Checks run on every build; the results are shown on 說明及數據狀態 (nothing here stops a publish)."""
 import pandas as pd
-from .mkt import adjacent_session, is_trading_day
+from .mkt import NY, adjacent_session, close_due, close_minute, is_trading_day
 
 KC_FIELDS = ("mcap", "sq", "sa", "inst", "beta")  # fundamentals KC's default screener reads
 
@@ -86,9 +86,16 @@ def run(data, today=None, now=None):
     eqd = sum(1 for s in st if s.get("eqv") and s.get("eqd"))
     add(0 if eqd >= eqn * 0.9 else 1, f"EPS 增長標明比較邊兩季：{eqd:,} / {eqn:,} 隻")
 
-    today = pd.Timestamp(today or pd.Timestamp.now(tz="America/New_York").date())
-    lag = len(pd.bdate_range(pd.Timestamp(data["asof"]), today)) - 1
-    add(0 if lag <= 1 else 2, f"價格日期：{data['asof']}，" + ("係最近一個交易日" if lag <= 1 else f"落後 {lag} 個交易日"))
+    if now is None:
+        now = pd.Timestamp(today) if today is not None else pd.Timestamp.now(tz=NY)
+    now = pd.Timestamp(now)
+    if now.tzinfo:
+        now = now.tz_convert(NY)
+    want_close = close_due(now)
+    lag = sum(is_trading_day(d) for d in pd.date_range(pd.Timestamp(data["asof"]) + pd.Timedelta(days=1), want_close))
+    settling = lag == 1 and want_close == now.date().isoformat() and now.hour * 60 + now.minute < close_minute(now) + 180
+    message = "係最近一個已完成更新時段嘅交易日" if not lag else ("收市更新時段內" if settling else f"落後 {lag} 個交易日")
+    add(2 if lag and not settling else 0, f"價格日期：{data['asof']}，{message}", "priceDate", lag)
     late = len(fund_late(st))
     add(0 if late <= 50 else 1, f"出咗業績但基本面未更新：{late} 隻（選股器代號旁邊標「業績後待更新」，每日優先更新）",
         "late", late)
@@ -101,7 +108,6 @@ def run(data, today=None, now=None):
     old = len(past_due(st, data["asof"]))
     add(0 if old <= 30 else 1, f"預計業績日已過但未確認公布：{old} 隻（{data['asof']} 之前嘅日子；等候核實公布）",
         "past", old)
-    now = pd.Timestamp(now) if now is not None else pd.Timestamp.now(tz="America/New_York")
     want, pm = pm_expected(now), data.get("pm_d")
     current = bool(pm and is_trading_day(pm) and pm >= want)
     add(0 if current else 1,

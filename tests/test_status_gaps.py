@@ -39,3 +39,35 @@ def test_pending_estimate_and_security_types():
     assert instrument_type("AFGB","American Financial Group Subordinated Debentures due 2059")
     assert instrument_type("DFTX","Definium Therapeutics Inc. Common Shares") is None
     assert instrument_type("PBT","Permian Basin Royalty Trust Common Stock") is None
+
+def test_half_day_expected_close():
+    from kcdt.mkt import close_due
+    for at, expected in [
+        ("2026-11-26 18:00", "2026-11-25"),
+        ("2026-11-27 05:31", "2026-11-25"),
+        ("2026-11-27 13:29", "2026-11-25"),
+        ("2026-11-27 13:30", "2026-11-27"),
+        ("2026-11-28 12:00", "2026-11-27"),
+        ("2026-11-30 16:29", "2026-11-27"),
+    ]:
+        assert close_due(pd.Timestamp(at, tz="America/New_York")) == expected
+
+
+def test_wds_report_does_not_replace_newer_results():
+    row = dict(s="WDS", erep="2023-02-25", eold="2026-08-24")
+    apply_issuer_report(row, "2026-11-25")
+    assert row["erep"] == "2026-08-24" and "eold" not in row
+    assert "woodside.com" in row["reportSource"]
+    row = dict(s="WDS", erep="2027-02-24")
+    apply_issuer_report(row, "2027-02-25")
+    assert row == dict(s="WDS", erep="2027-02-24")
+
+
+def test_partial_response_keeps_quarter(tmp_path, monkeypatch):
+    import json
+    p = tmp_path / "fund.json"
+    old = dict(qend="2026-09-30", epsq=[1.49], revq=[200], mcap=20)
+    p.write_text(json.dumps({"ABC": old}))
+    monkeypatch.setattr(fetch, "_one", lambda t: dict(mcap=25, qend="2026-06-30", epsq=[1.1]))
+    rec = fetch.fundamentals(["ABC"], p, pause=0)["ABC"]
+    assert (rec["qend"], rec["epsq"], rec["revq"], rec["mcap"]) == ("2026-09-30", [1.49], [200], 25)

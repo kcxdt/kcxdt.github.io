@@ -12,7 +12,7 @@ from .ipo import load_listings, searchable
 from .verified import instrument_type
 from .checks import run as run_checks
 from .compute import build, kc_technical, stock_pages, wants_fundamentals
-from .mkt import HOLIDAYS, NY, close_due, is_trading_day
+from .mkt import EARLY_CLOSES, HOLIDAYS, NY, close_minute, close_due, is_trading_day
 from .fetch import (earnings_calendar, earnings_dates, economic_calendar, fear_greed, fetch_prices, fundamentals,
                     headlines, nasdaq_recent_gaps, nasdaq_quarters, profiles, quarter_behind, reported_after_fetch, report_times, retry_due, universe)
 
@@ -172,7 +172,7 @@ def drop_open_session(px, now=None):
     """Remove today's row while New York is still trading: it holds intraday prices, not a close."""
     now = now or pd.Timestamp.now(tz=NY)
     last = px["Close"].index[-1]
-    if last.strftime("%Y-%m-%d") == now.strftime("%Y-%m-%d") and now.hour * 60 + now.minute < 980:
+    if last.strftime("%Y-%m-%d") == now.strftime("%Y-%m-%d") and now.hour * 60 + now.minute < close_minute(last) + 20:
         print(f"dropping {last:%Y-%m-%d}: the session is still open ({now:%H:%M} New York)")
         return {f: df.iloc[:-1] for f, df in px.items()}
     return px
@@ -301,6 +301,7 @@ def main():
         print(f"ETF map skipped: {e}")
         data["etfs"] = {}
     data["mhol"] = sorted(HOLIDAYS)
+    data["earlyCloses"] = sorted(EARLY_CLOSES)
     OUT.mkdir(exist_ok=True)
     data["pm_t"], data["pm_d"] = keep_history(data, hist)
     data["checks"] = run_checks(data)
