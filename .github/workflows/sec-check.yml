@@ -32,3 +32,21 @@ jobs:
           assert (eps["end"], latest, prior, growth(latest, prior)) == ("2026-09-30", 1.49, 1.20, 24.2)
           print("BOH diluted EPS:", latest, prior, growth(latest, prior), eps["url"])
           PY
+      - name: Replay current public backlog without publishing changes
+        run: |
+          python - <<'PY'
+          import pathlib, tempfile
+          import requests
+          from kcdt.sec import supplement
+          response = requests.get("https://kcxdt.github.io/data.json", timeout=30)
+          response.raise_for_status()
+          data = response.json()
+          with tempfile.TemporaryDirectory() as tmp:
+              before = sum(bool(s.get("fst")) for s in data["stocks"])
+              status = supplement(data["stocks"], data["asof"], pathlib.Path(tmp) / "sec.json")
+          after = sum(bool(s.get("fst")) for s in data["stocks"])
+          print(data["asof"], status, "fully reconciled:", before-after)
+          for s in data["stocks"]:
+              if s.get("secQuarter"):
+                  print(s["s"], s["secQuarter"]["end"], "EPS YoY:", s.get("eq"), "revenue YoY:", s.get("sq"))
+          PY
