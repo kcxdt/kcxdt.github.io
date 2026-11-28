@@ -1434,7 +1434,11 @@ const NEWFST = (D.checks||[]).some(c=>c.k==='fill');
 const fStale = s => NEWFST ? !!s.fst : !!(s.erep && s.fts && s.erep>=s.fts);
 // "2026 Q3（截至 09-30）": the fiscal quarter the revenue/EPS are from, by its end date
 const qTxt = s => s.qend ? `${s.qend.slice(0,7)} 季` : '未知';
-const staleTag = s => fStale(s) ? `<span class="fstale" title="${s.erep} 出咗業績，但數據仲係截至 ${s.qend||'?'} 嗰季（最後成功擷取 ${s.fts}）。相隔最少 12 小時，輪到更新時再試，直到拎到新一季；用嚟篩選要小心">業績後待更新</span>` : '';
+const secSummary = s => Object.entries({eps:'EPS',revenue:'營收'}).map(([key,label])=>{
+  const m=s.secQuarter.metrics[key];
+  return label+(m?(m.comparable?' 已更新':' 已公布，同比待補'):' 待補');
+}).join(' · ');
+const staleTag = s => s.secQuarter ? `<span class="fstale" title="SEC · ${esc(s.secQuarter.end)}">${secSummary(s)}</span>` : fStale(s) ? `<span class="fstale" title="${s.erep} 出咗業績，但數據仲係截至 ${s.qend||'?'} 嗰季（最後成功擷取 ${s.fts}）。相隔最少 12 小時，輪到更新時再試，直到拎到新一季；用嚟篩選要小心">業績後待更新</span>` : '';
 // No price for the last session: the close before it is carried forward (up to 3 days), so there is no change, volume or
 // new high/low for the day, and those stocks are left out of the day's counts
 const fillTag = s => s.fill ? `<span class="fstale fill" title="冇 ${D.asof} 報價，用 ${s.pxd||'之前'} 收市價補（補咗 ${s.fill} 日）。今日升跌、成交量同新高新低唔計呢隻">補價</span>` : '';
@@ -2375,7 +2379,7 @@ const COLS=[
   ['tt','趨勢',1,s=>`<td>${ttbar(s.tt)}</td>`,s=>s.tt,'趨勢模板 5 項中咗幾多項'],
   ['edate','下次業績（美東）',1,s=>`<td class="num small" style="white-space:nowrap">${edtxt(s)}</td>`,s=>edcsv(s),'美東日期＋盤前／盤後；包括已排期、來源預計及待確認日期'],
   ['erep','上次業績（美東）',0,s=>`<td class="num small" style="white-space:nowrap">${eltxt(s)}</td>`,s=>eLast(s)||'','已確認公布嘅日子；預計日過咗但未確認會註明'],
-  ['qend','資料季度',0,s=>`<td class="num small nowrap">${s.qend?s.qend.slice(0,7):'<span class="muted">—</span>'}${fStale(s)?' <span class="down">舊</span>':''}<div class="muted">${s.fts?`${s.fts.slice(5)} 擷取`:'未有'}</div></td>`,s=>s.qend||'','營收／EPS 屬於邊一季（季度結束月份）；下面係最後成功擷取日期。「舊」= 出咗業績但仲係上一季'],
+  ['qend','資料季度',0,s=>`<td class="num small nowrap">${s.secQuarter?esc(s.secQuarter.end.slice(0,7)):s.qend?s.qend.slice(0,7):'<span class="muted">—</span>'}${s.secQuarter?' · SEC':fStale(s)?' <span class="down">舊</span>':''}<div class="muted">${s.fts?`${s.fts.slice(5)} 擷取`:'未有'}</div></td>`,s=>s.qend||'','營收／EPS 屬於邊一季（季度結束月份）；下面係最後成功擷取日期。「舊」= 出咗業績但仲係上一季'],
 ];
 const COLK=Object.fromEntries(COLS.map(c=>[c[0],c]));
 // 板塊 (Sector) is always shown (on phones it is under the ticker); 細分行業 (Industry) is one switch, kept apart from the sets
@@ -3112,7 +3116,7 @@ DRAW.about = () => {
   const E=econRows(), unc=E.filter(e=>e.unconf&&e.d<=wkEnd).length, uncNext=E.filter(e=>e.unconf&&e.d>wkEnd).length, late=E.filter(e=>e.state==='late').length;
   const rows=[
     ['價格、指數、市場寬度','Yahoo Finance、Nasdaq（缺價核對）',hkFmt(D.built),`${n.toLocaleString('en-US')} 隻股票，價格截至 ${D.asof} 收市`, stale?spill(2,'過期'):!$('stale').hidden?spill(1,'收市更新中'):S.some(s=>s.fill||s.prevMissing)?spill(1,`${S.filter(s=>s.fill||s.prevMissing).length} 隻缺當日或前收`):spill(0,'正常')],
-    ['營收／EPS（基本面）','Nasdaq、Yahoo Finance',fNew?`最新 ${fNew}，最舊 ${FTS[0]}`:'—',`共 ${nfmt(n)} 隻：${fcovTxt}（市值、營收增長、機構持股、Beta）· 選股器範圍內嘅股票每 7 日、其餘每 21 日輪流更新（新加入嘅會喺之後幾個交易日逐步補齊），剛出業績同新符合 KC 條件嘅優先`, old?spill(1,`${old} 隻待新季數據`)+' <a class="small" href="#screener" id="ab-stale">喺選股器睇</a>'+`<div class="small muted">${oldNew} 隻近 7 日公布，${old-oldNew} 隻已等超過 7 日。下方名單列出資料季度同上次擷取日期</div>`:spill(0,'正常')],
+    ['營收／EPS（基本面）',D.secStatus?'Nasdaq、Yahoo Finance、SEC EDGAR':'Nasdaq、Yahoo Finance',fNew?`最新 ${fNew}，最舊 ${FTS[0]}`:'—',`共 ${nfmt(n)} 隻：${fcovTxt}（市值、營收增長、機構持股、Beta）· 選股器範圍內嘅股票每 7 日、其餘每 21 日輪流更新（新加入嘅會喺之後幾個交易日逐步補齊），剛出業績同新符合 KC 條件嘅優先`, old?spill(1,`${old} 隻待新季數據`)+' <a class="small" href="#screener" id="ab-stale">喺選股器睇</a>'+`<div class="small muted">${oldNew} 隻近 7 日公布，${old-oldNew} 隻已等超過 7 日。下方名單列出資料季度同上次擷取日期${D.secStatus?.unavailable?'。今次 SEC 連線未完成，已保留核實紀錄':''}</div>`:spill(0,'正常')],
     ['業績日','Nasdaq 業績日曆、Yahoo Finance（公司已定＝已排期，其餘＝預計）',hkFmt(D.built),`美東日期＋盤前／盤後 · ${nfmt(ed.length)} 隻有下次日期，${nfmt(conf)} 隻已排期`, past?spill(1,`${past} 隻預計日已過，待核實`)+`<div class="small muted">${D.asof} 之前嘅預計日，Nasdaq 日曆未見實際 EPS；${S.filter(pastDue).map(tk).join('、')}</div>`:spill(0,'正常')],
     ['美國經濟數據','Nasdaq、ForexFactory（對照按月／按年）',hkFmt(D.econ_t||D.news_t),`今個星期同下個星期 ${E.length} 項${uncNext?` · 下星期有 ${uncNext} 項要到下星期一先分得出按月定按年（對照來源只出當週）`:''}`, late||unc?spill(1,[late&&`${late} 項等數據源更新`,unc&&`${unc} 項按月／按年未確認`].filter(Boolean).join('，')):spill(0,'正常')],
     ['市場新聞','Nasdaq',hkFmt(D.news_t),`${(D.news||[]).length} 條`, (D.news||[]).length?spill(0,'正常'):spill(2,'拎唔到')],
@@ -3141,7 +3145,7 @@ DRAW.about = () => {
   const grp=s=>WL.has(s.s)?0:passKC(s)?1:2, GN=['自選','符合 KC 條件',''];
   LT.sort((a,b)=>grp(a)-grp(b)||(a.erep||'').localeCompare(b.erep||'')||a.s.localeCompare(b.s));
   $('ab-late').hidden=!LT.length;
-  if(LT.length){ const nm=LT.filter(s=>grp(s)===0).length, row=s=>`<tr><td>${tk(s)}${GN[grp(s)]?` <span class="ov-tag">${GN[grp(s)]}</span>`:''}</td><td class="num">${s.erep||'—'}</td><td class="r num">${dd(s.erep)==null?'—':dd(s.erep)+' 日'}</td><td class="num">${s.fts||'未有'}</td><td class="num">${s.qend||'—'}</td><td class="small" style="color:var(--warm)">${s.issuer?`公司已公布 · ${tk(s)} 睇原文數字，篩選數列待補`:s.reportSource?`<a href="${esc(s.reportSource)}" target="_blank" rel="noopener">睇公司公告 ↗</a> · 篩選數列待補`:'待取得'}<div class="muted">${s.fattempt?`上次嘗試 ${hkFmt(new Date(s.fattempt*1000).toISOString())} · 最早再試 ${hkFmt(new Date((s.fattempt+43200)*1000).toISOString())} 香港 · 連續未補齊 ${s.ffails??0} 次`:'未有逐次紀錄'}</div></td></tr>`;
+  if(LT.length){ const nm=LT.filter(s=>grp(s)===0).length, row=s=>`<tr><td>${tk(s)}${GN[grp(s)]?` <span class="ov-tag">${GN[grp(s)]}</span>`:''}</td><td class="num">${s.erep||'—'}</td><td class="r num">${dd(s.erep)==null?'—':dd(s.erep)+' 日'}</td><td class="num">${s.fts||'未有'}</td><td class="num">${s.qend||'—'}</td><td class="small" style="color:var(--warm)">${s.secQuarter?secSummary(s):s.issuer?`公司已公布 · ${tk(s)} 睇原文數字，篩選數列待補`:s.reportSource?`<a href="${esc(s.reportSource)}" target="_blank" rel="noopener">睇公司公告 ↗</a> · 篩選數列待補`:'待取得'}<div class="muted">${s.fattempt?`上次嘗試 ${hkFmt(new Date(s.fattempt*1000).toISOString())} · 最早再試 ${hkFmt(new Date((s.fattempt+43200)*1000).toISOString())} 香港 · 連續未補齊 ${s.ffails??0} 次`:'未有逐次紀錄'}</div></td></tr>`;
     $('ab-late').innerHTML=`<div class="sechead"><h3>基本面待更新名單 <span class="muted small">${LT.length} 隻出咗業績，數據仲係上一季${WL.size?` · 你嘅自選股 ${nm} 隻`:''}</span></h3></div>
       <p class="muted small">排序：自選股 → 符合 KC 條件 → 等得最耐。相隔最少 12 小時，輪到更新時再試，剛出業績同新符合條件嘅股票優先更新。已等 = 由出業績日計到 ${D.asof}。「最後成功擷取」只代表嗰日讀到資料，如果日期喺出業績之後但季度仲係舊，即係來源嗰陣未出新一季數字。</p>
       <div class="tablewrap"><table><thead><tr><th>代號</th><th>出業績（美東）</th><th class="r">已等</th><th title="最後一次成功由來源讀到資料嘅日期；讀到嘅可能仲係舊季度">最後成功擷取</th><th>而家嘅財報季度</th><th>新季度</th></tr></thead><tbody>${LT.slice(0,15).map(row).join('')}</tbody>
@@ -3931,7 +3935,7 @@ function showStock(t, from){
   if($('s-indl')) $('s-indl').onclick=e=>{e.preventDefault(); $('s-peers').scrollIntoView({behavior:'smooth',block:'start'})};
   drawPeers(s); livePaint(); liveSoon();
   $('s-pxlab').textContent=s.fill?`最後核實收市 · ${s.pxd||'日期待核實'}（美東）`:`上個交易日收市 · ${D.asof.slice(5)}（美東）`; $('s-px').textContent=f(s.c); $('s-chg').innerHTML=`<span class="${cls(s.chg)}">${sgn(s.chg,2)}%</span> <span class="muted small">${s.prevMissing?'上個交易日缺收市價':'對再上一日收市'}</span>`;
-  const tags=[s.ndx?'Nasdaq-100':null, passKC(s)?'符合 KC 條件':null, s.nh?'今日創 52 週新高':null, s.nl?'今日創 52 週新低':null, s.mvp===3?'MVP 3/3':null, eNext(s)?`下次業績 ${edtxt(s)}`:null, fStale(s)?`<span title="${s.erep} 出咗業績，數據仲係截至 ${s.qend||'?'} 嗰季，最後成功擷取 ${s.fts}" style="color:var(--warm)">業績後待更新：營收／EPS 仲係上一季</span>`:null,
+  const tags=[s.ndx?'Nasdaq-100':null, passKC(s)?'符合 KC 條件':null, s.nh?'今日創 52 週新高':null, s.nl?'今日創 52 週新低':null, s.mvp===3?'MVP 3/3':null, eNext(s)?`下次業績 ${edtxt(s)}`:null, s.secQuarter?secSummary(s):fStale(s)?`<span title="${s.erep} 出咗業績，數據仲係截至 ${s.qend||'?'} 嗰季，最後成功擷取 ${s.fts}" style="color:var(--warm)">業績後待更新：營收／EPS 仲係上一季</span>`:null,
     s.fill?`<span title="今日升跌、成交量同新高新低唔計呢隻">冇 ${D.asof} 報價，用 ${s.pxd||'之前'} 收市價補</span>`:null].filter(Boolean);
   if(s.reportSource) tags.push(`<a href="${esc(s.reportSource)}" target="_blank" rel="noopener">公司已公布業績 ↗</a>`);
   if(s.scheduleSource) tags.push(`<a href="${esc(s.scheduleSource)}" target="_blank" rel="noopener">公司業績日公告 ↗</a>`);
@@ -3940,7 +3944,8 @@ function showStock(t, from){
   $('s-tags').innerHTML=tags.map(x=>`<span class="badge">${x}</span>`).join('')+stockChanges(s).map(c=>`<span class="badge" style="border-color:var(--accent);color:var(--ink)">今日：${c.txt.replace(/^今日/,'')}</span>`).join('');
   const issuer=s.issuer;
   $('s-stats').innerHTML=[
-    ...(issuer?[stat('公司公告 · '+issuer.quarter+' 季度',`${esc(issuer.revenue)}<br>${esc(issuer.eps)}<br><a href="${esc(issuer.url)}" target="_blank" rel="noopener">${esc(issuer.date)} 公告 ↗</a>${fStale(s)?'<div class="muted small">下方增長率仍用上一季數列</div>':''}`,'wide')]:[]),
+    ...(s.secQuarter?[stat('SEC · '+s.secQuarter.end, Object.entries(s.secQuarter.metrics).map(([k,m])=>`<a href="${esc(m.url)}" target="_blank" rel="noopener">${k==='eps'?'稀釋 EPS':'營收'} USD ${m.value.toLocaleString('en-US',{maximumFractionDigits:6})} ↗</a>`).join('<br>')+'<br>'+secSummary(s),'wide')]:[]),
+    ...(issuer?[stat('公司公告 · '+issuer.quarter+' 季度',`${esc(issuer.revenue)}<br>${esc(issuer.eps)}<br><a href="${esc(issuer.url)}" target="_blank" rel="noopener">${esc(issuer.date)} 公告 ↗</a>${fStale(s)&&!s.secQuarter?'<div class="muted small">下方增長率仍用上一季數列</div>':''}`,'wide')]:[]),
     stat('RS 排名', `<span style="color:${rsColor(s.rsr)}">${s.rsr??'—'}</span>${s.prsr!=null&&s.prsr!==s.rsr?` <span class="muted small">昨日 ${s.prsr}</span>`:''}<span class="explain">${EXP_RS()}</span>`,'wide'), stat('距 52 週高', f(s.dh,1)+'%'),
     stat('距 50 日線', `<span class="${cls(s.d50)}">${sgn(s.d50)}%</span>`), stat('距 200 日線', `<span class="${cls(s.d200)}">${sgn(s.d200)}%</span>`),
     stat('1 個月', `<span class="${cls(s.r21)}">${sgn(s.r21)}%</span>`), stat('3 個月', `<span class="${cls(s.r63)}">${sgn(s.r63)}%</span>`),
@@ -3957,7 +3962,7 @@ function showStock(t, from){
     stat('3 季按年最低（營收 / EPS）', pair(s.g3r,s.g3e)+(s.g3eb==='a'?'<br><span class="muted small">EPS 用經調整數字（GAAP 季度唔夠）</span>':'')), stat('連續 2 年增長', s.yr==null?'—':s.yr?'<span class="up">係</span>':'唔係'),
     stat('預測 EPS（今年 / 明年）', pair(s.e0,s.e1)), stat('預測營收（今年 / 明年）', pair(s.r0,s.r1)),
     stat('上市', s.ipo!=null?f(s.ipo,1)+' 年':'—'), stat('上次公布（美東）', eltxt(s,true)), stat('下次公布（美東）', edtxt(s)),
-    stat('營收／EPS 數據', `${s.qend?`截至 ${s.qend} 嗰季`:'—'}<br><span class="muted small">最後成功擷取 ${s.fts||'未有'}${fStale(s)?` · <span class="down">${s.erep} 出咗業績，等緊新一季（每 12 小時自動再試）</span>`:''}</span>`),
+    stat('營收／EPS 數據', s.secQuarter?`${s.secQuarter.end} · ${secSummary(s)}`:`${s.qend?`截至 ${s.qend} 嗰季`:'—'}<br><span class="muted small">最後成功擷取 ${s.fts||'未有'}${fStale(s)?` · <span class="down">${s.erep} 出咗業績，等緊新一季（每 12 小時自動再試）</span>`:''}</span>`),
   ].join('');
   $('s-ttn').textContent=`${s.tt} / 5`;
   const c=s.c, ok=b=>b?'<span class="ok">✓</span>':'<span class="no">✗</span>';

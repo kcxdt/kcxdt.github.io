@@ -8,6 +8,8 @@ import time
 import pandas as pd
 from datetime import datetime, timezone
 
+from .sec import supplement
+from .checks import coverage
 from .ipo import load_listings, searchable
 from .verified import instrument_type
 from .checks import run as run_checks
@@ -269,6 +271,9 @@ def main():
         print("warm run: caches refreshed, nothing published")
         return
     data = build(px, all_meta, fund, fear_greed(ROOT / "cache" / "fear_greed.json"), earn, done, prof, ydates)
+    data["secStatus"] = supplement(data["stocks"], data["asof"], ROOT / "cache" / "sec_quarters.json")
+    data["fcov"] = list(coverage(data["stocks"]))
+    say(f"SEC quarters: {data['secStatus']}")
     try:
         listings, data["etfNames"] = load_listings(ROOT / "cache", pd.Timestamp.now(tz=NY).date())
         data["listings"] = searchable(px, data["stocks"], data["special"], listings)
