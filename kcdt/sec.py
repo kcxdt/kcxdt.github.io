@@ -109,6 +109,7 @@ def supplement(stocks, asof, path):
         response = requests.get(url, headers=headers, timeout=8)
         response.raise_for_status()
         return response.json()
+    deadline = time.monotonic() + 90
     calls = 0
     unavailable = False
     directory = cache.get("_directory", {})
@@ -117,7 +118,7 @@ def supplement(stocks, asof, path):
         entry = cache.get(ticker, {})
         if entry.get("report") != report or entry.get("asof", "") > asof:
             entry = {}
-        if not unavailable and calls < 50 and now-entry.get("checked", 0) >= 43200:
+        if not unavailable and calls < 50 and time.monotonic() < deadline and now - entry.get("checked", 0) >= 43200:
             try:
                 if now-directory.get("checked", 0) >= 7*86400:
                     listing = get("https://www.sec.gov/files/company_tickers.json")

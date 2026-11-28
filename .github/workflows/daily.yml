@@ -63,6 +63,7 @@ jobs:
         name: Build the site
         env:
           KCDT_HISTORY: hist
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
           KCDT_MODE: close
         run: python -m kcdt ${{ (github.event_name == 'schedule' || inputs.if_due) && '--if-due' || '' }}
       - name: Save today's snapshot
