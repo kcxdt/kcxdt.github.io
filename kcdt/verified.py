@@ -46,6 +46,7 @@ def security_directory(close, asof, names=None):
 # Official statements. Figures have their own period and basis, separate from
 # the screener's complete multi-quarter series (which can still be behind).
 REPORTS = {
+    "BOH": ("2026-10-26", "2026-09-30", "淨利息收入 USD 156.1 百萬", "稀釋 EPS USD 1.49", "https://ir.boh.com/news-releases/news-release-details/bank-hawaii-corporation-third-quarter-2026-financial-results"),
     "AX": ("2026-10-29", "2026-09-30", "銀行淨利息收入加非利息收入 USD 395.071 百萬", "稀釋 EPS USD 2.25", "https://investors.axosfinancial.com/news-events/press-releases/news-details/2026/Axos-Financial-Inc--Reports-First-Quarter-Fiscal-Year-2027-Results/default.aspx"),
     "BDX": ("2026-11-05", "2026-09-30", "持續經營收入 USD 5,274 百萬", "持續經營 GAAP 稀釋 EPS USD 2.52", "https://investors.bd.com/sec-filings/all-sec-filings/content/0001628280-26-070511/ex9919302026.htm"),
     "GSHD": ("2026-11-09", "2026-09-30", "初步收入 USD 108.818–110.818 百萬", "正式 EPS 待公布，公司正重列過往財報", "https://www.sec.gov/Archives/edgar/data/1726978/000172697826000072/prelim20260930-pressreleas.htm"),
@@ -67,6 +68,22 @@ def apply_issuer_report(row, asof):
                        scheduleSource="https://investors.bradycorp.com/news-releases/news-release-details/brady-corporation-announces-first-quarter-2027-earnings")
             for key in ("edend", "emonth", "issuerPending", "eold"):
                 row.pop(key, None)
+    # Announced in Australia Aug 25, before the 10:00 AEST results call (Aug 24 ET).
+    if ticker == "WDS" and asof >= "2026-08-25" and (row.get("erep") or "") < "2026-08-25":
+        row.pop("lastSession", None)
+        row.update(erep="2026-08-24",
+                   reportSource="https://www.woodside.com/investors/shareholder-information/2026-half-year-results")
+        if (row.get("eold") or "") <= row["erep"]:
+            row.pop("eold", None)
+    quarter_sources = {
+        "HDB": ("2026-10-17", "https://www.sec.gov/Archives/edgar/data/1144967/000119312526424680/d166042dex99.htm"),
+        "SIM": ("2026-10-28", "https://www.sec.gov/Archives/edgar/data/887153/000121390026113459/ea0309987-6k_grupo.htm"),
+        "PKX": ("2026-11-02", "https://www.posco-inc.com/hs91a1-front/app/en/ir/overview.html"),
+    }
+    if ticker in quarter_sources:
+        date, url = quarter_sources[ticker]
+        if asof >= date and row.get("erep") == date and (row.get("qend") or "") < "2026-09-30":
+            row["reportSource"] = url
     record = REPORTS.get(ticker)
     if not record:
         return

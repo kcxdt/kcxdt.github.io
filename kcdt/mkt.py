@@ -26,12 +26,20 @@ def adjacent_session(day, step):
             return d.strftime("%Y-%m-%d")
 
 
+# NYSE early equity closes for the years covered by HOLIDAYS.
+EARLY_CLOSES = {"2026-11-27", "2026-12-24", "2027-11-26"}
+
+
+def close_minute(day):
+    return 780 if pd.Timestamp(day).date().isoformat() in EARLY_CLOSES else 960
+
+
 def close_due(now):
-    """The New York date whose close should be on the site at `now` (New York time): today once it is 16:30 on a
-    trading day, else the trading day before."""
+    """The New York date whose close should be on the site at `now` (New York time): today from 30 minutes after the scheduled
+    close, otherwise the preceding trading session."""
     now = pd.Timestamp(now)
     d = now.normalize().tz_localize(None) if now.tzinfo else now.normalize()
-    if not (is_trading_day(d) and now.hour * 60 + now.minute >= 990):
+    if not (is_trading_day(d) and now.hour * 60 + now.minute >= close_minute(d) + 30):
         d -= pd.Timedelta(days=1)
         while not is_trading_day(d):
             d -= pd.Timedelta(days=1)
